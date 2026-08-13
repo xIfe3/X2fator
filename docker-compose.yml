@@ -1,0 +1,24 @@
+services:
+  xfactor-postgres:
+    image: postgres:16
+    container_name: xfactor-postgres
+    environment:
+      POSTGRES_DB: xfactor
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5444:5432"
+    volumes:
+      - xfactor_postgres_data:/var/lib/postgresql/data
+
+  xfactor-redis:
+    image: redis:7-alpine
+    container_name: xfactor-redis
+    ports:
+      - "6389:6379"
+    volumes:
+      - xfactor_redis_data:/data
+
+volumes:
+  xfactor_postgres_data:
+  xfactor_redis_data:
