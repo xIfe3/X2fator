@@ -19,9 +19,19 @@ export class SubscriptionsService {
 
   /**
    * Purchase a plan.
+   *
+   * Everything happens inside one database transaction:
+   * 1. Validate the plan
+   * 2. Check for an existing active subscription
+   * 3. Debit the user's account wallet
+   * 4. Create the subscription
+   * 5. Process referral commission
+   *
+   * If any step fails, the entire transaction is rolled back.
    */
   async purchasePlan(userId: string, planId: string) {
     return db.transaction(async (tx) => {
+      // 1. Get active plan
       const plan = await tx.query.plans.findFirst({
         where: and(eq(plans.id, planId), eq(plans.status, 'active')),
       });
@@ -30,6 +40,7 @@ export class SubscriptionsService {
         throw new NotFoundException('Active plan not found');
       }
 
+      // 2. Check for existing active subscription
       const existingSubscription = await tx.query.planSubscriptions.findFirst({
         where: and(
           eq(planSubscriptions.userId, userId),
@@ -51,12 +62,7 @@ export class SubscriptionsService {
 
       const reference = this.generateReference('PLAN');
 
-      /**
-       * Debit the user's account wallet.
-       *
-       * Pass tx so this debit happens inside
-       * the same database transaction.
-       */
+      // 3. Debit account wallet
       await this.walletService.debit(
         {
           userId,
@@ -73,9 +79,7 @@ export class SubscriptionsService {
         tx,
       );
 
-      /**
-       * Create subscription.
-       */
+      // 4. Create subscription
       const [subscription] = await tx
         .insert(planSubscriptions)
         .values({
@@ -93,11 +97,11 @@ export class SubscriptionsService {
         })
         .returning();
 
-      /**
-       * Process referral commission.
-       *
-       * This also uses the same transaction.
-       */
+      // 5. Process referral commission
+      //
+      // This uses the same transaction, so if referral
+      // processing fails, the subscription and wallet
+      // debit are rolled back as well.
       await this.referralsService.processReferralCommission(
         userId,
         subscription.id,
@@ -172,7 +176,7 @@ export class SubscriptionsService {
   }
 
   /**
-   * Generate a unique-ish reference for transactions.
+   * Generate a unique-ish transaction reference.
    */
   private generateReference(prefix: string): string {
     return `${prefix}_${Date.now()}_${Math.random()

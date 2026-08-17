@@ -36,7 +36,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
       ) {
         const body = exceptionResponse as Record<string, unknown>;
 
-        message = typeof body.message === 'string' ? body.message : message;
+        if (typeof body.message === 'string') {
+          message = body.message;
+        } else if (Array.isArray(body.message)) {
+          message = body.message.join('; ');
+        }
 
         errors = body.message;
       }

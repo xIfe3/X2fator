@@ -1,0 +1,136 @@
+@import "tailwindcss";
+
+/*
+ * Tailwind v4 has no JS config file — everything that lived in
+ * tailwind.config.ts now lives here as @theme. Each namespace maps to
+ * the utilities it generates:
+ *   --color-*          -> bg-*, text-*, border-*, ring-* etc.
+ *   --font-*           -> font-*
+ *   --radius-*         -> rounded-*
+ *   --shadow-*         -> shadow-*
+ * Values are emitted as real CSS custom properties at :root, so they're
+ * also directly usable as var(--color-base-border) etc. outside of
+ * utility classes (see the `* { border-color }` rule below).
+ */
+@theme {
+  --color-base: #0a0d11;
+  --color-base-raised: #10141a;
+  --color-base-surface: #151a21;
+  --color-base-surface2: #1c222b;
+  --color-base-border: #242b35;
+  --color-base-borderStrong: #323b48;
+
+  --color-ink: #edf1f4;
+  --color-ink-dim: #9aa6b4;
+  --color-ink-faint: #5f6b7a;
+
+  --color-mint: #33d48f;
+  --color-mint-dim: #1f8f63;
+  --color-mint-soft: #0f2a21;
+
+  --color-amber: #e8a94a;
+  --color-amber-dim: #b8822e;
+  --color-amber-soft: #2e2413;
+
+  --color-danger: #e85d5d;
+  --color-danger-soft: #2e1616;
+
+  --color-info: #5b9fe8;
+  --color-info-soft: #162335;
+
+  /* Overrides two keys from Tailwind's default radius scale; the rest
+     (sm, md, lg, 3xl, full…) are untouched. */
+  --radius-xl: 14px;
+  --radius-2xl: 20px;
+
+  --shadow-panel: 0 1px 0 0 rgba(255, 255, 255, 0.02) inset, 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+}
+
+/* `inline` because these values reference CSS variables that next/font
+   sets at runtime (on <body>, see layout.tsx) rather than static values
+   Tailwind can resolve at build time — same pattern as the official
+   Tailwind v4 + Next.js font setup. */
+@theme inline {
+  --font-display: var(--display-font), sans-serif;
+  --font-body: var(--body-font), sans-serif;
+  --font-mono: var(--mono-font), monospace;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+* {
+  border-color: var(--color-base-border);
+}
+
+html,
+body {
+  background: #0a0d11;
+  color: #edf1f4;
+}
+
+body {
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+.font-mono,
+.tabular {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+::selection {
+  background: rgba(51, 212, 143, 0.25);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #242b35;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #323b48;
+}
+
+:focus-visible {
+  outline: 2px solid #33d48f;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Signature: the ledger rule — a faint repeating baseline grid behind
+   large balance figures, evoking a paper ledger sheet. */
+.ledger-surface {
+  background-image: repeating-linear-gradient(to bottom, transparent, transparent 27px, rgba(255, 255, 255, 0.028) 28px);
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-up {
+  animation: fade-up 0.35s ease-out both;
+}

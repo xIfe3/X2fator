@@ -35,6 +35,7 @@ export class WalletService {
         userId,
         type,
         balance: '0',
+        status: 'active',
       })
       .returning();
 

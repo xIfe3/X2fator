@@ -85,7 +85,9 @@ export class ReferralsService {
       throw new NotFoundException('Plan not found');
     }
 
-    const commissionRate = Number(plan.referralRewardRate);
+    // Use the rate stored on the subscription.
+    // This preserves the rate that applied when the subscription was purchased.
+    const commissionRate = Number(subscription.referralRewardRate);
 
     if (commissionRate <= 0) {
       return null;

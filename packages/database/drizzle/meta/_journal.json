@@ -5,22 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1786474362615,
-      "tag": "0000_wakeful_lockheed",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1786525150945,
-      "tag": "0001_famous_wasp",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1786606248186,
-      "tag": "0002_good_tiger_shark",
+      "when": 1786802474999,
+      "tag": "0000_tidy_captain_britain",
       "breakpoints": true
     }
   ]
