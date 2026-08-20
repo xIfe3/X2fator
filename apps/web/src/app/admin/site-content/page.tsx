@@ -58,11 +58,7 @@ export default function AdminSiteContentPage() {
       Object.fromEntries(
         SECTIONS.map((s) => [
           s.key,
-          JSON.stringify(
-            (data as Record<string, unknown>)[s.key] ?? {},
-            null,
-            2,
-          ),
+          JSON.stringify(data[s.key as keyof typeof data] ?? {}, null, 2),
         ]),
       ),
     );

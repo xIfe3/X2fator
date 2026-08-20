@@ -2,10 +2,21 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Menu, ShieldCheck, Users, Wallet } from "lucide-react";
+import {
+  LayoutDashboard,
+  Menu,
+  ShieldCheck,
+  Users,
+  Wallet,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const tabs = [
+const tabs: Array<{
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  exact?: boolean;
+}> = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard, exact: true },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/kyc", label: "KYC", icon: ShieldCheck },
@@ -21,7 +32,9 @@ export function AdminMobileTabBar({ onMore }: { onMore: () => void }) {
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       {tabs.map((item) => {
-        const active = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+        const active = item.exact
+          ? pathname === item.href
+          : pathname.startsWith(item.href);
         const Icon = item.icon;
         return (
           <Link
@@ -32,7 +45,12 @@ export function AdminMobileTabBar({ onMore }: { onMore: () => void }) {
               active ? "text-amber" : "text-ink-faint",
             )}
           >
-            <Icon className={cn("h-5 w-5", active && "drop-shadow-[0_0_10px_rgba(55,194,168,0.35)]")} />
+            <Icon
+              className={cn(
+                "h-5 w-5",
+                active && "drop-shadow-[0_0_10px_rgba(55,194,168,0.35)]",
+              )}
+            />
             {item.label}
           </Link>
         );

@@ -127,9 +127,10 @@ export default function TasksPage() {
             ) : (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {tasks.map((t) => {
-                  const meta =
-                    TASK_TYPE_META[t.taskType ?? "other"] ??
-                    TASK_TYPE_META.other;
+                  const meta = TASK_TYPE_META[t.taskType ?? "other"] ?? {
+                    label: "Open link",
+                    icon: ExternalLink,
+                  };
                   const Icon = meta.icon;
                   const completion = completions?.find(
                     (item) => item.taskId === t.id,
@@ -253,10 +254,13 @@ export default function TasksPage() {
               className="flex items-center gap-1.5 rounded-lg border border-base-border bg-base-raised px-3.5 py-2.5 text-sm font-medium text-mint hover:bg-base-surface2"
             >
               {(() => {
-                const Icon = TASK_TYPE_META[selected.taskType ?? "other"].icon;
+                const Icon =
+                  TASK_TYPE_META[selected.taskType ?? "other"]?.icon ??
+                  ExternalLink;
                 return <Icon className="h-4 w-4" />;
               })()}
-              {TASK_TYPE_META[selected.taskType ?? "other"].label}
+              {TASK_TYPE_META[selected.taskType ?? "other"]?.label ??
+                "Open link"}
             </a>
           )}
 

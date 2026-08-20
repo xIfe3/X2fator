@@ -197,7 +197,8 @@ export default function LandingPage() {
           </h2>
           <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-3">
             {features.map((f, i) => {
-              const Icon = FEATURE_ICONS[i % FEATURE_ICONS.length];
+              const Icon =
+                FEATURE_ICONS[i % FEATURE_ICONS.length] ?? ListChecks;
               return (
                 <div
                   key={f.title}
