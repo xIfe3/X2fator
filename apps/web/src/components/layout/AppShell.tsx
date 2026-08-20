@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
@@ -26,7 +26,7 @@ const mobileNav = [
   ["/support", "Support"],
 ] as const;
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
