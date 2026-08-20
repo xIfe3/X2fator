@@ -1,13 +1,13 @@
 "use client";
 
-import { ButtonHTMLAttributes } from "react";
+import type { ComponentPropsWithoutRef } from "react";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger" | "outline";
 type Size = "sm" | "md" | "lg";
 
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface ButtonProps extends ComponentPropsWithoutRef<"button"> {
   variant?: Variant;
   size?: Size;
   isLoading?: boolean;
@@ -41,6 +41,7 @@ export function Button({
 }: ButtonProps) {
   return (
     <button
+      type="button"
       disabled={disabled || isLoading}
       className={cn(
         "inline-flex items-center justify-center rounded-xl font-medium transition-all duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:active:scale-100",
