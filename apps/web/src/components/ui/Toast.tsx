@@ -24,7 +24,7 @@ const colors: Record<ToastKind, string> = {
   info: "text-info border-info/30 bg-info-soft",
 };
 
-export function ToastProvider({ children }: { children: React.ReactNode }) {
+export function ToastProvider({ children }: { children: any }) {
   const [items, setItems] = useState<ToastItem[]>([]);
 
   const push = useCallback((kind: ToastKind, message: string) => {
