@@ -30,6 +30,12 @@ export class AdminUsersController {
     return this.adminUsersService.getUser(id);
   }
 
+  @Get(':id/wallets')
+  @RequirePermission('users.read')
+  async getUserWalletDetails(@Param('id') id: string) {
+    return this.adminUsersService.getUserWalletDetails(id);
+  }
+
   @Patch(':id/suspend')
   @RequirePermission('users.suspend')
   async suspendUser(

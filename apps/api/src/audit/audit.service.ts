@@ -1,6 +1,15 @@
 import { Injectable } from '@nestjs/common';
 
-import { auditLogs, db } from '@2xfactor/database';
+import {
+  auditLogs,
+  db,
+  kycDocuments,
+  plans,
+  tasks,
+  users,
+  withdrawals,
+} from '@2xfactor/database';
+import { eq } from 'drizzle-orm';
 import { type DbTransaction } from '../wallet/wallet.service';
 
 export interface AuditLogParams {
@@ -67,8 +76,106 @@ export class AuditService {
   }
 
   async getLogs() {
-    return db.query.auditLogs.findMany({
+    const logs = await db.query.auditLogs.findMany({
       orderBy: (auditLogs, { desc }) => [desc(auditLogs.createdAt)],
     });
+
+    return Promise.all(
+      logs.map(async (log) => {
+        const actor = log.actorId
+          ? await db.query.users.findFirst({ where: eq(users.id, log.actorId) })
+          : null;
+        const entity = await this.getEntityDetails(
+          log.entityType,
+          log.entityId,
+        );
+
+        return {
+          ...log,
+          actor: actor
+            ? {
+                id: actor.id,
+                name: `${actor.firstName} ${actor.lastName}`.trim(),
+                email: actor.email,
+              }
+            : null,
+          entity,
+        };
+      }),
+    );
+  }
+
+  private async getEntityDetails(entityType: string, entityId?: string | null) {
+    if (!entityId) return null;
+
+    if (entityType === 'user') {
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, entityId),
+      });
+      return user
+        ? {
+            id: user.id,
+            name: `${user.firstName} ${user.lastName}`.trim(),
+            email: user.email,
+            status: user.status,
+          }
+        : null;
+    }
+    if (entityType === 'plan') {
+      const plan = await db.query.plans.findFirst({
+        where: eq(plans.id, entityId),
+      });
+      return plan
+        ? {
+            id: plan.id,
+            name: plan.name,
+            price: plan.price,
+            status: plan.status,
+          }
+        : null;
+    }
+    if (entityType === 'task') {
+      const task = await db.query.tasks.findFirst({
+        where: eq(tasks.id, entityId),
+      });
+      return task
+        ? {
+            id: task.id,
+            name: task.title,
+            reward: task.reward,
+            status: task.status,
+          }
+        : null;
+    }
+    if (entityType === 'kyc') {
+      const document = await db.query.kycDocuments.findFirst({
+        where: eq(kycDocuments.id, entityId),
+      });
+      if (!document) return null;
+      const owner = await db.query.users.findFirst({
+        where: eq(users.id, document.userId),
+      });
+      return {
+        id: document.id,
+        name: document.documentType,
+        status: document.status,
+        owner: owner?.email ?? document.userId,
+      };
+    }
+    if (entityType === 'withdrawal') {
+      const withdrawal = await db.query.withdrawals.findFirst({
+        where: eq(withdrawals.id, entityId),
+      });
+      return withdrawal
+        ? {
+            id: withdrawal.id,
+            name: withdrawal.accountName,
+            amount: withdrawal.amount,
+            status: withdrawal.status,
+            reference: withdrawal.transactionReference,
+          }
+        : null;
+    }
+    return { id: entityId };
   }
 }

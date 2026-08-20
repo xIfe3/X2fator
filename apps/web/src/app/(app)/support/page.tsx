@@ -18,9 +18,17 @@ import { useToast } from "@/components/ui/Toast";
 import { formatDateTime } from "@/lib/utils";
 
 export default function SupportPage() {
-  const { data: tickets, isLoading, refetch } = useApiQuery(() => supportApi.myTickets());
+  const {
+    data: tickets,
+    isLoading,
+    refetch,
+  } = useApiQuery(() => supportApi.myTickets());
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ subject: "", message: "", priority: "medium" });
+  const [form, setForm] = useState({
+    subject: "",
+    message: "",
+    priority: "medium",
+  });
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const { push } = useToast();
@@ -36,7 +44,11 @@ export default function SupportPage() {
       setForm({ subject: "", message: "", priority: "medium" });
       refetch();
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Could not create ticket.");
+      setError(
+        err instanceof ApiRequestError
+          ? err.message
+          : "Could not create ticket.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -46,8 +58,12 @@ export default function SupportPage() {
     <div className="space-y-6">
       <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
         <div>
-          <h1 className="font-display text-2xl font-semibold text-ink">Support</h1>
-          <p className="mt-1 text-sm text-ink-dim">Get help from the 2xFactor team.</p>
+          <h1 className="font-display text-2xl font-semibold text-ink">
+            Support
+          </h1>
+          <p className="mt-1 text-sm text-ink-dim">
+            Get help from the X2Factor team.
+          </p>
         </div>
         <Button onClick={() => setOpen(true)}>
           <Plus className="h-4 w-4" /> New ticket
@@ -62,7 +78,11 @@ export default function SupportPage() {
           {isLoading ? (
             <PageSkeleton />
           ) : !tickets || tickets.length === 0 ? (
-            <EmptyState icon={LifeBuoy} title="No tickets yet" description="Open a ticket if something needs attention." />
+            <EmptyState
+              icon={LifeBuoy}
+              title="No tickets yet"
+              description="Open a ticket if something needs attention."
+            />
           ) : (
             <Table>
               <THead>
@@ -75,12 +95,19 @@ export default function SupportPage() {
                 {tickets.map((t) => (
                   <Tr key={t.id} className="cursor-pointer">
                     <Td>
-                      <Link href={`/support/${t.id}`} className="hover:text-mint">
+                      <Link
+                        href={`/support/${t.id}`}
+                        className="hover:text-mint"
+                      >
                         {t.subject}
                       </Link>
                     </Td>
-                    <Td className="capitalize text-ink-dim">{t.priority ?? "—"}</Td>
-                    <Td className="text-ink-dim">{formatDateTime(t.createdAt)}</Td>
+                    <Td className="capitalize text-ink-dim">
+                      {t.priority ?? "—"}
+                    </Td>
+                    <Td className="text-ink-dim">
+                      {formatDateTime(t.createdAt)}
+                    </Td>
                     <Td>
                       <StatusPill status={t.status} />
                     </Td>
@@ -92,19 +119,27 @@ export default function SupportPage() {
         </CardBody>
       </Card>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="New support ticket">
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="New support ticket"
+      >
         <form onSubmit={onSubmit} className="space-y-4">
           <Input
             label="Subject"
             required
             minLength={3}
             value={form.subject}
-            onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, subject: e.target.value }))
+            }
           />
           <Select
             label="Priority"
             value={form.priority}
-            onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value }))}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, priority: e.target.value }))
+            }
           >
             <option value="low">Low</option>
             <option value="medium">Medium</option>
@@ -116,7 +151,9 @@ export default function SupportPage() {
             required
             rows={4}
             value={form.message}
-            onChange={(e) => setForm((f) => ({ ...f, message: e.target.value }))}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, message: e.target.value }))
+            }
           />
           {error && <p className="text-sm text-danger">{error}</p>}
           <Button type="submit" className="w-full" isLoading={submitting}>

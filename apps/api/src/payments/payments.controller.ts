@@ -17,6 +17,14 @@ export class PaymentsController {
     return this.paymentsService.initializePayment(user.id, depositId);
   }
 
+  @Get('verify/:reference')
+  async verifyPayment(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('reference') reference: string,
+  ) {
+    return this.paymentsService.verifyPaystackPayment(user.id, reference);
+  }
+
   @Get(':reference')
   async getPayment(@Param('reference') reference: string) {
     return this.paymentsService.getPaymentByReference(reference);

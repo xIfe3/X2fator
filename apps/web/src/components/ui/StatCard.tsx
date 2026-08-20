@@ -16,7 +16,7 @@ export function StatCard({
 }) {
   const toneClass = tone === "mint" ? "text-mint" : tone === "amber" ? "text-amber" : "text-ink";
   return (
-    <div className="ledger-surface relative overflow-hidden rounded-2xl border border-base-border bg-base-surface p-5">
+    <div className="ticket-notch ledger-surface relative overflow-hidden rounded-2xl border border-base-border bg-base-surface p-5">
       <div className="flex items-start justify-between">
         <span className="text-xs font-medium uppercase tracking-wider text-ink-faint">{label}</span>
         {Icon && (
@@ -25,8 +25,13 @@ export function StatCard({
           </span>
         )}
       </div>
-      <p className={cn("mt-4 font-mono text-2xl font-semibold tabular", toneClass)}>{value}</p>
-      {sub && <p className="mt-1 text-xs text-ink-dim">{sub}</p>}
+      <p className={cn("mt-4 font-display text-2xl font-semibold tabular", toneClass)}>{value}</p>
+      {sub && (
+        <>
+          <div className="ticket-tear -mx-5 mt-4" />
+          <p className="mt-2.5 px-0 text-xs text-ink-dim">{sub}</p>
+        </>
+      )}
     </div>
   );
 }

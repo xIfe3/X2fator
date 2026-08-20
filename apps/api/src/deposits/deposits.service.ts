@@ -2,15 +2,17 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { desc, eq } from 'drizzle-orm';
 
 import { db } from '@2xfactor/database';
 import { deposits, payments } from '@2xfactor/database';
+import { WalletService } from '../wallet/wallet.service';
 
 @Injectable()
 export class DepositsService {
-  constructor() {}
+  constructor(@Optional() private readonly walletService?: WalletService) {}
 
   async createDeposit(
     userId: string,
@@ -107,13 +109,40 @@ export class DepositsService {
         .where(eq(deposits.id, depositId))
         .returning();
 
-      /**
-       * Wallet credit is handled separately through
-       * WalletService when we wire provider webhooks.
-       */
+      await this.walletService!.credit(
+        {
+          userId: deposit.userId,
+          walletType: 'account',
+          amount: deposit.amount.toFixed(2),
+          type: 'deposit',
+          reference: `DEP_${deposit.reference}`,
+          description: 'Wallet deposit',
+          metadata: { depositId: deposit.id, providerReference },
+        },
+        tx,
+      );
 
       return updatedDeposit;
     });
+  }
+
+  async getAllDeposits() {
+    return db.query.deposits.findMany({
+      orderBy: [desc(deposits.createdAt)],
+    });
+  }
+
+  async reviewDeposit(
+    depositId: string,
+    action: 'approve' | 'reject',
+    providerReference?: string,
+    reason?: string,
+  ) {
+    if (action === 'approve') {
+      return this.completeDeposit(depositId, providerReference);
+    }
+
+    return this.failDeposit(depositId, reason);
   }
 
   async failDeposit(depositId: string, reason?: string) {

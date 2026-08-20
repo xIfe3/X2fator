@@ -6,7 +6,11 @@ import { Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { AppShell } from "@/components/layout/AppShell";
 
-export default function AppGroupLayout({ children }: { children: React.ReactNode }) {
+export default function AppGroupLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const { user, isLoading } = useAuth();
   const router = useRouter();
 
@@ -16,8 +20,11 @@ export default function AppGroupLayout({ children }: { children: React.ReactNode
 
   if (isLoading || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-base">
-        <Loader2 className="h-6 w-6 animate-spin text-mint" />
+      <div className="flex min-h-screen items-center justify-center bg-[#0b0d11]">
+        <Loader2
+          className="h-7 w-7 animate-spin text-[#e7b64a]"
+          style={{ animationDuration: "0.9s" }}
+        />
       </div>
     );
   }

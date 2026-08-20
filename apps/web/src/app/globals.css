@@ -11,32 +11,41 @@
  * Values are emitted as real CSS custom properties at :root, so they're
  * also directly usable as var(--color-base-border) etc. outside of
  * utility classes (see the `* { border-color }` rule below).
+ *
+ * Palette: "ledger" — a deep ink-navy surface with two accents pulled
+ * from a paper ledger: stamped gold (primary — approvals, balances,
+ * CTAs) and a verifying teal (secondary — confirmations, the "2x" mark
+ * on secondary surfaces). Token names (mint/amber) are kept as-is for
+ * compatibility with every page that already references them — only
+ * the hex values changed.
  */
 @theme {
-  --color-base: #0a0d11;
-  --color-base-raised: #10141a;
-  --color-base-surface: #151a21;
-  --color-base-surface2: #1c222b;
-  --color-base-border: #242b35;
-  --color-base-borderStrong: #323b48;
+  --color-base: #0b0d11;
+  --color-base-raised: #111419;
+  --color-base-surface: #15181f;
+  --color-base-surface2: #1c2029;
+  --color-base-border: #262b34;
+  --color-base-borderStrong: #363c48;
 
-  --color-ink: #edf1f4;
-  --color-ink-dim: #9aa6b4;
-  --color-ink-faint: #5f6b7a;
+  --color-ink: #f1f3f5;
+  --color-ink-dim: #97a1ac;
+  --color-ink-faint: #5c6572;
 
-  --color-mint: #33d48f;
-  --color-mint-dim: #1f8f63;
-  --color-mint-soft: #0f2a21;
+  /* primary — stamped gold */
+  --color-mint: #e7b64a;
+  --color-mint-dim: #b78d34;
+  --color-mint-soft: #2a2314;
 
-  --color-amber: #e8a94a;
-  --color-amber-dim: #b8822e;
-  --color-amber-soft: #2e2413;
+  /* secondary — verifying teal */
+  --color-amber: #37c2a8;
+  --color-amber-dim: #279180;
+  --color-amber-soft: #10221f;
 
-  --color-danger: #e85d5d;
-  --color-danger-soft: #2e1616;
+  --color-danger: #ef5f57;
+  --color-danger-soft: #2b1716;
 
-  --color-info: #5b9fe8;
-  --color-info-soft: #162335;
+  --color-info: #6d93f2;
+  --color-info-soft: #161f2f;
 
   /* Overrides two keys from Tailwind's default radius scale; the rest
      (sm, md, lg, 3xl, full…) are untouched. */
@@ -44,6 +53,7 @@
   --radius-2xl: 20px;
 
   --shadow-panel: 0 1px 0 0 rgba(255, 255, 255, 0.02) inset, 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+  --shadow-stamp: 0 1px 0 0 rgba(255, 255, 255, 0.03) inset, 0 12px 32px -14px rgba(231, 182, 74, 0.18);
 }
 
 /* `inline` because these values reference CSS variables that next/font
@@ -51,7 +61,7 @@
    Tailwind can resolve at build time — same pattern as the official
    Tailwind v4 + Next.js font setup. */
 @theme inline {
-  --font-display: var(--display-font), sans-serif;
+  --font-display: var(--display-font), serif;
   --font-body: var(--body-font), sans-serif;
   --font-mono: var(--mono-font), monospace;
 }
@@ -66,8 +76,8 @@
 
 html,
 body {
-  background: #0a0d11;
-  color: #edf1f4;
+  background: #0b0d11;
+  color: #f1f3f5;
 }
 
 body {
@@ -81,7 +91,7 @@ body {
 }
 
 ::selection {
-  background: rgba(51, 212, 143, 0.25);
+  background: rgba(231, 182, 74, 0.25);
 }
 
 ::-webkit-scrollbar {
@@ -92,15 +102,15 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #242b35;
+  background: #262b34;
   border-radius: 8px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #323b48;
+  background: #363c48;
 }
 
 :focus-visible {
-  outline: 2px solid #33d48f;
+  outline: 2px solid #e7b64a;
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -115,10 +125,43 @@ body {
   }
 }
 
-/* Signature: the ledger rule — a faint repeating baseline grid behind
-   large balance figures, evoking a paper ledger sheet. */
+/* Signature #1: the ledger rule — a faint repeating baseline grid
+   behind large balance figures, evoking a paper ledger sheet. */
 .ledger-surface {
-  background-image: repeating-linear-gradient(to bottom, transparent, transparent 27px, rgba(255, 255, 255, 0.028) 28px);
+  background-image: repeating-linear-gradient(to bottom, transparent, transparent 27px, rgba(231, 182, 74, 0.045) 28px);
+}
+
+/* Signature #2: the ticket notch — punches two half-circle "holes" into
+   the left/right edge of a card, like a torn ledger ticket or receipt
+   stub. The notch color must match whatever surface sits behind the
+   card (default: page background). Pair with a dashed divider inside
+   (.ticket-tear) to complete the stub. */
+.ticket-notch {
+  position: relative;
+}
+.ticket-notch::before,
+.ticket-notch::after {
+  content: "";
+  position: absolute;
+  top: 1.6rem;
+  width: 14px;
+  height: 14px;
+  background: var(--color-base);
+  border-radius: 9999px;
+  z-index: 1;
+}
+.ticket-notch::before {
+  left: -7px;
+}
+.ticket-notch::after {
+  right: -7px;
+}
+.ticket-notch.ticket-notch--raised::before,
+.ticket-notch.ticket-notch--raised::after {
+  background: var(--color-base-raised);
+}
+.ticket-tear {
+  border-top: 1.5px dashed var(--color-base-border);
 }
 
 @keyframes fade-up {
@@ -133,4 +176,59 @@ body {
 }
 .animate-fade-up {
   animation: fade-up 0.35s ease-out both;
+}
+
+@keyframes stamp-in {
+  from {
+    opacity: 0;
+    transform: scale(1.15) rotate(-4deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(-4deg);
+  }
+}
+.animate-stamp {
+  animation: stamp-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Perforated "tear line" — used between ledger-statement sections to
+   reinforce the paper-ledger motif (dashboard hero, subscription
+   passbook entries). */
+.ledger-tear {
+  position: relative;
+  border-top: 1px dashed var(--color-base-border);
+}
+.ledger-tear::before,
+.ledger-tear::after {
+  content: "";
+  position: absolute;
+  top: -7px;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: var(--color-base);
+  border: 1px solid var(--color-base-border);
+}
+.ledger-tear::before {
+  left: -7px;
+}
+.ledger-tear::after {
+  right: -7px;
+}
+
+/* Rotated wax-stamp badge, e.g. "ACTIVE" / "APPROVED" on a subscription
+   passbook card. */
+.stamp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transform: rotate(-6deg);
+  border: 1.5px solid currentColor;
+  border-radius: 8px;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }

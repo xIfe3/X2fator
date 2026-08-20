@@ -6,7 +6,7 @@ import {
 
 import { desc, eq } from 'drizzle-orm';
 
-import { db, users } from '@2xfactor/database';
+import { db, users, wallets, walletTransactions } from '@2xfactor/database';
 
 import { AuditService } from '../../audit/audit.service';
 
@@ -30,6 +30,48 @@ export class AdminUsersService {
     }
 
     return user;
+  }
+
+  async getUserWalletDetails(userId: string) {
+    const user = await this.getUser(userId);
+    const userWallets = await db.query.wallets.findMany({
+      where: eq(wallets.userId, userId),
+    });
+
+    const transactions = await db
+      .select({
+        id: walletTransactions.id,
+        walletId: walletTransactions.walletId,
+        walletType: wallets.type,
+        type: walletTransactions.type,
+        direction: walletTransactions.direction,
+        amount: walletTransactions.amount,
+        balanceBefore: walletTransactions.balanceBefore,
+        balanceAfter: walletTransactions.balanceAfter,
+        reference: walletTransactions.reference,
+        description: walletTransactions.description,
+        status: walletTransactions.status,
+        createdAt: walletTransactions.createdAt,
+      })
+      .from(walletTransactions)
+      .innerJoin(wallets, eq(walletTransactions.walletId, wallets.id))
+      .where(eq(wallets.userId, userId))
+      .orderBy(desc(walletTransactions.createdAt));
+
+    return {
+      user: {
+        id: user.id,
+        name: `${user.firstName} ${user.lastName}`.trim(),
+        email: user.email,
+      },
+      wallets: {
+        account:
+          userWallets.find((wallet) => wallet.type === 'account') ?? null,
+        earnings:
+          userWallets.find((wallet) => wallet.type === 'earnings') ?? null,
+      },
+      transactions,
+    };
   }
 
   async suspendUser(adminId: string, userId: string) {

@@ -17,9 +17,18 @@ import { useToast } from "@/components/ui/Toast";
 import { formatDateTime, formatMoney } from "@/lib/utils";
 
 export default function WithdrawalsPage() {
-  const { data: withdrawals, isLoading, refetch } = useApiQuery(() => withdrawalsApi.list());
+  const {
+    data: withdrawals,
+    isLoading,
+    refetch,
+  } = useApiQuery(() => withdrawalsApi.list());
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ amount: "", bankName: "", accountNumber: "", accountName: "" });
+  const [form, setForm] = useState({
+    amount: "",
+    bankName: "",
+    accountNumber: "",
+    accountName: "",
+  });
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const { push } = useToast();
@@ -34,12 +43,17 @@ export default function WithdrawalsPage() {
     setSubmitting(true);
     try {
       await withdrawalsApi.create(form);
+      window.dispatchEvent(new Event("wallet-updated"));
       push("success", "Withdrawal request submitted for review.");
       setOpen(false);
       setForm({ amount: "", bankName: "", accountNumber: "", accountName: "" });
       refetch();
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Could not submit withdrawal.");
+      setError(
+        err instanceof ApiRequestError
+          ? err.message
+          : "Could not submit withdrawal.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -49,8 +63,12 @@ export default function WithdrawalsPage() {
     <div className="space-y-6">
       <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
         <div>
-          <h1 className="font-display text-2xl font-semibold text-ink">Withdrawals</h1>
-          <p className="mt-1 text-sm text-ink-dim">Move earnings out to your bank account.</p>
+          <h1 className="font-display text-2xl font-semibold text-ink">
+            Withdrawals
+          </h1>
+          <p className="mt-1 text-sm text-ink-dim">
+            Move earnings out to your bank account.
+          </p>
         </div>
         <Button onClick={() => setOpen(true)}>
           <Plus className="h-4 w-4" /> Request withdrawal
@@ -86,11 +104,15 @@ export default function WithdrawalsPage() {
                     <Td className="font-mono text-xs text-ink-dim">
                       {w.accountNumber} · {w.accountName}
                     </Td>
-                    <Td className="text-ink-dim">{formatDateTime(w.createdAt)}</Td>
+                    <Td className="text-ink-dim">
+                      {formatDateTime(w.createdAt)}
+                    </Td>
                     <Td>
                       <StatusPill status={w.status} />
                     </Td>
-                    <Td className="text-right font-mono tabular font-medium text-ink">{formatMoney(w.amount)}</Td>
+                    <Td className="text-right font-mono tabular font-medium text-ink">
+                      {formatMoney(w.amount)}
+                    </Td>
                   </Tr>
                 ))}
               </tbody>
@@ -99,7 +121,11 @@ export default function WithdrawalsPage() {
         </CardBody>
       </Card>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Request withdrawal">
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Request withdrawal"
+      >
         <form onSubmit={onSubmit} className="space-y-4">
           <Input
             label="Amount (NGN)"

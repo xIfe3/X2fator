@@ -9,6 +9,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Public } from '../common/decorators/public.decorator';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../common/types/authenticated-request';
 
 import { PlansService } from './plans.service';
 import { CreatePlanDto } from './dto/create-plan.dto';
@@ -32,15 +34,6 @@ export class PlansController {
   }
 
   /**
-   * Get a single active plan.
-   */
-  @Public()
-  @Get(':id')
-  async getActivePlan(@Param('id') id: string) {
-    return this.plansService.findActiveById(id);
-  }
-
-  /**
    * Admin: get every plan.
    */
   @Get('admin/all')
@@ -51,13 +44,22 @@ export class PlansController {
   }
 
   /**
+   * Get a single active plan.
+   */
+  @Public()
+  @Get(':id')
+  async getActivePlan(@Param('id') id: string) {
+    return this.plansService.findActiveById(id);
+  }
+
+  /**
    * Admin: create plan.
    */
   @Post()
   @UseGuards(RolesGuard)
   @Roles('admin')
-  async createPlan(@Body() dto: CreatePlanDto) {
-    return this.plansService.create(dto);
+  async createPlan(@CurrentUser() admin: AuthenticatedUser, @Body() dto: CreatePlanDto) {
+    return this.plansService.create(admin.id, dto);
   }
 
   /**
@@ -66,8 +68,12 @@ export class PlansController {
   @Patch(':id')
   @UseGuards(RolesGuard)
   @Roles('admin')
-  async updatePlan(@Param('id') id: string, @Body() dto: UpdatePlanDto) {
-    return this.plansService.update(id, dto);
+  async updatePlan(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: UpdatePlanDto,
+  ) {
+    return this.plansService.update(admin.id, id, dto);
   }
 
   /**
@@ -76,7 +82,7 @@ export class PlansController {
   @Delete(':id')
   @UseGuards(RolesGuard)
   @Roles('admin')
-  async deletePlan(@Param('id') id: string) {
-    return this.plansService.remove(id);
+  async deletePlan(@CurrentUser() admin: AuthenticatedUser, @Param('id') id: string) {
+    return this.plansService.remove(admin.id, id);
   }
 }

@@ -5,24 +5,31 @@ interface FieldWrapProps {
   label?: string;
   error?: string;
   hint?: string;
+  rightElement?: React.ReactNode;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement> & FieldWrapProps>(
-  ({ className, label, error, hint, id, ...props }, ref) => {
+  ({ className, label, error, hint, rightElement, id, ...props }, ref) => {
     return (
       <label className="block">
         {label && <span className="mb-1.5 block text-xs font-medium text-ink-dim">{label}</span>}
-        <input
-          ref={ref}
-          id={id}
-          className={cn(
-            "w-full rounded-xl border border-base-border bg-base-raised px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-faint",
-            "focus:border-mint/60 focus:outline-none focus:ring-1 focus:ring-mint/40",
-            error && "border-danger/60 focus:border-danger focus:ring-danger/30",
-            className,
+        <span className="relative block">
+          <input
+            ref={ref}
+            id={id}
+            className={cn(
+              "w-full rounded-xl border border-base-border bg-base-raised px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-faint",
+              "focus:border-mint/60 focus:outline-none focus:ring-1 focus:ring-mint/40",
+              error && "border-danger/60 focus:border-danger focus:ring-danger/30",
+              rightElement && "pr-10",
+              className,
+            )}
+            {...props}
+          />
+          {rightElement && (
+            <span className="absolute inset-y-0 right-0 flex items-center pr-3">{rightElement}</span>
           )}
-          {...props}
-        />
+        </span>
         {hint && !error && <span className="mt-1.5 block text-xs text-ink-faint">{hint}</span>}
         {error && <span className="mt-1.5 block text-xs text-danger">{error}</span>}
       </label>

@@ -1,6 +1,13 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 import { authApi } from "./api/auth";
 import { tokenStore } from "./api-client";
@@ -10,7 +17,7 @@ interface AuthContextValue {
   user: User | null;
   isLoading: boolean;
   isAdmin: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
   register: (dto: {
     email: string;
     password: string;
@@ -41,7 +48,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // /auth/me in the background — see AuthMeResponse for why that
     // endpoint alone can't rehydrate the full profile.
     const cached = tokenStore.getCachedUser<User>();
-    if (cached) setUser(cached);
+    if (cached) {
+      setUser(cached);
+      setIsLoading(false);
+    }
 
     try {
       const me = await authApi.me();
@@ -68,6 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     tokenStore.set(res.accessToken, res.refreshToken);
     tokenStore.setCachedUser(res.user);
     setUser(res.user);
+    return res.user;
   }, []);
 
   const register = useCallback(
@@ -80,7 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       referralCode?: string;
     }) => {
       const res = await authApi.register(dto);
-      console.log("Register response", res)
+      console.log("Register response", res);
       tokenStore.set(res.accessToken, res.refreshToken);
       tokenStore.setCachedUser(res.user);
       setUser(res.user);
@@ -97,7 +108,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isAdmin = useMemo(() => !!user?.roles?.includes("admin"), [user]);
 
   const value = useMemo(
-    () => ({ user, isLoading, isAdmin, login, register, logout, refreshUser: loadUser }),
+    () => ({
+      user,
+      isLoading,
+      isAdmin,
+      login,
+      register,
+      logout,
+      refreshUser: loadUser,
+    }),
     [user, isLoading, isAdmin, login, register, logout, loadUser],
   );
 

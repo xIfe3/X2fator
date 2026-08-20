@@ -1,62 +1,56 @@
 import { ReactNode } from "react";
-import Link from "next/link";
+import { cn } from "@/lib/utils";
+import { BrandLogo } from "./BrandLogo";
 
 export function AuthShell({
   title,
   subtitle,
   children,
   footer,
+  progress,
+  width = "sm",
 }: {
   title: string;
   subtitle: string;
   children: ReactNode;
-  footer: ReactNode;
+  footer?: ReactNode;
+  /** 0–100. Renders a slim "form completion" rule under the accent bar. Omit to hide it. */
+  progress?: number;
+  width?: "sm" | "md";
 }) {
   return (
-    <div className="grid min-h-screen lg:grid-cols-2">
-      {/* Signature panel: the "2x" ledger mark anchors the brand */}
-      <div className="ledger-surface relative hidden overflow-hidden border-r border-base-border bg-base-raised lg:flex lg:flex-col lg:justify-between lg:p-12">
-        <Link href="/" className="flex items-center gap-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-mint font-display text-base font-bold text-base">
-            2X
-          </span>
-          <span className="font-display text-lg font-semibold tracking-tight">2xFactor</span>
-        </Link>
-
-        <div className="space-y-6">
-          <p className="max-w-sm font-display text-3xl font-medium leading-tight text-ink">
-            Every deposit, task, and referral — <span className="text-mint">one ledger</span>, always reconciled.
-          </p>
-          <div className="flex gap-8 font-mono text-sm text-ink-dim">
-            <div>
-              <div className="text-2xl font-semibold text-amber">2×</div>
-              <div className="mt-1 text-xs uppercase tracking-wider">multiplier plans</div>
-            </div>
-            <div>
-              <div className="text-2xl font-semibold text-mint">24/7</div>
-              <div className="mt-1 text-xs uppercase tracking-wider">wallet access</div>
-            </div>
-          </div>
-        </div>
-
-        <p className="text-xs text-ink-faint">Sandbox learning environment — not a real financial product.</p>
+    <div className="ledger-surface flex min-h-screen flex-col items-center justify-center bg-base px-5 py-10">
+      <div className="mb-8">
+        <BrandLogo />
       </div>
 
-      <div className="flex flex-col items-center justify-center p-6 sm:p-12">
-        <div className="w-full max-w-sm">
-          <div className="mb-8 lg:hidden">
-            <Link href="/" className="flex items-center gap-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-mint font-display text-sm font-bold text-base">
-                2X
-              </span>
-              <span className="font-display text-base font-semibold">2xFactor</span>
-            </Link>
+      <div className={cn("w-full", width === "md" ? "max-w-md" : "max-w-sm")}>
+        <div className="ticket-notch ticket-notch--raised overflow-hidden rounded-2xl border border-base-border bg-base-surface shadow-panel">
+          <div className="h-1 w-full bg-mint" />
+          {typeof progress === "number" && (
+            <div className="h-0.5 w-full bg-base-border">
+              <div
+                className="h-full bg-mint transition-all duration-300"
+                style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
+              />
+            </div>
+          )}
+          <div className="p-6 sm:p-8">
+            <h1 className="font-display text-2xl font-semibold text-ink">
+              {title}
+            </h1>
+            <p className="mt-1.5 text-sm text-ink-dim">{subtitle}</p>
+            <div className="mt-7">{children}</div>
           </div>
-          <h1 className="font-display text-2xl font-semibold text-ink">{title}</h1>
-          <p className="mt-1.5 text-sm text-ink-dim">{subtitle}</p>
-          <div className="mt-8">{children}</div>
-          <div className="mt-6 text-sm text-ink-dim">{footer}</div>
         </div>
+
+        {footer && (
+          <div className="mt-6 text-center text-sm text-ink-dim">{footer}</div>
+        )}
+
+        <p className="mt-8 text-center text-xs text-ink-faint">
+          Sandbox learning environment — not a real financial product.
+        </p>
       </div>
     </div>
   );

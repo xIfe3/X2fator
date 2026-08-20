@@ -6,10 +6,21 @@ import {
 
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { eq } from 'drizzle-orm';
-
-import { db, users, wallets, roles, userRoles } from '@2xfactor/database';
-
+import { eq, and, gt, isNull } from 'drizzle-orm';
+import { createHash, randomBytes } from 'crypto';
+import { Inject } from '@nestjs/common';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { MAILER, type Mailer } from '../mail/mailer.service';
+import {
+  db,
+  users,
+  wallets,
+  roles,
+  userRoles,
+  passwordResetTokens,
+  referrals,
+} from '@2xfactor/database';
 import { PasswordService } from './password.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -20,6 +31,7 @@ export class AuthService {
     private readonly passwordService: PasswordService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    @Inject(MAILER) private readonly mailer: Mailer,
   ) {}
 
   private async getUserRoles(userId: string): Promise<string[]> {
@@ -106,6 +118,15 @@ export class AuthService {
         },
       ]);
 
+      if (referredById) {
+        await tx.insert(referrals).values({
+          referrerId: referredById,
+          referredUserId: user.id,
+          commissionRate: '0',
+          status: 'active',
+        });
+      }
+
       return user;
     });
 
@@ -118,7 +139,10 @@ export class AuthService {
     );
 
     return {
-      user: this.sanitizeUser(result),
+      user: {
+        ...this.sanitizeUser(result),
+        roles: userRolesList,
+      },
       ...tokens,
     };
   }
@@ -170,7 +194,10 @@ export class AuthService {
     );
 
     return {
-      user: this.sanitizeUser(user),
+      user: {
+        ...this.sanitizeUser(user),
+        roles: userRolesList,
+      },
       ...tokens,
     };
   }
@@ -267,5 +294,77 @@ export class AuthService {
         return code;
       }
     } while (true);
+  }
+
+  private hashToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
+  }
+
+  async requestPasswordReset(
+    dto: ForgotPasswordDto,
+  ): Promise<{ message: string }> {
+    const email = dto.email.trim().toLowerCase();
+    const genericResponse = {
+      message:
+        'If an account exists for that email, a reset link has been sent.',
+    };
+
+    const user = await db.query.users.findFirst({
+      where: eq(users.email, email),
+    });
+    // Never reveal whether the email exists, and skip non-active accounts silently.
+    if (!user || user.status !== 'active') {
+      return genericResponse;
+    }
+
+    const rawToken = randomBytes(32).toString('hex');
+    const tokenHash = this.hashToken(rawToken);
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+
+    await db.insert(passwordResetTokens).values({
+      userId: user.id,
+      tokenHash,
+      expiresAt,
+    });
+
+    const webUrl =
+      this.configService.get<string>('app.webUrl') ?? 'http://localhost:3001';
+    const resetUrl = `${webUrl}/reset-password?token=${rawToken}`;
+    await this.mailer.sendPasswordReset(user.email, resetUrl);
+
+    return genericResponse;
+  }
+
+  async resetPassword(dto: ResetPasswordDto): Promise<{ message: string }> {
+    const tokenHash = this.hashToken(dto.token);
+
+    const record = await db.query.passwordResetTokens.findFirst({
+      where: and(
+        eq(passwordResetTokens.tokenHash, tokenHash),
+        isNull(passwordResetTokens.usedAt),
+        gt(passwordResetTokens.expiresAt, new Date()),
+      ),
+    });
+
+    if (!record) {
+      throw new UnauthorizedException(
+        'This reset link is invalid or has expired',
+      );
+    }
+
+    const passwordHash = await this.passwordService.hash(dto.password);
+
+    await db.transaction(async (tx) => {
+      await tx
+        .update(users)
+        .set({ passwordHash, updatedAt: new Date() })
+        .where(eq(users.id, record.userId));
+      await tx
+        .update(passwordResetTokens)
+        .set({ usedAt: new Date() })
+        .where(eq(passwordResetTokens.id, record.id));
+    });
+
+    return { message: 'Password updated successfully.' };
   }
 }

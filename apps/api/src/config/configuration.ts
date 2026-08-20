@@ -23,4 +23,9 @@ export default () => ({
   cors: {
     origin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
   },
+
+  paystack: {
+    secretKey: process.env.PAYSTACK_SECRET_KEY,
+    callbackUrl: process.env.PAYSTACK_CALLBACK_URL,
+  },
 });

@@ -33,6 +33,18 @@ export const tasks = pgTable(
 
     durationSeconds: integer("duration_seconds"),
 
+    // What kind of task this is — drives which link/label the frontend
+    // shows ('video' -> "Watch video", 'app' -> "Get the app", etc).
+    taskType: varchar("task_type", {
+      length: 20,
+    })
+      .notNull()
+      .default("other"),
+
+    // The link the user is sent to complete the task (video URL, app
+    // store link, etc). Optional — some tasks may not need one.
+    targetUrl: text("target_url"),
+
     status: taskStatusEnum("status").notNull().default("active"),
 
     createdAt: timestamp("created_at", {

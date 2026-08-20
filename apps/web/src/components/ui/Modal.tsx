@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -25,11 +26,14 @@ export function Modal({
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4">
+      <div
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        onClick={onClose}
+      />
       <div
         className={cn(
           "relative w-full max-w-md animate-fade-up rounded-2xl border border-base-border bg-base-surface p-6 shadow-panel",
@@ -40,7 +44,9 @@ export function Modal({
         aria-label={title}
       >
         <div className="mb-5 flex items-center justify-between">
-          <h2 className="font-display text-base font-semibold text-ink">{title}</h2>
+          <h2 className="font-display text-base font-semibold text-ink">
+            {title}
+          </h2>
           <button
             onClick={onClose}
             className="rounded-lg p-1.5 text-ink-faint hover:bg-base-surface2 hover:text-ink"
@@ -51,6 +57,7 @@ export function Modal({
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

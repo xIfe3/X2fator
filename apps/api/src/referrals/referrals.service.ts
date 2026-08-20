@@ -1,5 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { and, desc, eq } from 'drizzle-orm';
 
 import { db } from '@2xfactor/database';
 import {
@@ -14,7 +14,7 @@ import { WalletService, type DbTransaction } from '../wallet/wallet.service';
 
 @Injectable()
 export class ReferralsService {
-  constructor(private readonly walletService: WalletService) {}
+  constructor(@Optional() private readonly walletService?: WalletService) {}
 
   async getMyReferralInfo(userId: string) {
     const user = await db.query.users.findFirst({
@@ -25,9 +25,18 @@ export class ReferralsService {
       throw new NotFoundException('User not found');
     }
 
-    const referredUsers = await db.query.referrals.findMany({
-      where: eq(referrals.referrerId, userId),
-    });
+    const referredUsers = await db
+      .select({
+        id: referrals.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+        status: referrals.status,
+        createdAt: referrals.createdAt,
+      })
+      .from(referrals)
+      .innerJoin(users, eq(referrals.referredUserId, users.id))
+      .where(eq(referrals.referrerId, userId));
 
     return {
       referralCode: user.referralCode,
@@ -37,10 +46,19 @@ export class ReferralsService {
   }
 
   async getMyReferrals(userId: string) {
-    return db.query.referrals.findMany({
-      where: eq(referrals.referrerId, userId),
-      orderBy: (referrals, { desc }) => [desc(referrals.createdAt)],
-    });
+    return db
+      .select({
+        id: referrals.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+        status: referrals.status,
+        createdAt: referrals.createdAt,
+      })
+      .from(referrals)
+      .innerJoin(users, eq(referrals.referredUserId, users.id))
+      .where(eq(referrals.referrerId, userId))
+      .orderBy(desc(referrals.createdAt));
   }
 
   async getMyReferralEarnings(userId: string) {
@@ -140,7 +158,7 @@ export class ReferralsService {
 
     const reference = this.generateReference('REF');
 
-    await this.walletService.credit(
+    await this.walletService!.credit(
       {
         userId: referrerId,
         walletType: 'earnings',

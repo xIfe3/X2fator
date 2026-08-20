@@ -1,9 +1,10 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { ShieldCheck } from "lucide-react";
+import { FormEvent, useRef, useState } from "react";
+import { ImagePlus, ShieldCheck } from "lucide-react";
 import { useApiQuery } from "@/hooks/useApiQuery";
 import { kycApi } from "@/lib/api/kyc";
+import { uploadsApi } from "@/lib/api/uploads";
 import type { KycDocumentType } from "@/lib/types";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Table, THead, Th, Tr, Td } from "@/components/ui/Table";
@@ -27,27 +28,45 @@ export default function KycPage() {
   const { data: status, isLoading: statusLoading, refetch: refetchStatus } = useApiQuery(() => kycApi.status());
   const { data: documents, isLoading, refetch } = useApiQuery(() => kycApi.myDocuments());
 
-  const [form, setForm] = useState<{ documentType: KycDocumentType; documentNumber: string; documentUrl: string }>({
+  const [form, setForm] = useState<{ documentType: KycDocumentType; documentNumber: string }>({
     documentType: "national_id",
     documentNumber: "",
-    documentUrl: "",
   });
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { push } = useToast();
+
+  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setFile(f);
+    setPreview(URL.createObjectURL(f));
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+
+    if (!file) {
+      setError("Upload a photo or scan of the document.");
+      return;
+    }
+
     setSubmitting(true);
     try {
+      const { url } = await uploadsApi.uploadImage(file);
       await kycApi.submit({
         documentType: form.documentType,
         documentNumber: form.documentNumber || undefined,
-        documentUrl: form.documentUrl,
+        documentUrl: url,
       });
       push("success", "Document submitted for review.");
-      setForm({ documentType: "national_id", documentNumber: "", documentUrl: "" });
+      setForm({ documentType: "national_id", documentNumber: "" });
+      setFile(null);
+      setPreview(null);
       refetch();
       refetchStatus();
     } catch (err) {
@@ -105,15 +124,37 @@ export default function KycPage() {
                 value={form.documentNumber}
                 onChange={(e) => setForm((f) => ({ ...f, documentNumber: e.target.value }))}
               />
-              <Input
-                label="Document image URL"
-                type="url"
-                required
-                value={form.documentUrl}
-                onChange={(e) => setForm((f) => ({ ...f, documentUrl: e.target.value }))}
-                placeholder="https://..."
-                hint="Upload the scan/photo somewhere first and paste the link here."
-              />
+
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-ink-dim">Document photo</label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={onFileChange}
+                />
+                {preview ? (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="block w-full overflow-hidden rounded-xl border border-base-border"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={preview} alt="Document preview" className="max-h-56 w-full object-cover" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex w-full flex-col items-center gap-2 rounded-xl border border-dashed border-base-border bg-base-raised px-4 py-8 text-ink-faint transition-colors hover:border-mint-dim/50 hover:text-mint"
+                  >
+                    <ImagePlus className="h-6 w-6" />
+                    <span className="text-xs font-medium">Upload a clear photo or scan of your document</span>
+                  </button>
+                )}
+              </div>
+
               {error && <p className="text-sm text-danger">{error}</p>}
               <Button type="submit" isLoading={submitting}>
                 Submit for review

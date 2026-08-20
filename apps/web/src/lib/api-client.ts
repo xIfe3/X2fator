@@ -7,8 +7,10 @@ const REFRESH_KEY = "2xf_refresh_token";
 const USER_KEY = "2xf_user";
 
 export const tokenStore = {
-  getAccess: () => (typeof window === "undefined" ? null : localStorage.getItem(ACCESS_KEY)),
-  getRefresh: () => (typeof window === "undefined" ? null : localStorage.getItem(REFRESH_KEY)),
+  getAccess: () =>
+    typeof window === "undefined" ? null : localStorage.getItem(ACCESS_KEY),
+  getRefresh: () =>
+    typeof window === "undefined" ? null : localStorage.getItem(REFRESH_KEY),
   set(accessToken: string, refreshToken: string) {
     localStorage.setItem(ACCESS_KEY, accessToken);
     localStorage.setItem(REFRESH_KEY, refreshToken);
@@ -60,7 +62,10 @@ async function doRefresh(): Promise<boolean> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refreshToken }),
     });
-    const json = (await res.json()) as ApiEnvelope<{ accessToken: string; refreshToken: string }>;
+    const json = (await res.json()) as ApiEnvelope<{
+      accessToken: string;
+      refreshToken: string;
+    }>;
     if (!res.ok || !json.success) return false;
     tokenStore.set(json.data.accessToken, json.data.refreshToken);
     return true;
@@ -74,7 +79,10 @@ interface RequestOptions extends RequestInit {
   skipRefreshRetry?: boolean;
 }
 
-async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+async function request<T>(
+  path: string,
+  options: RequestOptions = {},
+): Promise<T> {
   const { auth = true, skipRefreshRetry, headers, ...rest } = options;
 
   const finalHeaders = new Headers(headers);
@@ -86,11 +94,23 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     if (token) finalHeaders.set("Authorization", `Bearer ${token}`);
   }
 
-  const res = await fetch(`${API_URL}${path}`, { ...rest, headers: finalHeaders });
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 8000);
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      ...rest,
+      headers: finalHeaders,
+      signal: rest.signal ?? controller.signal,
+    });
+  } finally {
+    window.clearTimeout(timeout);
+  }
 
   // Access token expired mid-session: refresh once, then retry the call.
   if (res.status === 401 && auth && !skipRefreshRetry) {
-    if (!refreshInFlight) refreshInFlight = doRefresh().finally(() => (refreshInFlight = null));
+    if (!refreshInFlight)
+      refreshInFlight = doRefresh().finally(() => (refreshInFlight = null));
     const refreshed = await refreshInFlight;
     if (refreshed) {
       return request<T>(path, { ...options, skipRefreshRetry: true });
@@ -104,22 +124,36 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   try {
     json = await res.json();
   } catch {
-    console.log("Error!!!!")
+    console.log("Error!!!!");
     throw new ApiRequestError("Unexpected server response", res.status);
   }
 
   if (!json.success) {
-    console.log("Error", json)
-    throw new ApiRequestError(json.error.message, json.error.statusCode, json.error.errors);
+    console.log("Error", json);
+    throw new ApiRequestError(
+      json.error.message,
+      json.error.statusCode,
+      json.error.errors,
+    );
   }
   return json.data;
 }
 
 export const api = {
-  get: <T>(path: string, options?: RequestOptions) => request<T>(path, { ...options, method: "GET" }),
+  get: <T>(path: string, options?: RequestOptions) =>
+    request<T>(path, { ...options, method: "GET" }),
   post: <T>(path: string, body?: unknown, options?: RequestOptions) =>
-    request<T>(path, { ...options, method: "POST", body: body !== undefined ? JSON.stringify(body) : undefined }),
+    request<T>(path, {
+      ...options,
+      method: "POST",
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    }),
   patch: <T>(path: string, body?: unknown, options?: RequestOptions) =>
-    request<T>(path, { ...options, method: "PATCH", body: body !== undefined ? JSON.stringify(body) : undefined }),
-  delete: <T>(path: string, options?: RequestOptions) => request<T>(path, { ...options, method: "DELETE" }),
+    request<T>(path, {
+      ...options,
+      method: "PATCH",
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    }),
+  delete: <T>(path: string, options?: RequestOptions) =>
+    request<T>(path, { ...options, method: "DELETE" }),
 };

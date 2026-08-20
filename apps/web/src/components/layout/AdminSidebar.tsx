@@ -2,14 +2,30 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowLeft, LayoutDashboard, ScrollText, ShieldCheck, Users, Wallet } from "lucide-react";
+import {
+  ArrowLeft,
+  ClipboardList,
+  Globe,
+  LayoutDashboard,
+  ArrowDownToLine,
+  LineChart,
+  ScrollText,
+  ShieldCheck,
+  Users,
+  Wallet,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BrandLogo } from "./BrandLogo";
 
-const nav = [
+export const adminNav = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard, exact: true },
+  { href: "/admin/deposits", label: "Deposits", icon: ArrowDownToLine },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/kyc", label: "KYC review", icon: ShieldCheck },
   { href: "/admin/withdrawals", label: "Withdrawals", icon: Wallet },
+  { href: "/admin/plans", label: "Plans", icon: LineChart },
+  { href: "/admin/tasks", label: "Tasks", icon: ClipboardList },
+  { href: "/admin/site-content", label: "Site content", icon: Globe },
   { href: "/admin/audit", label: "Audit log", icon: ScrollText },
 ];
 
@@ -18,29 +34,33 @@ export function AdminSidebar() {
 
   return (
     <aside className="hidden w-60 shrink-0 flex-col border-r border-base-border bg-base-raised lg:flex">
-      <div className="flex items-center gap-2 px-6 py-6">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber font-display text-sm font-bold text-base">
-          2X
-        </span>
-        <div>
-          <p className="font-display text-sm font-semibold leading-tight tracking-tight">2xFactor</p>
-          <p className="text-[11px] font-medium text-amber">Admin console</p>
-        </div>
+      <div className="px-6 py-6">
+        <BrandLogo href="/admin" compact admin />
+        <p className="ml-10 mt-1 text-[11px] font-medium text-amber">
+          Admin console
+        </p>
       </div>
 
       <nav className="flex-1 space-y-0.5 px-3">
-        {nav.map((item) => {
-          const active = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+        {adminNav.map((item) => {
+          const active = item.exact
+            ? pathname === item.href
+            : pathname.startsWith(item.href);
           const Icon = item.icon;
           return (
             <Link
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                active ? "bg-amber-soft text-amber" : "text-ink-dim hover:bg-base-surface2 hover:text-ink",
+                "relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                active
+                  ? "bg-amber-soft text-amber"
+                  : "text-ink-dim hover:bg-base-surface2 hover:text-ink",
               )}
             >
+              {active && (
+                <span className="absolute -left-3 top-1/2 h-4 w-1 -translate-y-1/2 rounded-r-full bg-amber" />
+              )}
               <Icon className="h-4 w-4" />
               {item.label}
             </Link>

@@ -2,7 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Bell, ChevronDown, LogOut, Menu, Settings, User as UserIcon, Wallet } from "lucide-react";
+import {
+  Bell,
+  ChevronDown,
+  LogOut,
+  Menu,
+  Settings,
+  User as UserIcon,
+  Wallet,
+} from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { walletApi } from "@/lib/api/wallet";
 import { notificationsApi } from "@/lib/api/notifications";
@@ -15,27 +23,35 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  function refreshBalance() {
     walletApi
       .getBalance()
       .then((b) => setBalance(String(b.total)))
       .catch(() => setBalance(null));
+  }
+
+  useEffect(() => {
+    refreshBalance();
     notificationsApi
       .unreadCount()
       .then((r) => setUnread(r.count))
       .catch(() => setUnread(0));
+
+    window.addEventListener("wallet-updated", refreshBalance);
+    return () => window.removeEventListener("wallet-updated", refreshBalance);
   }, []);
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+      if (menuRef.current && !menuRef.current.contains(e.target as Node))
+        setMenuOpen(false);
     }
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between border-b border-base-border bg-base px-4 sm:px-6">
+    <header className="relative z-30 flex h-16 shrink-0 items-center justify-between border-b border-base-border bg-base px-4 sm:px-6">
       <div className="flex items-center gap-3">
         <button
           onClick={onMenuClick}
@@ -79,7 +95,7 @@ export function Topbar({ onMenuClick }: { onMenuClick?: () => void }) {
             <ChevronDown className="h-3.5 w-3.5 text-ink-faint" />
           </button>
           {menuOpen && (
-            <div className="absolute right-0 top-11 w-52 animate-fade-up rounded-xl border border-base-border bg-base-surface p-1.5 shadow-panel">
+            <div className="absolute right-0 top-11 z-50 w-52 animate-fade-up rounded-xl border border-base-border bg-base-surface p-1.5 shadow-panel">
               <div className="px-3 py-2">
                 <p className="truncate text-sm font-medium text-ink">
                   {user?.firstName} {user?.lastName}

@@ -1,8 +1,10 @@
 import {
+  IsIn,
   IsInt,
   IsNumberString,
   IsOptional,
   IsString,
+  IsUrl,
   MaxLength,
   Min,
 } from 'class-validator';
@@ -29,4 +31,14 @@ export class UpdateTaskDto {
   @IsOptional()
   @IsString()
   status?: 'active' | 'inactive';
+
+  // See CreateTaskDto — requires task_type / target_url columns.
+  @IsOptional()
+  @IsIn(['video', 'app', 'other'])
+  taskType?: 'video' | 'app' | 'other';
+
+  @IsOptional()
+  @IsUrl({ require_protocol: true })
+  @MaxLength(2048)
+  targetUrl?: string;
 }

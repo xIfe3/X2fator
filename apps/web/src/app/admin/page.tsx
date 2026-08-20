@@ -1,44 +1,104 @@
 "use client";
 
 import Link from "next/link";
-import { ScrollText, ShieldCheck, Users, Wallet } from "lucide-react";
+import {
+  ArrowDownToLine,
+  ClipboardList,
+  LineChart,
+  ScrollText,
+  ShieldCheck,
+  Users,
+  Wallet,
+} from "lucide-react";
 import { useApiQuery } from "@/hooks/useApiQuery";
 import { adminApi } from "@/lib/api/admin";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
 
 const links = [
-  { href: "/admin/users", label: "Users", icon: Users, desc: "Suspend, activate, or block accounts." },
-  { href: "/admin/kyc", label: "KYC review", icon: ShieldCheck, desc: "Approve or reject identity documents." },
-  { href: "/admin/withdrawals", label: "Withdrawals", icon: Wallet, desc: "Review pending payout requests." },
-  { href: "/admin/audit", label: "Audit log", icon: ScrollText, desc: "See every admin action taken." },
+  {
+    href: "/admin/deposits",
+    label: "Deposits",
+    icon: ArrowDownToLine,
+    desc: "Review and credit account deposits.",
+  },
+  {
+    href: "/admin/users",
+    label: "Users",
+    icon: Users,
+    desc: "Suspend, activate, or block accounts.",
+  },
+  {
+    href: "/admin/kyc",
+    label: "KYC review",
+    icon: ShieldCheck,
+    desc: "Approve or reject identity documents.",
+  },
+  {
+    href: "/admin/withdrawals",
+    label: "Withdrawals",
+    icon: Wallet,
+    desc: "Review pending payout requests.",
+  },
+  {
+    href: "/admin/plans",
+    label: "Plans",
+    icon: LineChart,
+    desc: "Create and manage subscription plans.",
+  },
+  {
+    href: "/admin/tasks",
+    label: "Tasks",
+    icon: ClipboardList,
+    desc: "Create and manage earning tasks.",
+  },
+  {
+    href: "/admin/audit",
+    label: "Audit log",
+    icon: ScrollText,
+    desc: "See every admin action taken.",
+  },
 ];
 
 export default function AdminOverviewPage() {
-  const { data: users, isLoading: usersLoading } = useApiQuery(() => adminApi.users.list());
-  const { data: pendingKyc, isLoading: kycLoading } = useApiQuery(() => adminApi.kyc.pending());
-  const { data: pendingWithdrawals, isLoading: withdrawalsLoading } = useApiQuery(() =>
-    adminApi.withdrawals.pending(),
+  const { data: users, isLoading: usersLoading } = useApiQuery(() =>
+    adminApi.users.list(),
+  );
+  const { data: pendingKyc, isLoading: kycLoading } = useApiQuery(() =>
+    adminApi.kyc.pending(),
+  );
+  const { data: pendingWithdrawals, isLoading: withdrawalsLoading } =
+    useApiQuery(() => adminApi.withdrawals.pending());
+  const { data: deposits, isLoading: depositsLoading } = useApiQuery(() =>
+    adminApi.deposits.all(),
   );
 
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="font-display text-2xl font-semibold text-ink">Admin console</h1>
+        <h1 className="font-display text-2xl font-semibold text-ink">
+          Admin console
+        </h1>
         <p className="mt-1 text-sm text-ink-dim">
-          Actions here require the <span className="font-mono text-amber">admin</span> role and the specific
-          permission for each action (guarded server-side by <span className="font-mono">PermissionsGuard</span>).
+          Actions here require the{" "}
+          <span className="font-mono text-amber">admin</span> role and the
+          specific permission for each action (guarded server-side by{" "}
+          <span className="font-mono">PermissionsGuard</span>).
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
         {usersLoading ? (
           <Skeleton className="h-24" />
         ) : (
           <Card>
             <CardBody>
-              <p className="text-xs uppercase tracking-wider text-ink-faint">Total users</p>
-              <p className="mt-2 font-mono text-2xl font-semibold tabular text-ink">{users?.length ?? 0}</p>
+              <p className="text-xs uppercase tracking-wider text-ink-faint">
+                Total users
+              </p>
+              <p className="mt-2 font-mono text-2xl font-semibold tabular text-ink">
+                {users?.length ?? 0}
+              </p>
             </CardBody>
           </Card>
         )}
@@ -47,8 +107,12 @@ export default function AdminOverviewPage() {
         ) : (
           <Card>
             <CardBody>
-              <p className="text-xs uppercase tracking-wider text-ink-faint">Pending KYC</p>
-              <p className="mt-2 font-mono text-2xl font-semibold tabular text-amber">{pendingKyc?.length ?? 0}</p>
+              <p className="text-xs uppercase tracking-wider text-ink-faint">
+                Pending KYC
+              </p>
+              <p className="mt-2 font-mono text-2xl font-semibold tabular text-amber">
+                {pendingKyc?.length ?? 0}
+              </p>
             </CardBody>
           </Card>
         )}
@@ -57,9 +121,26 @@ export default function AdminOverviewPage() {
         ) : (
           <Card>
             <CardBody>
-              <p className="text-xs uppercase tracking-wider text-ink-faint">Pending withdrawals</p>
+              <p className="text-xs uppercase tracking-wider text-ink-faint">
+                Pending withdrawals
+              </p>
               <p className="mt-2 font-mono text-2xl font-semibold tabular text-amber">
                 {pendingWithdrawals?.length ?? 0}
+              </p>
+            </CardBody>
+          </Card>
+        )}
+        {depositsLoading ? (
+          <Skeleton className="h-24" />
+        ) : (
+          <Card>
+            <CardBody>
+              <p className="text-xs uppercase tracking-wider text-ink-faint">
+                Pending deposits
+              </p>
+              <p className="mt-2 font-mono text-2xl font-semibold tabular text-amber">
+                {deposits?.filter((deposit) => deposit.status === "pending")
+                  .length ?? 0}
               </p>
             </CardBody>
           </Card>

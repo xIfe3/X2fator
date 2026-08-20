@@ -1,33 +1,5 @@
-/**
- * Seeds the data 2xFactor needs before ANY user can sign in:
- *
- * 1. The `user` role — AuthService.register() throws
- *    ConflictException('Default user role is not configured') if this
- *    row doesn't exist, so registration is completely blocked without it.
- * 2. The `admin` role, plus every permission the admin controllers check
- *    via @RequirePermission(...) (PermissionsGuard reads these live from
- *    role_permissions on every request — see permissions.guard.ts).
- * 3. One bootstrap admin account, since there is no "promote to admin"
- *    API route anywhere in the app — the only way to get an admin is a
- *    direct DB write like this one.
- *
- * Safe to re-run: every insert is keyed off a unique constraint
- * (role/permission name, the role+permission pair, or the admin's
- * email) and skips rows that already exist instead of erroring.
- *
- * Usage (from packages/database):
- *   pnpm db:seed
- *   SEED_ADMIN_EMAIL=me@2xfactor.com SEED_ADMIN_PASSWORD=... pnpm db:seed
- */
-
 import { config } from "dotenv";
 
-// Loaded before anything else, and BEFORE `./client` is imported below —
-// client.ts reads process.env.DATABASE_URL at module-evaluation time to
-// build the pg Pool, and static `import` statements are hoisted above
-// runtime code in ESM, so a top-of-file `import { db } from "./client"`
-// would run before this config() call ever fires. The dynamic import()
-// inside main() sidesteps that ordering trap.
 config({ path: "../../.env" });
 
 async function main() {
@@ -37,9 +9,6 @@ async function main() {
   const { eq, inArray } = await import("drizzle-orm");
   const bcrypt = await import("bcrypt");
 
-  // Every permission name referenced by @RequirePermission(...) across
-  // the admin controllers. Keep this list in sync with the codebase —
-  // grep for RequirePermission( to check for drift.
   const PERMISSIONS: { name: string; description: string }[] = [
     { name: "users.read", description: "View user accounts" },
     { name: "users.suspend", description: "Suspend a user account" },
@@ -109,7 +78,10 @@ async function main() {
   await db
     .insert(rolePermissions)
     .values(
-      permissionRows.map((p) => ({ roleId: adminRole.id, permissionId: p.id })),
+      permissionRows.map((p: any) => ({
+        roleId: adminRole.id,
+        permissionId: p.id,
+      })),
     )
     .onConflictDoNothing({
       target: [rolePermissions.roleId, rolePermissions.permissionId],
@@ -136,7 +108,7 @@ async function main() {
     const referralCode =
       "XF" + Math.random().toString(36).substring(2, 8).toUpperCase();
 
-    await db.transaction(async (tx) => {
+    await db.transaction(async (tx: any) => {
       const [admin] = await tx
         .insert(users)
         .values({

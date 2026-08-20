@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { Space_Grotesk, Inter, IBM_Plex_Mono } from "next/font/google";
+import { Fraunces, Inter, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 import { ToastProvider } from "@/components/ui/Toast";
 
-const display = Space_Grotesk({
+const display = Fraunces({
   subsets: ["latin"],
   // Named to avoid colliding with Tailwind v4's own --font-display theme
   // variable (defined in globals.css @theme inline, which references
@@ -20,14 +20,20 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "2xFactor",
-  description: "Invest, complete tasks, earn — the 2xFactor ledger.",
+  title: "X2Factor",
+  description: "Invest, complete tasks, earn with X2Factor.",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en" className="dark">
-      <body className={`${display.variable} ${body.variable} ${mono.variable} font-body bg-base text-ink antialiased`}>
+      <body
+        className={`${display.variable} ${body.variable} ${mono.variable} font-body bg-base text-ink antialiased`}
+      >
         <ToastProvider>
           <AuthProvider>{children}</AuthProvider>
         </ToastProvider>

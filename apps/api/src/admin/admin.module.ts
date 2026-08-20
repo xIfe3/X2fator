@@ -4,6 +4,7 @@ import { AdminAuditController } from './controllers/admin-audit.controller';
 import { AdminKycController } from './controllers/admin-kyc.controller';
 import { AdminUsersController } from './controllers/admin-users.controller';
 import { AdminWalletsController } from './controllers/admin-wallets.controller';
+import { AdminWithdrawalsController } from './controllers/admin-withdrawals.controller';
 import { AdminKycService } from './services/admin-kyc.service';
 import { AdminUsersService } from './services/admin-users.service';
 import { AdminWalletsService } from './services/admin-wallets.service';
@@ -16,7 +17,7 @@ import { AuditService } from 'src/audit/audit.service';
     AdminKycController,
     AdminUsersController,
     AdminWalletsController,
-    AdminWalletsController,
+    AdminWithdrawalsController,
   ],
   providers: [
     WalletService,

@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
+import { BrandLogo } from "./BrandLogo";
 
 const nav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -42,26 +43,29 @@ export function Sidebar() {
 
   return (
     <aside className="hidden w-60 shrink-0 flex-col border-r border-base-border bg-base-raised lg:flex">
-      <Link href="/dashboard" className="flex items-center gap-2 px-6 py-6">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-mint font-display text-sm font-bold text-base">
-          2X
-        </span>
-        <span className="font-display text-base font-semibold tracking-tight">2xFactor</span>
-      </Link>
+      <div className="px-6 py-6">
+        <BrandLogo href="/dashboard" compact />
+      </div>
 
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4">
         {nav.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(item.href + "/");
+          const active =
+            pathname === item.href || pathname.startsWith(item.href + "/");
           const Icon = item.icon;
           return (
             <Link
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                active ? "bg-mint-soft text-mint" : "text-ink-dim hover:bg-base-surface2 hover:text-ink",
+                "relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                active
+                  ? "bg-mint-soft text-mint"
+                  : "text-ink-dim hover:bg-base-surface2 hover:text-ink",
               )}
             >
+              {active && (
+                <span className="absolute -left-3 top-1/2 h-4 w-1 -translate-y-1/2 rounded-r-full bg-mint" />
+              )}
               <Icon className="h-4 w-4" />
               {item.label}
             </Link>
@@ -76,12 +80,15 @@ export function Sidebar() {
             <Link
               href="/admin"
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                "relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                 pathname.startsWith("/admin")
                   ? "bg-amber-soft text-amber"
                   : "text-ink-dim hover:bg-base-surface2 hover:text-ink",
               )}
             >
+              {pathname.startsWith("/admin") && (
+                <span className="absolute -left-3 top-1/2 h-4 w-1 -translate-y-1/2 rounded-r-full bg-amber" />
+              )}
               <ShieldAlert className="h-4 w-4" />
               Admin console
             </Link>

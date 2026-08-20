@@ -8,9 +8,11 @@ import { and, eq, ne } from 'drizzle-orm';
 
 import { db } from '@2xfactor/database';
 import { plans, planSubscriptions } from '@2xfactor/database';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class PlansService {
+  constructor(private readonly auditService: AuditService) {}
   /**
    * Get all active plans for users.
    */
@@ -65,7 +67,7 @@ export class PlansService {
   /**
    * Create a plan.
    */
-  async create(data: {
+  async create(adminId: string, data: {
     name: string;
     description?: string;
     price: string;
@@ -131,6 +133,15 @@ export class PlansService {
       })
       .returning();
 
+    await this.auditService.log({
+      actorId: adminId,
+      action: 'create',
+      entityType: 'plan',
+      entityId: plan.id,
+      description: `Created plan "${plan.name}"`,
+      newValues: { ...data },
+    });
+
     return plan;
   }
 
@@ -138,6 +149,7 @@ export class PlansService {
    * Update a plan.
    */
   async update(
+    adminId: string,
     id: string,
     data: {
       name?: string;
@@ -203,6 +215,16 @@ export class PlansService {
       .where(eq(plans.id, id))
       .returning();
 
+    await this.auditService.log({
+      actorId: adminId,
+      action: 'update',
+      entityType: 'plan',
+      entityId: id,
+      description: `Updated plan "${existing.name}"`,
+      oldValues: { ...existing },
+      newValues: { ...data },
+    });
+
     return updatedPlan;
   }
 
@@ -211,8 +233,8 @@ export class PlansService {
    *
    * We do not allow deleting a plan that has subscriptions.
    */
-  async remove(id: string) {
-    await this.findById(id);
+  async remove(adminId: string, id: string) {
+    const existing = await this.findById(id);
 
     const subscription = await db.query.planSubscriptions.findFirst({
       where: eq(planSubscriptions.planId, id),
@@ -225,6 +247,15 @@ export class PlansService {
     }
 
     await db.delete(plans).where(eq(plans.id, id));
+
+    await this.auditService.log({
+      actorId: adminId,
+      action: 'delete',
+      entityType: 'plan',
+      entityId: id,
+      description: `Deleted plan "${existing.name}"`,
+      oldValues: { ...existing },
+    });
 
     return {
       message: 'Plan deleted successfully',

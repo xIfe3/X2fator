@@ -1,11 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { LineChart } from "lucide-react";
+import { Check, LineChart, Star } from "lucide-react";
 import { useApiQuery } from "@/hooks/useApiQuery";
 import { plansApi, subscriptionsApi } from "@/lib/api/plans";
 import type { Plan } from "@/lib/types";
-import { Card, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -48,37 +47,72 @@ export default function PlansPage() {
       ) : !plans || plans.length === 0 ? (
         <EmptyState icon={LineChart} title="No active plans" description="Check back soon — new plans are added regularly." />
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {plans.map((p) => (
-            <Card key={p.id} className="flex flex-col justify-between transition-colors hover:border-mint/40">
-              <CardBody className="space-y-4">
-                <div>
-                  <h3 className="font-display text-base font-semibold text-ink">{p.name}</h3>
-                  {p.description && <p className="mt-1 text-xs text-ink-dim">{p.description}</p>}
+            <div
+              key={p.id}
+              className={
+                "group relative flex flex-col overflow-hidden rounded-2xl border bg-base-surface shadow-panel transition-all hover:-translate-y-0.5 " +
+                (p.isFeatured ? "border-mint-dim/60 shadow-stamp" : "border-base-border hover:border-mint-dim/40")
+              }
+            >
+              {p.isFeatured && (
+                <div className="flex items-center gap-1.5 bg-mint px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-base">
+                  <Star className="h-3 w-3 fill-base" /> Most subscribed
                 </div>
-                <div className="space-y-1.5 border-t border-base-border pt-4">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-ink-dim">Price</span>
-                    <span className="font-mono font-semibold tabular text-ink">{formatMoney(p.price)}</span>
-                  </div>
-                  {p.dailyReturn && (
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-ink-dim">Daily return</span>
-                      <span className="font-mono font-semibold tabular text-mint">{formatMoney(p.dailyReturn)}</span>
-                    </div>
-                  )}
-                  {p.durationDays && (
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-ink-dim">Duration</span>
-                      <span className="font-mono tabular text-ink">{p.durationDays} days</span>
-                    </div>
-                  )}
+              )}
+
+              <div className="flex flex-1 flex-col p-6">
+                <h3 className="font-display text-lg font-semibold text-ink">{p.name}</h3>
+                {p.description && <p className="mt-1.5 text-sm text-ink-dim">{p.description}</p>}
+
+                <div className="mt-5 flex items-baseline gap-1.5">
+                  <span className="font-mono text-3xl font-semibold tabular text-ink">{formatMoney(p.price)}</span>
+                  <span className="text-xs text-ink-faint">/ {p.durationDays} days</span>
                 </div>
-                <Button className="w-full" onClick={() => setSelected(p)}>
+
+                <div className="ledger-tear my-5" />
+
+                <ul className="flex-1 space-y-2.5 text-sm">
+                  {p.dailyReward && (
+                    <li className="flex items-center justify-between">
+                      <span className="flex items-center gap-2 text-ink-dim">
+                        <Check className="h-3.5 w-3.5 text-mint" /> Daily reward
+                      </span>
+                      <span className="font-mono font-semibold tabular text-mint">{formatMoney(p.dailyReward)}</span>
+                    </li>
+                  )}
+                  {p.dailyTaskLimit != null && (
+                    <li className="flex items-center justify-between">
+                      <span className="flex items-center gap-2 text-ink-dim">
+                        <Check className="h-3.5 w-3.5 text-mint" /> Tasks per day
+                      </span>
+                      <span className="font-mono tabular text-ink">{p.dailyTaskLimit}</span>
+                    </li>
+                  )}
+                  {p.referralRewardRate && (
+                    <li className="flex items-center justify-between">
+                      <span className="flex items-center gap-2 text-ink-dim">
+                        <Check className="h-3.5 w-3.5 text-mint" /> Referral bonus
+                      </span>
+                      <span className="font-mono tabular text-ink">{Number(p.referralRewardRate) * 100}%</span>
+                    </li>
+                  )}
+                  {p.minimumWithdrawal && (
+                    <li className="flex items-center justify-between">
+                      <span className="flex items-center gap-2 text-ink-dim">
+                        <Check className="h-3.5 w-3.5 text-mint" /> Min. withdrawal
+                      </span>
+                      <span className="font-mono tabular text-ink">{formatMoney(p.minimumWithdrawal)}</span>
+                    </li>
+                  )}
+                </ul>
+
+                <Button className="mt-6 w-full" onClick={() => setSelected(p)}>
                   Subscribe
                 </Button>
-              </CardBody>
-            </Card>
+              </div>
+            </div>
           ))}
         </div>
       )}

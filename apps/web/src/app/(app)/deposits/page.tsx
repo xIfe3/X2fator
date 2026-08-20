@@ -18,7 +18,11 @@ import { useToast } from "@/components/ui/Toast";
 import { formatDateTime, formatMoney } from "@/lib/utils";
 
 export default function DepositsPage() {
-  const { data: deposits, isLoading, refetch } = useApiQuery(() => depositsApi.list());
+  const {
+    data: deposits,
+    isLoading,
+    refetch,
+  } = useApiQuery(() => depositsApi.list());
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const [provider, setProvider] = useState<DepositProvider>("mock");
@@ -31,13 +35,24 @@ export default function DepositsPage() {
     setError(null);
     setSubmitting(true);
     try {
-      await depositsApi.create(amount, provider);
+      const result = await depositsApi.create(amount, provider);
+      if (provider === "paystack") {
+        const payment = await depositsApi.initializePayment(result.deposit.id);
+        if (payment.authorizationUrl) {
+          window.location.assign(payment.authorizationUrl);
+          return;
+        }
+      }
       push("success", "Deposit created. Complete payment to fund your wallet.");
       setOpen(false);
       setAmount("");
       refetch();
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Could not create deposit.");
+      setError(
+        err instanceof ApiRequestError
+          ? err.message
+          : "Could not create deposit.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -47,7 +62,9 @@ export default function DepositsPage() {
     <div className="space-y-6">
       <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
         <div>
-          <h1 className="font-display text-2xl font-semibold text-ink">Deposits</h1>
+          <h1 className="font-display text-2xl font-semibold text-ink">
+            Deposits
+          </h1>
           <p className="mt-1 text-sm text-ink-dim">Fund your account wallet.</p>
         </div>
         <Button onClick={() => setOpen(true)}>
@@ -85,13 +102,19 @@ export default function DepositsPage() {
               <tbody>
                 {deposits.map((d) => (
                   <Tr key={d.id}>
-                    <Td className="font-mono text-xs text-ink-dim">{d.reference ?? d.id.slice(0, 8)}</Td>
+                    <Td className="font-mono text-xs text-ink-dim">
+                      {d.reference ?? d.id.slice(0, 8)}
+                    </Td>
                     <Td className="capitalize">{d.provider}</Td>
-                    <Td className="text-ink-dim">{formatDateTime(d.createdAt)}</Td>
+                    <Td className="text-ink-dim">
+                      {formatDateTime(d.createdAt)}
+                    </Td>
                     <Td>
                       <StatusPill status={d.status} />
                     </Td>
-                    <Td className="text-right font-mono tabular font-medium text-ink">{formatMoney(d.amount)}</Td>
+                    <Td className="text-right font-mono tabular font-medium text-ink">
+                      {formatMoney(d.amount)}
+                    </Td>
                   </Tr>
                 ))}
               </tbody>
@@ -112,7 +135,11 @@ export default function DepositsPage() {
             onChange={(e) => setAmount(e.target.value)}
             placeholder="5000"
           />
-          <Select label="Provider" value={provider} onChange={(e) => setProvider(e.target.value as DepositProvider)}>
+          <Select
+            label="Provider"
+            value={provider}
+            onChange={(e) => setProvider(e.target.value as DepositProvider)}
+          >
             <option value="mock">Mock (instant, sandbox)</option>
             <option value="paystack">Paystack</option>
             <option value="flutterwave">Flutterwave</option>

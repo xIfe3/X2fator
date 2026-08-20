@@ -2,17 +2,22 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { eq } from 'drizzle-orm';
 
 import { db } from '@2xfactor/database';
-import { deposits, payments } from '@2xfactor/database';
+import { deposits, payments, users } from '@2xfactor/database';
 
 import { WalletService } from '../wallet/wallet.service';
 
 @Injectable()
 export class PaymentsService {
-  constructor(private readonly walletService: WalletService) {}
+  constructor(
+    @Optional() private readonly walletService?: WalletService,
+    @Optional() private readonly configService?: ConfigService,
+  ) {}
 
   /**
    * Initialize a payment.
@@ -41,11 +46,61 @@ export class PaymentsService {
       throw new NotFoundException('Payment record not found');
     }
 
-    /**
-     * Provider integration goes here.
-     *
-     * For now we return the payment information.
-     */
+    if (payment.provider === 'paystack') {
+      const secretKey = this.configService?.get<string>('paystack.secretKey');
+      if (!secretKey) {
+        throw new BadRequestException('Paystack is not configured');
+      }
+
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, userId),
+      });
+      if (!user) throw new NotFoundException('User not found');
+
+      const response = await fetch(
+        'https://api.paystack.co/transaction/initialize',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${secretKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: user.email,
+            amount: Math.round(Number(payment.amount) * 100),
+            reference: payment.reference,
+            currency: deposit.currency,
+            callback_url: this.configService?.get<string>(
+              'paystack.callbackUrl',
+            ),
+          }),
+        },
+      );
+
+      const body = (await response.json()) as {
+        status?: boolean;
+        message?: string;
+        data?: { authorization_url?: string; access_code?: string };
+      };
+
+      if (!response.ok || !body.status || !body.data?.authorization_url) {
+        throw new BadRequestException(
+          body.message ?? 'Paystack initialization failed',
+        );
+      }
+
+      return {
+        paymentId: payment.id,
+        reference: payment.reference,
+        provider: payment.provider,
+        amount: payment.amount,
+        currency: deposit.currency,
+        status: payment.status,
+        authorizationUrl: body.data.authorization_url,
+        accessCode: body.data.access_code,
+      };
+    }
+
     return {
       paymentId: payment.id,
       reference: payment.reference,
@@ -69,6 +124,41 @@ export class PaymentsService {
     }
 
     return payment;
+  }
+
+  async verifyPaystackPayment(userId: string, reference: string) {
+    const payment = await db.query.payments.findFirst({
+      where: eq(payments.reference, reference),
+    });
+
+    if (!payment || payment.userId !== userId) {
+      throw new NotFoundException('Payment not found');
+    }
+    if (payment.provider !== 'paystack') {
+      throw new BadRequestException('Payment is not a Paystack payment');
+    }
+    if (payment.status === 'successful') return payment;
+
+    const secretKey = this.configService?.get<string>('paystack.secretKey');
+    if (!secretKey) throw new BadRequestException('Paystack is not configured');
+
+    const response = await fetch(
+      `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
+      { headers: { Authorization: `Bearer ${secretKey}` } },
+    );
+    const body = (await response.json()) as {
+      status?: boolean;
+      message?: string;
+      data?: { status?: string; reference?: string };
+    };
+
+    if (!response.ok || !body.status || body.data?.status !== 'success') {
+      throw new BadRequestException(
+        body.message ?? 'Paystack payment is not successful',
+      );
+    }
+
+    return this.completePayment(reference, body.data.reference ?? reference);
   }
 
   /**
@@ -118,7 +208,7 @@ export class PaymentsService {
     /**
      * Credit the account wallet.
      */
-    await this.walletService.credit({
+    await this.walletService!.credit({
       userId: payment.userId,
       walletType: 'account',
       amount: payment.amount,

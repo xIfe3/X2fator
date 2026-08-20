@@ -12,7 +12,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PageSkeleton } from "@/components/ui/Skeleton";
 import { ApiRequestError } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime, resolveFileUrl } from "@/lib/utils";
 
 const documentLabels: Record<string, string> = {
   national_id: "National ID",
@@ -71,7 +71,11 @@ export default function AdminKycPage() {
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {pending.map((d) => (
-            <Card key={d.id}>
+            <Card key={d.id} className="overflow-hidden">
+              <a href={resolveFileUrl(d.documentUrl)} target="_blank" rel="noreferrer" className="block bg-base-raised">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={resolveFileUrl(d.documentUrl)} alt="KYC document" className="h-44 w-full object-cover" />
+              </a>
               <CardHeader>
                 <CardTitle>{documentLabels[d.documentType] ?? d.documentType}</CardTitle>
               </CardHeader>
@@ -82,14 +86,6 @@ export default function AdminKycPage() {
                     Doc #: <span className="font-mono text-ink">{d.documentNumber}</span>
                   </p>
                 )}
-                <a
-                  href={d.documentUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block truncate text-sm text-mint hover:underline"
-                >
-                  View document
-                </a>
                 <div className="flex gap-2 pt-2">
                   <Button size="sm" isLoading={busyId === d.id} onClick={() => approve(d.id)} className="flex-1">
                     Approve

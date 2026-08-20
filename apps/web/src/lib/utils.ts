@@ -68,3 +68,25 @@ export function statusTone(status: string | null | undefined): Tone {
   if (["closed", "resolved"].includes(s)) return "info";
   return "neutral";
 }
+
+export function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+export function isValidNigerianPhone(value: string) {
+  if (!value) return true; // optional field
+  return /^(\+234|0)[789][01]\d{8}$/.test(value.trim());
+}
+
+/**
+ * Resolves a possibly-relative file URL (e.g. "/uploads/xyz.png", as
+ * returned by our own upload endpoint) against the API's origin, so
+ * links/images work regardless of whether the frontend and backend are
+ * on different hosts. Absolute URLs are returned unchanged.
+ */
+export function resolveFileUrl(url?: string | null) {
+  if (!url) return "";
+  if (/^https?:\/\//i.test(url)) return url;
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
+  return `${apiUrl.replace(/\/api$/, "")}${url}`;
+}

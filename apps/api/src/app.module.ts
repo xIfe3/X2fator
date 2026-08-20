@@ -25,6 +25,10 @@ import { AdminModule } from './admin/admin.module';
 import { AuditModule } from './audit/audit.module';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor'; // adjust path
 import { HttpExceptionFilter } from './common/filters/http-exception.filter'; // adjust path
+import { MailModule } from './mail/mail.module';
+import { UploadsModule } from './uploads/uploads.module';
+import { SiteContentModule } from './site-content/site-content.module';
+import { BonusesModule } from './bonuses/bonuses.module';
 
 @Module({
   controllers: [HealthController],
@@ -60,6 +64,10 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter'; //
     SupportModule,
     AdminModule,
     AuditModule,
+    MailModule,
+    UploadsModule,
+    SiteContentModule,
+    BonusesModule,
   ],
 })
 export class AppModule {}
