@@ -1,7 +1,6 @@
 "use client";
 
-import { createElement, type ButtonHTMLAttributes } from "react";
-import { Loader2 } from "lucide-react";
+import type { ButtonHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger" | "outline";
@@ -39,20 +38,25 @@ export function Button({
   children,
   ...props
 }: ButtonProps) {
-  return createElement(
-    "button",
-    {
-      ...props,
-      type: props.type ?? "button",
-      disabled: disabled || isLoading,
-      className: cn(
+  return (
+    <button
+      {...props}
+      type={props.type ?? "button"}
+      disabled={disabled || isLoading}
+      className={cn(
         "inline-flex items-center justify-center rounded-xl font-medium transition-all duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:active:scale-100",
         variants[variant],
         sizes[size],
         className,
-      ),
-    },
-    isLoading ? createElement(Loader2, { className: "h-4 w-4 animate-spin" }) : null,
-    children,
+      )}
+    >
+      {isLoading && (
+        <span
+          aria-hidden="true"
+          className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+        />
+      )}
+      {children}
+    </button>
   );
 }
