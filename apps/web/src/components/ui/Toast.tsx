@@ -11,7 +11,9 @@ interface ToastItem {
   message: string;
 }
 
-const ToastContext = createContext<{ push: (kind: ToastKind, message: string) => void } | null>(null);
+const ToastContext = createContext<{
+  push: (kind: ToastKind, message: string) => void;
+} | null>(null);
 
 const icons: Record<ToastKind, typeof CheckCircle2> = {
   success: CheckCircle2,
