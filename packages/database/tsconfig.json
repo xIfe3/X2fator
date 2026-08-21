@@ -2,8 +2,6 @@
   "extends": "../typescript-config/base.json",
   "compilerOptions": {
     "declaration": true,
-    "composite": true,
-    "incremental": true,
     "outDir": "dist",
     "rootDir": "src",
     "module": "CommonJS",
