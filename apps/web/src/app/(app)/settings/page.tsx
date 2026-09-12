@@ -4,7 +4,8 @@ import { FormEvent, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { StatusPill } from "@/components/ui/StatusPill";
-import { initials, formatDate } from "@/lib/utils";
+import { Avatar } from "@/components/ui/Avatar";
+import { formatDate } from "@/lib/utils";
 import { PasswordField } from "@/components/ui/PasswordField";
 import { PasswordStrength } from "@/components/ui/PasswordStrength";
 import { Button } from "@/components/ui/Button";
@@ -58,7 +59,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="space-y-6">
       <div>
         <h1 className="font-display text-2xl font-semibold text-ink">
           Account settings
@@ -68,9 +69,11 @@ export default function SettingsPage() {
 
       <Card>
         <CardBody className="flex items-center gap-4">
-          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-base-surface2 font-display text-lg font-semibold text-ink">
-            {user ? initials(user.firstName, user.lastName) : "··"}
-          </span>
+          <Avatar
+            size="lg"
+            firstName={user?.firstName}
+            lastName={user?.lastName}
+          />
           <div>
             <p className="font-display text-lg font-semibold text-ink">
               {user?.firstName} {user?.lastName}

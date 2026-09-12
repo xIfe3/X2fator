@@ -5,15 +5,15 @@ import { Zap } from "lucide-react";
 import { useApiQuery } from "@/hooks/useApiQuery";
 import { utilitiesApi } from "@/lib/api/utilities";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Table, THead, Th, Tr, Td } from "@/components/ui/Table";
 import { Button } from "@/components/ui/Button";
 import { Input, Select } from "@/components/ui/Input";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { Money } from "@/components/ui/Money";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageSkeleton } from "@/components/ui/Skeleton";
 import { ApiRequestError } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
-import { formatDateTime, formatMoney } from "@/lib/utils";
+import { formatDateTime } from "@/lib/utils";
 
 export default function UtilitiesPage() {
   const { data: purchases, isLoading, refetch } = useApiQuery(() => utilitiesApi.myPurchases());
@@ -97,28 +97,30 @@ export default function UtilitiesPage() {
           ) : !purchases || purchases.length === 0 ? (
             <EmptyState icon={Zap} title="No purchases yet" />
           ) : (
-            <Table>
-              <THead>
-                <Th>Reference</Th>
-                <Th>Type</Th>
-                <Th>Date</Th>
-                <Th>Status</Th>
-                <Th className="text-right">Amount</Th>
-              </THead>
-              <tbody>
-                {purchases.map((p) => (
-                  <Tr key={p.id}>
-                    <Td className="font-mono text-xs text-ink-dim">{p.reference}</Td>
-                    <Td className="capitalize">{p.type ?? "—"}</Td>
-                    <Td className="text-ink-dim">{formatDateTime(p.createdAt)}</Td>
-                    <Td>
-                      <StatusPill status={p.status} />
-                    </Td>
-                    <Td className="text-right font-mono tabular font-medium text-ink">{formatMoney(p.amount)}</Td>
-                  </Tr>
-                ))}
-              </tbody>
-            </Table>
+            <div className="space-y-2.5">
+              {purchases.map((p) => (
+                <div
+                  key={p.id}
+                  className="flex items-center gap-4 rounded-xl border border-base-border bg-base-raised p-4"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium capitalize text-ink">
+                      {p.type ?? "—"}
+                    </p>
+                    <p className="mt-0.5 truncate font-mono text-[11px] text-ink-faint">
+                      {p.reference}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-ink-faint">
+                      {formatDateTime(p.createdAt)}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1.5">
+                    <Money value={p.amount} size="sm" />
+                    <StatusPill status={p.status} />
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </CardBody>
       </Card>

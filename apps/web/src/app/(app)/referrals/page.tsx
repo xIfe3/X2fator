@@ -6,9 +6,9 @@ import { useApiQuery } from "@/hooks/useApiQuery";
 import { referralsApi } from "@/lib/api/referrals";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { StatCard } from "@/components/ui/StatCard";
-import { Table, THead, Th, Tr, Td } from "@/components/ui/Table";
 import { Button } from "@/components/ui/Button";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { Avatar } from "@/components/ui/Avatar";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageSkeleton, Skeleton } from "@/components/ui/Skeleton";
 import { formatDate, formatMoney } from "@/lib/utils";
@@ -77,28 +77,28 @@ export default function ReferralsPage() {
           ) : !referrals || referrals.length === 0 ? (
             <EmptyState icon={Users} title="No referrals yet" description="Share your code above to start earning." />
           ) : (
-            <Table>
-              <THead>
-                <Th>Name</Th>
-                <Th>Email</Th>
-                <Th>Joined</Th>
-                <Th>Status</Th>
-              </THead>
-              <tbody>
-                {referrals.map((r) => (
-                  <Tr key={r.id}>
-                    <Td>
+            <div className="space-y-2.5">
+              {referrals.map((r) => (
+                <div
+                  key={r.id}
+                  className="flex items-center gap-3 rounded-xl border border-base-border bg-base-raised p-4"
+                >
+                  <Avatar firstName={r.firstName} lastName={r.lastName} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-ink">
                       {r.firstName} {r.lastName}
-                    </Td>
-                    <Td className="text-ink-dim">{r.email}</Td>
-                    <Td className="text-ink-dim">{formatDate(r.createdAt)}</Td>
-                    <Td>
-                      <StatusPill status={r.status} />
-                    </Td>
-                  </Tr>
-                ))}
-              </tbody>
-            </Table>
+                    </p>
+                    <p className="truncate text-xs text-ink-faint">
+                      {r.email}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-ink-faint">
+                      Joined {formatDate(r.createdAt)}
+                    </p>
+                  </div>
+                  <StatusPill status={r.status} />
+                </div>
+              ))}
+            </div>
           )}
         </CardBody>
       </Card>

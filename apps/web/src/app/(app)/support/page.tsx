@@ -6,7 +6,6 @@ import { LifeBuoy, Plus } from "lucide-react";
 import { useApiQuery } from "@/hooks/useApiQuery";
 import { supportApi } from "@/lib/api/support";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Table, THead, Th, Tr, Td } from "@/components/ui/Table";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Input, Select, Textarea } from "@/components/ui/Input";
@@ -84,37 +83,29 @@ export default function SupportPage() {
               description="Open a ticket if something needs attention."
             />
           ) : (
-            <Table>
-              <THead>
-                <Th>Subject</Th>
-                <Th>Priority</Th>
-                <Th>Opened</Th>
-                <Th>Status</Th>
-              </THead>
-              <tbody>
-                {tickets.map((t) => (
-                  <Tr key={t.id} className="cursor-pointer">
-                    <Td>
-                      <Link
-                        href={`/support/${t.id}`}
-                        className="hover:text-primary"
-                      >
-                        {t.subject}
-                      </Link>
-                    </Td>
-                    <Td className="capitalize text-ink-dim">
-                      {t.priority ?? "—"}
-                    </Td>
-                    <Td className="text-ink-dim">
-                      {formatDateTime(t.createdAt)}
-                    </Td>
-                    <Td>
-                      <StatusPill status={t.status} />
-                    </Td>
-                  </Tr>
-                ))}
-              </tbody>
-            </Table>
+            <div className="space-y-2.5">
+              {tickets.map((t) => (
+                <Link
+                  key={t.id}
+                  href={`/support/${t.id}`}
+                  className="flex items-center gap-4 rounded-xl border border-base-border bg-base-raised p-4 transition-colors hover:border-base-borderStrong"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-ink">
+                      {t.subject}
+                    </p>
+                    <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-ink-faint">
+                      <span className="capitalize">
+                        {t.priority ?? "—"} priority
+                      </span>
+                      <span>·</span>
+                      <span>{formatDateTime(t.createdAt)}</span>
+                    </div>
+                  </div>
+                  <StatusPill status={t.status} />
+                </Link>
+              ))}
+            </div>
           )}
         </CardBody>
       </Card>

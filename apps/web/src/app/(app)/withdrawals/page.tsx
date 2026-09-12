@@ -5,16 +5,16 @@ import { ArrowUpFromLine, Plus } from "lucide-react";
 import { useApiQuery } from "@/hooks/useApiQuery";
 import { withdrawalsApi } from "@/lib/api/withdrawals";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Table, THead, Th, Tr, Td } from "@/components/ui/Table";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { Money } from "@/components/ui/Money";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageSkeleton } from "@/components/ui/Skeleton";
 import { ApiRequestError } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
-import { formatDateTime, formatMoney } from "@/lib/utils";
+import { formatDateTime } from "@/lib/utils";
 
 export default function WithdrawalsPage() {
   const {
@@ -89,34 +89,33 @@ export default function WithdrawalsPage() {
               description="Requests are reviewed by an admin before payout."
             />
           ) : (
-            <Table>
-              <THead>
-                <Th>Bank</Th>
-                <Th>Account</Th>
-                <Th>Date</Th>
-                <Th>Status</Th>
-                <Th className="text-right">Amount</Th>
-              </THead>
-              <tbody>
-                {withdrawals.map((w) => (
-                  <Tr key={w.id}>
-                    <Td>{w.bankName}</Td>
-                    <Td className="font-mono text-xs text-ink-dim">
+            <div className="space-y-2.5">
+              {withdrawals.map((w) => (
+                <div
+                  key={w.id}
+                  className="flex items-center gap-4 rounded-xl border border-base-border bg-base-raised p-4"
+                >
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary">
+                    <ArrowUpFromLine className="h-4.5 w-4.5" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-ink">
+                      {w.bankName}
+                    </p>
+                    <p className="mt-0.5 truncate font-mono text-[11px] text-ink-faint">
                       {w.accountNumber} · {w.accountName}
-                    </Td>
-                    <Td className="text-ink-dim">
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-ink-faint">
                       {formatDateTime(w.createdAt)}
-                    </Td>
-                    <Td>
-                      <StatusPill status={w.status} />
-                    </Td>
-                    <Td className="text-right font-mono tabular font-medium text-ink">
-                      {formatMoney(w.amount)}
-                    </Td>
-                  </Tr>
-                ))}
-              </tbody>
-            </Table>
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1.5">
+                    <Money value={w.amount} size="sm" />
+                    <StatusPill status={w.status} />
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </CardBody>
       </Card>
