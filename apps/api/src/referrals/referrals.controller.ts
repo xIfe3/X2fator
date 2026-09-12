@@ -23,4 +23,9 @@ export class ReferralsController {
   async getMyReferralEarnings(@CurrentUser() user: AuthenticatedUser) {
     return this.referralsService.getMyReferralEarnings(user.id);
   }
+
+  @Get('leaderboard')
+  async getLeaderboard() {
+    return this.referralsService.getLeaderboard();
+  }
 }

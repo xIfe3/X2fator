@@ -23,6 +23,7 @@ export interface User {
   firstName: string;
   lastName: string;
   phone?: string | null;
+  gender?: "male" | "female" | "other" | null;
   referralCode: string;
   referredById?: string | null;
   status: "active" | "suspended" | "blocked" | "pending";
@@ -55,20 +56,53 @@ export interface AuthMeResponse {
 export interface Wallet {
   id: string;
   userId: string;
-  type: "account" | "earnings";
+  type: "account" | "task" | "referral";
   balance: string;
   status: string;
 }
 export interface UserWallets {
   account: Wallet;
-  earnings: Wallet;
+  task: Wallet;
+  referral: Wallet;
+}
+export type AdType =
+  | "app_download"
+  | "followers"
+  | "subscribers"
+  | "comments"
+  | "likes";
+
+export type AdPricing = Record<AdType, string>;
+
+export interface Ad {
+  id: string;
+  userId: string;
+  adType: AdType;
+  title: string;
+  description?: string | null;
+  targetUrl: string;
+  budget: string;
+  quantity: number;
+  pricePerUnit: string;
+  remainingSlots: number;
+  taskId?: string | null;
+  status: "pending" | "active" | "paused" | "completed" | "rejected";
+  createdAt: string;
+}
+
+export interface CreateAdInput {
+  adType: AdType;
+  title: string;
+  description?: string;
+  targetUrl: string;
+  quantity: number;
 }
 export interface AdminWalletDetails {
   user: { id: string; name: string; email: string };
   wallets: UserWallets;
   transactions: Array<
     WalletTransaction & {
-      walletType: "account" | "earnings";
+      walletType: "account" | "task" | "referral";
       balanceBefore: string;
       reference: string;
       status: string;
@@ -89,12 +123,16 @@ export interface DailyBonusStatus {
   enabled: boolean;
   claimed: boolean;
   amount: string;
-  claimDate: string;
+  currentStreak: number;
+  longestStreak: number;
+  nextStreak: number;
+  nextIsMilestone: boolean;
+  milestoneDays: number;
   nextClaimAt: string | null;
 }
 
 // ---- Deposits / Payments ----
-export type DepositProvider = "paystack" | "flutterwave" | "manual" | "mock";
+export type DepositProvider = "flutterwave" | "manual" | "mock";
 export interface AdminDeposit {
   id: string;
   userId: string;
@@ -107,12 +145,22 @@ export interface AdminDeposit {
   failureReason?: string | null;
   createdAt: string;
 }
+export interface AdminDepositStats {
+  totalCount: number;
+  totalAmount: string;
+  successfulCount: number;
+  successfulAmount: string;
+  pendingCount: number;
+  pendingAmount: string;
+  failedCount: number;
+  failedAmount: string;
+}
 export interface Deposit {
   id: string;
   userId: string;
   amount: string;
   provider: DepositProvider;
-  status: "pending" | "success" | "failed";
+  status: "pending" | "processing" | "successful" | "failed" | "rejected";
   reference?: string;
   createdAt: string;
 }
@@ -129,6 +177,16 @@ export interface Withdrawal {
   note?: string | null;
   createdAt: string;
   reviewedAt?: string | null;
+}
+export interface WithdrawalStats {
+  totalCount: number;
+  totalAmount: string;
+  pendingCount: number;
+  pendingAmount: string;
+  completedCount: number;
+  completedAmount: string;
+  rejectedCount: number;
+  rejectedAmount: string;
 }
 
 // ---- Plans / Subscriptions ----
@@ -168,6 +226,7 @@ export interface Task {
   taskType?: TaskType;
   targetUrl?: string;
   createdAt?: string;
+  source?: "admin" | "ad";
 }
 export interface TaskCompletion {
   id: string;
@@ -207,6 +266,13 @@ export interface ReferralInfo {
   totalReferrals?: number;
   totalEarned?: string;
 }
+
+export interface ReferralLeaderboardEntry {
+  userId: string;
+  firstName: string;
+  lastName: string;
+  referralCount: number;
+}
 export interface Referral {
   id: string;
   firstName: string;
@@ -214,27 +280,6 @@ export interface Referral {
   email: string;
   status: string;
   createdAt: string;
-}
-
-// ---- KYC ----
-export type KycDocumentType =
-  | "national_id"
-  | "drivers_license"
-  | "passport"
-  | "voters_card";
-export interface KycDocument {
-  id: string;
-  userId: string;
-  documentType: KycDocumentType;
-  documentNumber?: string;
-  documentUrl: string;
-  status: "pending" | "approved" | "rejected";
-  reviewNote?: string | null;
-  createdAt: string;
-}
-export interface KycStatus {
-  status: "unsubmitted" | "pending" | "approved" | "rejected";
-  documents?: KycDocument[];
 }
 
 // ---- Notifications ----
@@ -294,10 +339,10 @@ export interface AuditLog {
     | "adjust"
     | "create"
     | "update"
+    | "reset_password"
     | "delete";
   entityType:
     | "user"
-    | "kyc"
     | "withdrawal"
     | "wallet"
     | "plan"
@@ -329,5 +374,9 @@ export interface SiteContentSections {
   about: Record<string, unknown>;
   contact: Record<string, unknown>;
   legal: Record<string, unknown>;
+  stats?: { items: { value: string; label: string }[] };
+  testimonials?: { items: { quote: string; name: string; role: string }[] };
+  faq?: { items: { question: string; answer: string }[] };
   daily_bonus: { enabled: boolean; amount: string };
+  welcome_bonus: { enabled: boolean; amount: string };
 }

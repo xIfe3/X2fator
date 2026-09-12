@@ -3,7 +3,6 @@ import { Injectable } from '@nestjs/common';
 import {
   auditLogs,
   db,
-  kycDocuments,
   plans,
   tasks,
   users,
@@ -24,11 +23,11 @@ export interface AuditLogParams {
     | 'adjust'
     | 'create'
     | 'update'
+    | 'reset_password'
     | 'delete';
 
   entityType:
     | 'user'
-    | 'kyc'
     | 'withdrawal'
     | 'wallet'
     | 'plan'
@@ -146,21 +145,6 @@ export class AuditService {
             status: task.status,
           }
         : null;
-    }
-    if (entityType === 'kyc') {
-      const document = await db.query.kycDocuments.findFirst({
-        where: eq(kycDocuments.id, entityId),
-      });
-      if (!document) return null;
-      const owner = await db.query.users.findFirst({
-        where: eq(users.id, document.userId),
-      });
-      return {
-        id: document.id,
-        name: document.documentType,
-        status: document.status,
-        owner: owner?.email ?? document.userId,
-      };
     }
     if (entityType === 'withdrawal') {
       const withdrawal = await db.query.withdrawals.findFirst({

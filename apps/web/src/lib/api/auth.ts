@@ -22,8 +22,15 @@ export const authApi = {
   // Always resolves with a generic message on the backend, whether or
   // not the email exists — never leak account existence to the client.
   forgotPassword: (email: string) =>
-    api.post<{ message: string }>("/auth/forgot-password", { email }, { auth: false }),
+    api.post<{ message: string }>(
+      "/auth/forgot-password",
+      { email },
+      { auth: false },
+    ),
 
   resetPassword: (dto: { token: string; password: string }) =>
     api.post<{ message: string }>("/auth/reset-password", dto, { auth: false }),
+
+  changePassword: (dto: { currentPassword: string; newPassword: string }) =>
+    api.post<{ message: string }>("/auth/change-password", dto),
 };

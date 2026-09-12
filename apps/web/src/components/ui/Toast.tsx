@@ -21,7 +21,7 @@ const icons: Record<ToastKind, typeof CheckCircle2> = {
   info: Info,
 };
 const colors: Record<ToastKind, string> = {
-  success: "text-mint border-mint-dim/40 bg-mint-soft",
+  success: "text-primary border-primary-dim/40 bg-primary-soft",
   error: "text-danger border-danger/30 bg-danger-soft",
   info: "text-info border-info/30 bg-info-soft",
 };

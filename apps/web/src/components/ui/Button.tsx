@@ -3,7 +3,13 @@
 import type { ButtonHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
-type Variant = "primary" | "secondary" | "ghost" | "danger" | "outline";
+type Variant =
+  | "primary"
+  | "auth"
+  | "secondary"
+  | "ghost"
+  | "danger"
+  | "outline";
 type Size = "sm" | "md" | "lg";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -14,9 +20,10 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variants: Record<Variant, string> = {
   primary:
-    "bg-mint text-base font-semibold shadow-stamp hover:bg-mint-dim disabled:bg-mint/40 disabled:shadow-none",
+    "brand-gradient text-white font-semibold shadow-[0_9px_18px_-10px_rgba(37,99,235,0.8)] hover:brightness-105 disabled:opacity-50 disabled:shadow-none",
+  auth: "bg-primary text-white font-semibold shadow-[0_7px_16px_-10px_rgba(37,99,235,0.65)] hover:bg-primary-dim disabled:bg-primary/50 disabled:shadow-none",
   secondary:
-    "bg-base-surface2 text-ink hover:bg-base-borderStrong border border-base-border",
+    "bg-primary-soft text-primary hover:bg-base-borderStrong border border-primary/10",
   outline:
     "border border-base-border text-ink hover:border-base-borderStrong hover:bg-base-surface2",
   ghost: "text-ink-dim hover:text-ink hover:bg-base-surface2",

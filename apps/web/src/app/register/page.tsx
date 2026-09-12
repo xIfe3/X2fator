@@ -40,7 +40,10 @@ function RegisterForm() {
   const { push } = useToast();
   const searchParams = useSearchParams();
 
-  const [form, setForm] = useState({ ...initialForm, referralCode: searchParams.get("ref") ?? "" });
+  const [form, setForm] = useState({
+    ...initialForm,
+    referralCode: searchParams.get("ref") ?? "",
+  });
   const [touched, setTouched] = useState<Touched>({});
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -53,12 +56,23 @@ function RegisterForm() {
   }
 
   const errors = {
-    firstName: form.firstName.trim().length === 0 ? "First name is required" : undefined,
-    lastName: form.lastName.trim().length === 0 ? "Last name is required" : undefined,
-    email: !isValidEmail(form.email) ? "Enter a valid email address" : undefined,
-    phone: !isValidNigerianPhone(form.phone) ? "Enter a valid phone number, e.g. +2348012345678" : undefined,
-    password: !isPasswordValid(form.password) ? "Use at least 8 characters" : undefined,
-    confirmPassword: form.confirmPassword !== form.password ? "Passwords don't match" : undefined,
+    firstName:
+      form.firstName.trim().length === 0 ? "First name is required" : undefined,
+    lastName:
+      form.lastName.trim().length === 0 ? "Last name is required" : undefined,
+    email: !isValidEmail(form.email)
+      ? "Enter a valid email address"
+      : undefined,
+    phone: !isValidNigerianPhone(form.phone)
+      ? "Enter a valid phone number, e.g. +2348012345678"
+      : undefined,
+    password: !isPasswordValid(form.password)
+      ? "Use at least 8 characters"
+      : undefined,
+    confirmPassword:
+      form.confirmPassword !== form.password
+        ? "Passwords don't match"
+        : undefined,
   };
 
   const validCount = Object.values(errors).filter((e) => !e).length;
@@ -89,7 +103,7 @@ function RegisterForm() {
         referralCode: form.referralCode || undefined,
       });
       push("success", "Account created.");
-      router.replace("/dashboard");
+      router.replace("/getting-started");
     } catch (err) {
       const message =
         err instanceof ApiRequestError
@@ -113,7 +127,7 @@ function RegisterForm() {
       footer={
         <>
           Already have an account?{" "}
-          <Link href="/login" className="font-medium text-mint hover:underline">
+          <Link href="/login" className="font-medium text-primary hover:underline">
             Log in
           </Link>
         </>
@@ -187,7 +201,12 @@ function RegisterForm() {
             {error}
           </p>
         )}
-        <Button type="submit" className="w-full" isLoading={isLoading}>
+        <Button
+          type="submit"
+          variant="auth"
+          className="w-full"
+          isLoading={isLoading}
+        >
           Create account
         </Button>
       </form>

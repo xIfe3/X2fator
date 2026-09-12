@@ -5,12 +5,10 @@ import { usePathname } from "next/navigation";
 import {
   ArrowLeft,
   ClipboardList,
-  Globe,
   LayoutDashboard,
   ArrowDownToLine,
-  LineChart,
+  Megaphone,
   ScrollText,
-  ShieldCheck,
   Users,
   Wallet,
 } from "lucide-react";
@@ -21,11 +19,9 @@ export const adminNav = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard, exact: true },
   { href: "/admin/deposits", label: "Deposits", icon: ArrowDownToLine },
   { href: "/admin/users", label: "Users", icon: Users },
-  { href: "/admin/kyc", label: "KYC review", icon: ShieldCheck },
   { href: "/admin/withdrawals", label: "Withdrawals", icon: Wallet },
-  { href: "/admin/plans", label: "Plans", icon: LineChart },
   { href: "/admin/tasks", label: "Tasks", icon: ClipboardList },
-  { href: "/admin/site-content", label: "Site content", icon: Globe },
+  { href: "/admin/ads", label: "Ad campaigns", icon: Megaphone },
   { href: "/admin/audit", label: "Audit log", icon: ScrollText },
 ];
 
@@ -36,7 +32,7 @@ export function AdminSidebar() {
     <aside className="hidden w-60 shrink-0 flex-col border-r border-base-border bg-base-raised lg:flex">
       <div className="px-6 py-6">
         <BrandLogo href="/admin" compact admin />
-        <p className="ml-10 mt-1 text-[11px] font-medium text-amber">
+        <p className="ml-10 mt-1 text-[11px] font-medium text-secondary">
           Admin console
         </p>
       </div>
@@ -54,12 +50,12 @@ export function AdminSidebar() {
               className={cn(
                 "relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                 active
-                  ? "bg-amber-soft text-amber"
+                  ? "bg-secondary-soft text-secondary"
                   : "text-ink-dim hover:bg-base-surface2 hover:text-ink",
               )}
             >
               {active && (
-                <span className="absolute -left-3 top-1/2 h-4 w-1 -translate-y-1/2 rounded-r-full bg-amber" />
+                <span className="absolute -left-3 top-1/2 h-4 w-1 -translate-y-1/2 rounded-r-full bg-secondary" />
               )}
               <Icon className="h-4 w-4" />
               {item.label}

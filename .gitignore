@@ -36,3 +36,7 @@ yarn-error.log*
 # Misc
 .DS_Store
 *.pem
+
+# Runtime-uploaded files (task proof screenshots, etc.)
+apps/api/uploads/
+*.tsbuildinfo

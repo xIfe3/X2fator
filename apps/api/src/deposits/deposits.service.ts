@@ -4,7 +4,7 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, sql } from 'drizzle-orm';
 
 import { db } from '@2xfactor/database';
 import { deposits, payments } from '@2xfactor/database';
@@ -17,7 +17,7 @@ export class DepositsService {
   async createDeposit(
     userId: string,
     amount: string,
-    provider: 'paystack' | 'flutterwave' | 'manual' | 'mock',
+    provider: 'flutterwave' | 'manual' | 'mock',
   ) {
     if (Number(amount) <= 0) {
       throw new BadRequestException('Deposit amount must be greater than zero');
@@ -47,6 +47,13 @@ export class DepositsService {
       amount,
       status: 'pending',
     });
+
+    if (provider === 'mock') {
+      // Sandbox provider — there's no real payment to wait on, so
+      // complete it immediately and credit the wallet right away.
+      const completedDeposit = await this.completeDeposit(deposit.id, 'MOCK');
+      return { deposit: completedDeposit, paymentReference };
+    }
 
     return {
       deposit,
@@ -109,6 +116,15 @@ export class DepositsService {
         .where(eq(deposits.id, depositId))
         .returning();
 
+      await tx
+        .update(payments)
+        .set({
+          status: 'successful',
+          providerReference,
+          updatedAt: new Date(),
+        })
+        .where(eq(payments.depositId, depositId));
+
       await this.walletService!.credit(
         {
           userId: deposit.userId,
@@ -130,6 +146,23 @@ export class DepositsService {
     return db.query.deposits.findMany({
       orderBy: [desc(deposits.createdAt)],
     });
+  }
+
+  async getAdminStats() {
+    const [stats] = await db
+      .select({
+        totalCount: sql<number>`count(*)::int`,
+        totalAmount: sql<string>`coalesce(sum(${deposits.amount}), 0)::text`,
+        successfulCount: sql<number>`count(*) filter (where ${deposits.status} = 'successful')::int`,
+        successfulAmount: sql<string>`coalesce(sum(${deposits.amount}) filter (where ${deposits.status} = 'successful'), 0)::text`,
+        pendingCount: sql<number>`count(*) filter (where ${deposits.status} in ('pending', 'processing'))::int`,
+        pendingAmount: sql<string>`coalesce(sum(${deposits.amount}) filter (where ${deposits.status} in ('pending', 'processing')), 0)::text`,
+        failedCount: sql<number>`count(*) filter (where ${deposits.status} in ('failed', 'rejected'))::int`,
+        failedAmount: sql<string>`coalesce(sum(${deposits.amount}) filter (where ${deposits.status} in ('failed', 'rejected')), 0)::text`,
+      })
+      .from(deposits);
+
+    return stats;
   }
 
   async reviewDeposit(

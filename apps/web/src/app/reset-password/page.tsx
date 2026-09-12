@@ -27,13 +27,21 @@ function ResetPasswordForm() {
 
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [touched, setTouched] = useState<{ password?: boolean; confirmPassword?: boolean }>({});
+  const [touched, setTouched] = useState<{
+    password?: boolean;
+    confirmPassword?: boolean;
+  }>({});
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const passwordError = touched.password && !isPasswordValid(password) ? "Use at least 8 characters" : undefined;
+  const passwordError =
+    touched.password && !isPasswordValid(password)
+      ? "Use at least 8 characters"
+      : undefined;
   const confirmError =
-    touched.confirmPassword && confirmPassword !== password ? "Passwords don't match" : undefined;
+    touched.confirmPassword && confirmPassword !== password
+      ? "Passwords don't match"
+      : undefined;
   const canSubmit = isPasswordValid(password) && confirmPassword === password;
 
   if (!token) {
@@ -42,7 +50,10 @@ function ResetPasswordForm() {
         title="Link invalid or expired"
         subtitle="This password reset link is no longer valid."
         footer={
-          <Link href="/forgot-password" className="font-medium text-mint hover:underline">
+          <Link
+            href="/forgot-password"
+            className="font-medium text-primary hover:underline"
+          >
             Request a new link
           </Link>
         }
@@ -52,7 +63,8 @@ function ResetPasswordForm() {
             <AlertTriangle className="h-5 w-5" />
           </span>
           <p className="text-sm text-ink-dim">
-            Reset links expire 30 minutes after they're requested and can only be used once.
+            Reset links expire 30 minutes after they're requested and can only
+            be used once.
           </p>
         </div>
       </AuthShell>
@@ -70,14 +82,21 @@ function ResetPasswordForm() {
       await authApi.resetPassword({ token: token as string, password });
       router.replace("/reset-password/success");
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Something went wrong. Try again.");
+      setError(
+        err instanceof ApiRequestError
+          ? err.message
+          : "Something went wrong. Try again.",
+      );
     } finally {
       setIsLoading(false);
     }
   }
 
   return (
-    <AuthShell title="Set a new password" subtitle="Choose a strong password you haven't used before.">
+    <AuthShell
+      title="Set a new password"
+      subtitle="Choose a strong password you haven't used before."
+    >
       <form onSubmit={onSubmit} noValidate className="space-y-4">
         <div>
           <PasswordField
@@ -105,7 +124,12 @@ function ResetPasswordForm() {
             {error}
           </p>
         )}
-        <Button type="submit" className="w-full" isLoading={isLoading}>
+        <Button
+          type="submit"
+          variant="auth"
+          className="w-full"
+          isLoading={isLoading}
+        >
           Update password
         </Button>
       </form>

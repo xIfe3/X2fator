@@ -19,7 +19,10 @@ export class BonusesController {
   @Patch('admin/daily')
   @UseGuards(RolesGuard)
   @Roles('admin')
-  updateAdminSettings(@Body() body: { enabled?: boolean; amount?: string }) {
+  updateAdminSettings(
+    @Body()
+    body: { enabled?: boolean; amount?: string; milestoneAmount?: string },
+  ) {
     return this.bonusesService.updateAdminSettings(body);
   }
 

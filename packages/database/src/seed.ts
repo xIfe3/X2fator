@@ -14,9 +14,10 @@ async function main() {
     { name: "users.suspend", description: "Suspend a user account" },
     { name: "users.activate", description: "Reactivate a user account" },
     { name: "users.block", description: "Permanently block a user account" },
-    { name: "kyc.read", description: "View submitted KYC documents" },
-    { name: "kyc.approve", description: "Approve a KYC document" },
-    { name: "kyc.reject", description: "Reject a KYC document" },
+    {
+      name: "users.update",
+      description: "Edit user account details and reset passwords",
+    },
     { name: "withdrawals.read", description: "View withdrawal requests" },
     { name: "withdrawals.reject", description: "Reject a withdrawal request" },
     {
@@ -129,7 +130,8 @@ async function main() {
 
       await tx.insert(wallets).values([
         { userId: admin.id, type: "account", balance: "0", status: "active" },
-        { userId: admin.id, type: "earnings", balance: "0", status: "active" },
+        { userId: admin.id, type: "task", balance: "0", status: "active" },
+        { userId: admin.id, type: "referral", balance: "0", status: "active" },
       ]);
     });
 

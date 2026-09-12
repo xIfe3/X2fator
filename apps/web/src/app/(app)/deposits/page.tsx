@@ -1,12 +1,11 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { ArrowDownToLine, Plus } from "lucide-react";
+import { ArrowDownToLine, Plus, Wallet } from "lucide-react";
 import { useApiQuery } from "@/hooks/useApiQuery";
 import { depositsApi } from "@/lib/api/deposits";
 import type { DepositProvider } from "@/lib/types";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Table, THead, Th, Tr, Td } from "@/components/ui/Table";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Input, Select } from "@/components/ui/Input";
@@ -15,7 +14,9 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PageSkeleton } from "@/components/ui/Skeleton";
 import { ApiRequestError } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
-import { formatDateTime, formatMoney } from "@/lib/utils";
+import { cn, formatDateTime, formatMoney } from "@/lib/utils";
+
+const PRESET_AMOUNTS = [1000, 2000, 5000, 10000, 20000, 50000];
 
 export default function DepositsPage() {
   const {
@@ -28,6 +29,7 @@ export default function DepositsPage() {
   const [provider, setProvider] = useState<DepositProvider>("mock");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [verifying, setVerifying] = useState<string | null>(null);
   const { push } = useToast();
 
   async function onSubmit(e: FormEvent) {
@@ -36,7 +38,7 @@ export default function DepositsPage() {
     setSubmitting(true);
     try {
       const result = await depositsApi.create(amount, provider);
-      if (provider === "paystack") {
+      if (provider === "flutterwave") {
         const payment = await depositsApi.initializePayment(result.deposit.id);
         if (payment.authorizationUrl) {
           window.location.assign(payment.authorizationUrl);
@@ -55,6 +57,25 @@ export default function DepositsPage() {
       );
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function verify(reference?: string) {
+    if (!reference) return;
+    setVerifying(reference);
+    try {
+      await depositsApi.verify(reference);
+      push("success", "Payment confirmed and wallet updated.");
+      refetch();
+    } catch (err) {
+      push(
+        "error",
+        err instanceof ApiRequestError
+          ? err.message
+          : "Payment is not confirmed yet.",
+      );
+    } finally {
+      setVerifying(null);
     }
   }
 
@@ -83,7 +104,7 @@ export default function DepositsPage() {
             <EmptyState
               icon={ArrowDownToLine}
               title="No deposits yet"
-              description="Fund your wallet to subscribe to plans and unlock tasks."
+              description="Fund your wallet to complete tasks and use platform services."
               action={
                 <Button size="sm" onClick={() => setOpen(true)}>
                   Make your first deposit
@@ -91,34 +112,54 @@ export default function DepositsPage() {
               }
             />
           ) : (
-            <Table>
-              <THead>
-                <Th>Reference</Th>
-                <Th>Provider</Th>
-                <Th>Date</Th>
-                <Th>Status</Th>
-                <Th className="text-right">Amount</Th>
-              </THead>
-              <tbody>
-                {deposits.map((d) => (
-                  <Tr key={d.id}>
-                    <Td className="font-mono text-xs text-ink-dim">
-                      {d.reference ?? d.id.slice(0, 8)}
-                    </Td>
-                    <Td className="capitalize">{d.provider}</Td>
-                    <Td className="text-ink-dim">
-                      {formatDateTime(d.createdAt)}
-                    </Td>
-                    <Td>
-                      <StatusPill status={d.status} />
-                    </Td>
-                    <Td className="text-right font-mono tabular font-medium text-ink">
+            <div className="space-y-2.5">
+              {deposits.map((d) => (
+                <div
+                  key={d.id}
+                  className="flex items-center gap-4 rounded-xl border border-base-border bg-base-raised p-4 transition-colors hover:border-base-borderStrong"
+                >
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary">
+                    <Wallet className="h-4.5 w-4.5" />
+                  </span>
+
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium capitalize text-ink">
+                      {d.provider} deposit
+                    </p>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 font-mono text-[11px] text-ink-faint">
+                      <span className="truncate">
+                        {d.reference ?? d.id.slice(0, 8)}
+                      </span>
+                      <span>·</span>
+                      <span className="whitespace-nowrap">
+                        {formatDateTime(d.createdAt)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex shrink-0 flex-col items-end gap-1.5">
+                    <span className="font-mono text-sm font-semibold tabular text-ink">
                       {formatMoney(d.amount)}
-                    </Td>
-                  </Tr>
-                ))}
-              </tbody>
-            </Table>
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <StatusPill status={d.status} />
+                      {(d.status === "pending" || d.status === "processing") &&
+                        d.provider !== "manual" &&
+                        d.provider !== "mock" && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            isLoading={verifying === d.reference}
+                            onClick={() => verify(d.reference)}
+                          >
+                            Check
+                          </Button>
+                        )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </CardBody>
       </Card>
@@ -135,13 +176,29 @@ export default function DepositsPage() {
             onChange={(e) => setAmount(e.target.value)}
             placeholder="5000"
           />
+          <div className="flex flex-wrap gap-2">
+            {PRESET_AMOUNTS.map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                onClick={() => setAmount(String(preset))}
+                className={cn(
+                  "rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors",
+                  Number(amount) === preset
+                    ? "border-primary bg-primary-soft text-primary"
+                    : "border-base-border text-ink-dim hover:border-primary-dim/50 hover:text-ink",
+                )}
+              >
+                {formatMoney(preset)}
+              </button>
+            ))}
+          </div>
           <Select
             label="Provider"
             value={provider}
             onChange={(e) => setProvider(e.target.value as DepositProvider)}
           >
             <option value="mock">Mock (instant, sandbox)</option>
-            <option value="paystack">Paystack</option>
             <option value="flutterwave">Flutterwave</option>
             <option value="manual">Manual bank transfer</option>
           </Select>

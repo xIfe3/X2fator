@@ -1,4 +1,5 @@
 import {
+  AnyPgColumn,
   index,
   integer,
   jsonb,
@@ -14,6 +15,7 @@ import { taskCompletionStatusEnum, taskStatusEnum } from "./enums";
 
 import { users } from "./users";
 import { planSubscriptions } from "./subscriptions";
+import { ads } from "./ads";
 
 export const tasks = pgTable(
   "tasks",
@@ -47,6 +49,12 @@ export const tasks = pgTable(
 
     status: taskStatusEnum("status").notNull().default("active"),
 
+    // Set when this task was generated from a user-funded ad campaign;
+    // null for regular admin-created tasks.
+    adId: uuid("ad_id").references((): AnyPgColumn => ads.id, {
+      onDelete: "cascade",
+    }),
+
     createdAt: timestamp("created_at", {
       withTimezone: true,
     })
@@ -61,6 +69,7 @@ export const tasks = pgTable(
   },
   (table) => ({
     statusIdx: index("tasks_status_idx").on(table.status),
+    adIdx: index("tasks_ad_idx").on(table.adId),
   }),
 );
 
@@ -81,11 +90,16 @@ export const taskCompletions = pgTable(
         onDelete: "restrict",
       }),
 
-    subscriptionId: uuid("subscription_id")
-      .notNull()
-      .references(() => planSubscriptions.id, {
-        onDelete: "restrict",
-      }),
+    subscriptionId: uuid("subscription_id").references(
+      () => planSubscriptions.id,
+      { onDelete: "set null" },
+    ),
+
+    // Set when this completion is for an ad-generated task, so approval
+    // logic can decrement the right campaign's remaining slots.
+    adId: uuid("ad_id").references((): AnyPgColumn => ads.id, {
+      onDelete: "set null",
+    }),
 
     reward: numeric("reward", {
       precision: 18,
@@ -128,6 +142,8 @@ export const taskCompletions = pgTable(
     subscriptionIdx: index("task_completions_subscription_idx").on(
       table.subscriptionId,
     ),
+
+    adIdx: index("task_completions_ad_idx").on(table.adId),
 
     statusIdx: index("task_completions_status_idx").on(table.status),
 

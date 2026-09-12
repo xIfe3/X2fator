@@ -97,7 +97,7 @@ export default function SupportPage() {
                     <Td>
                       <Link
                         href={`/support/${t.id}`}
-                        className="hover:text-mint"
+                        className="hover:text-primary"
                       >
                         {t.subject}
                       </Link>

@@ -73,6 +73,17 @@ export function AuthProvider({ children }: { children: any }) {
     loadUser();
   }, [loadUser]);
 
+  useEffect(() => {
+    function handleSessionExpired() {
+      setUser(null);
+      router.replace("/login");
+    }
+
+    window.addEventListener("session-expired", handleSessionExpired);
+    return () =>
+      window.removeEventListener("session-expired", handleSessionExpired);
+  }, [router]);
+
   const login = useCallback(async (email: string, password: string) => {
     const res = await authApi.login({ email, password });
     tokenStore.set(res.accessToken, res.refreshToken);

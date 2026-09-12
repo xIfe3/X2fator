@@ -2,7 +2,7 @@
 
 Next.js 14 (App Router) + TypeScript + Tailwind frontend for the 2xFactor
 NestJS sandbox API — wallets, deposits, withdrawals, plans/subscriptions,
-tasks, earnings, referrals, KYC, notifications, support, and a
+tasks, earnings, referrals, notifications, support, and a
 permission-gated admin console.
 
 ## Dropping this into the turborepo
@@ -65,7 +65,7 @@ Your NestJS API sets a global prefix of `api` (`main.ts`) and listens on
   multiple times).
 - `src/lib/api/*.ts` — one typed module per NestJS controller
   (`auth`, `wallet`, `deposits`, `withdrawals`, `plans`, `tasks`,
-  `earnings`, `referrals`, `kyc`, `notifications`, `support`, `utilities`,
+  `earnings`, `referrals`, `notifications`, `support`, `utilities`,
   `admin`). Each function maps 1:1 to an endpoint.
 - `src/lib/auth-context.tsx` — session state. See the note below on why
   it caches the full user object instead of relying on `GET /auth/me`.
@@ -74,7 +74,7 @@ Your NestJS API sets a global prefix of `api` (`main.ts`) and listens on
   from these instead of one-off markup.
 - `src/app/(app)/*` — the authenticated user app (dashboard, wallet,
   deposits, withdrawals, plans, subscriptions, tasks, earnings,
-  referrals, kyc, notifications, support, utilities, settings), gated by
+  referrals, notifications, support, utilities, settings), gated by
   `(app)/layout.tsx`.
 - `src/app/admin/*` — the admin console, gated separately by
   `admin/layout.tsx` on `roles.includes('admin')`.

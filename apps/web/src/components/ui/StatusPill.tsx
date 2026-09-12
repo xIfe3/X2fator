@@ -1,8 +1,8 @@
 import { cn, statusTone } from "@/lib/utils";
 
 const toneClasses: Record<string, string> = {
-  mint: "bg-mint-soft text-mint border-mint-dim/40",
-  amber: "bg-amber-soft text-amber border-amber-dim/40",
+  primary: "bg-primary-soft text-primary border-primary-dim/40",
+  secondary: "bg-secondary-soft text-secondary border-secondary-dim/40",
   danger: "bg-danger-soft text-danger border-danger/30",
   info: "bg-info-soft text-info border-info/30",
   neutral: "bg-base-surface2 text-ink-dim border-base-border",

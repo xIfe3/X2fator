@@ -19,7 +19,7 @@ export class WalletService {
    */
   async ensureWallet(
     userId: string,
-    type: 'account' | 'earnings',
+    type: 'account' | 'task' | 'referral',
   ): Promise<Wallet> {
     const existing = await db.query.wallets.findFirst({
       where: and(eq(wallets.userId, userId), eq(wallets.type, type)),
@@ -47,7 +47,7 @@ export class WalletService {
    */
   async getWallet(
     userId: string,
-    type: 'account' | 'earnings',
+    type: 'account' | 'task' | 'referral',
   ): Promise<Wallet> {
     const wallet = await db.query.wallets.findFirst({
       where: and(eq(wallets.userId, userId), eq(wallets.type, type)),
@@ -61,16 +61,18 @@ export class WalletService {
   }
 
   /**
-   * Get both account and earnings wallets.
+   * Get the three wallets used by the product.
    */
   async getUserWallets(userId: string) {
     const accountWallet = await this.ensureWallet(userId, 'account');
 
-    const earningsWallet = await this.ensureWallet(userId, 'earnings');
+    const taskWallet = await this.ensureWallet(userId, 'task');
+    const referralWallet = await this.ensureWallet(userId, 'referral');
 
     return {
       account: accountWallet,
-      earnings: earningsWallet,
+      task: taskWallet,
+      referral: referralWallet,
     };
   }
 
@@ -83,7 +85,7 @@ export class WalletService {
   async credit(
     params: {
       userId: string;
-      walletType: 'account' | 'earnings';
+      walletType: 'account' | 'task' | 'referral';
       amount: string;
       type:
         | 'deposit'
@@ -162,7 +164,7 @@ export class WalletService {
   async debit(
     params: {
       userId: string;
-      walletType: 'account' | 'earnings';
+      walletType: 'account' | 'task' | 'referral';
       amount: string;
       type:
         | 'plan_purchase'
@@ -240,7 +242,10 @@ export class WalletService {
   /**
    * Get wallet transactions.
    */
-  async getTransactions(userId: string, walletType: 'account' | 'earnings') {
+  async getTransactions(
+    userId: string,
+    walletType: 'account' | 'task' | 'referral',
+  ) {
     const wallet = await this.getWallet(userId, walletType);
 
     return db.query.walletTransactions.findMany({

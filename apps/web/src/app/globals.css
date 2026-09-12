@@ -12,48 +12,51 @@
  * also directly usable as var(--color-base-border) etc. outside of
  * utility classes (see the `* { border-color }` rule below).
  *
- * Palette: "ledger" — a deep ink-navy surface with two accents pulled
- * from a paper ledger: stamped gold (primary — approvals, balances,
- * CTAs) and a verifying teal (secondary — confirmations, the "2x" mark
- * on secondary surfaces). Token names (mint/amber) are kept as-is for
- * compatibility with every page that already references them — only
- * the hex values changed.
+ * Palette: a deep ink-navy surface with two accurately-named accents:
+ * an electric indigo primary (CTAs, links, active states) and a
+ * lime-leaning green secondary (confirmations, admin accent). These
+ * are the canonical dark-mode values — `.dark` no longer redeclares
+ * them (see the note above `:root:not(.dark)` below).
  */
 @theme {
-  --color-base: #0b0d11;
-  --color-base-raised: #111419;
-  --color-base-surface: #15181f;
-  --color-base-surface2: #1c2029;
-  --color-base-border: #262b34;
-  --color-base-borderStrong: #363c48;
+  --color-base: #0a0d16;
+  --color-base-raised: #10141f;
+  --color-base-surface: #151a27;
+  --color-base-surface2: #1c2233;
+  --color-base-border: #262e42;
+  --color-base-borderStrong: #38445e;
 
-  --color-ink: #f1f3f5;
-  --color-ink-dim: #97a1ac;
-  --color-ink-faint: #5c6572;
+  --color-ink: #f2f4fa;
+  --color-ink-dim: #97a2ba;
+  --color-ink-faint: #5f6b85;
 
-  /* primary — stamped gold */
-  --color-mint: #e7b64a;
-  --color-mint-dim: #b78d34;
-  --color-mint-soft: #2a2314;
+  /* primary — electric indigo */
+  --color-primary: #5b5bf6;
+  --color-primary-dim: #4645d1;
+  --color-primary-soft: #191a3d;
 
-  /* secondary — verifying teal */
-  --color-amber: #37c2a8;
-  --color-amber-dim: #279180;
-  --color-amber-soft: #10221f;
+  /* secondary — lime-leaning green */
+  --color-secondary: #34d399;
+  --color-secondary-dim: #1fb37e;
+  --color-secondary-soft: #0f2a22;
 
-  --color-danger: #ef5f57;
+  --color-danger: #f0554f;
   --color-danger-soft: #2b1716;
 
-  --color-info: #6d93f2;
-  --color-info-soft: #161f2f;
+  --color-info: #4b9fe8;
+  --color-info-soft: #15202f;
 
   /* Overrides two keys from Tailwind's default radius scale; the rest
      (sm, md, lg, 3xl, full…) are untouched. */
   --radius-xl: 14px;
   --radius-2xl: 20px;
 
-  --shadow-panel: 0 1px 0 0 rgba(255, 255, 255, 0.02) inset, 0 8px 24px -12px rgba(0, 0, 0, 0.6);
-  --shadow-stamp: 0 1px 0 0 rgba(255, 255, 255, 0.03) inset, 0 12px 32px -14px rgba(231, 182, 74, 0.18);
+  --shadow-panel:
+    0 1px 0 0 rgba(255, 255, 255, 0.02) inset,
+    0 8px 24px -12px rgba(0, 0, 0, 0.6);
+  --shadow-stamp:
+    0 1px 0 0 rgba(255, 255, 255, 0.03) inset,
+    0 12px 32px -14px rgba(91, 91, 246, 0.22);
 }
 
 /* `inline` because these values reference CSS variables that next/font
@@ -61,13 +64,43 @@
    Tailwind can resolve at build time — same pattern as the official
    Tailwind v4 + Next.js font setup. */
 @theme inline {
-  --font-display: var(--display-font), serif;
+  --font-display: var(--display-font), sans-serif;
   --font-body: var(--body-font), sans-serif;
   --font-mono: var(--mono-font), monospace;
 }
 
 :root {
+  color-scheme: light;
+  --page-background: #f7f8fc;
+  --page-foreground: #0f1220;
+}
+
+/* `.dark`'s color tokens used to be redeclared here byte-for-byte
+   identical to `@theme` above — pure duplication. `@theme` already IS
+   the dark-mode palette, so `.dark` only needs to flip color-scheme
+   and the page bg/fg vars; it inherits every --color-* token as-is. */
+.dark {
   color-scheme: dark;
+  --page-background: #0a0d16;
+  --page-foreground: #f2f4fa;
+}
+
+:root:not(.dark) {
+  --color-base: #f7f8fc;
+  --color-base-raised: #ffffff;
+  --color-base-surface: #ffffff;
+  --color-base-surface2: #eef0fa;
+  --color-base-border: #e2e5f3;
+  --color-base-borderStrong: #cbd0e8;
+  --color-ink: #0f1220;
+  --color-ink-dim: #5a6482;
+  --color-ink-faint: #838da8;
+  --color-primary: #4645d1;
+  --color-primary-dim: #3634ad;
+  --color-primary-soft: #ecebff;
+  --color-secondary: #0f9d6f;
+  --color-secondary-dim: #0c7f59;
+  --color-secondary-soft: #e4f7ee;
 }
 
 * {
@@ -76,12 +109,50 @@
 
 html,
 body {
-  background: #0b0d11;
-  color: #f1f3f5;
+  background: var(--page-background);
+  color: var(--page-foreground);
 }
 
 body {
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+.app-page-background {
+  background:
+    radial-gradient(
+      circle at 50% -10%,
+      rgba(91, 91, 246, 0.12),
+      transparent 34rem
+    ),
+    var(--page-background);
+}
+
+/* Locks the authenticated app/admin shells to exactly the viewport
+   height so only their inner `main` scrolls — the fixed Topbar/Sidebar
+   never move. Scoped to these shells only (not html/body globally) so
+   public marketing pages and the auth screens keep normal page scroll. */
+html:has(.app-shell-frame) {
+  height: 100%;
+  overflow: hidden;
+}
+
+.brand-gradient {
+  background: linear-gradient(
+    135deg,
+    var(--color-primary-dim) 0%,
+    var(--color-primary) 55%,
+    var(--color-info) 100%
+  );
+}
+
+.balance-gradient {
+  background: linear-gradient(
+    135deg,
+    var(--color-primary-dim) 0%,
+    var(--color-primary) 55%,
+    var(--color-info) 100%
+  );
+  box-shadow: 0 18px 35px -22px rgba(91, 91, 246, 0.7);
 }
 
 .font-mono,
@@ -91,7 +162,7 @@ body {
 }
 
 ::selection {
-  background: rgba(231, 182, 74, 0.25);
+  background: rgba(91, 91, 246, 0.25);
 }
 
 ::-webkit-scrollbar {
@@ -102,15 +173,15 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #262b34;
+  background: #262e42;
   border-radius: 8px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #363c48;
+  background: #38445e;
 }
 
 :focus-visible {
-  outline: 2px solid #e7b64a;
+  outline: 2px solid #5b5bf6;
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -128,7 +199,12 @@ body {
 /* Signature #1: the ledger rule — a faint repeating baseline grid
    behind large balance figures, evoking a paper ledger sheet. */
 .ledger-surface {
-  background-image: repeating-linear-gradient(to bottom, transparent, transparent 27px, rgba(231, 182, 74, 0.045) 28px);
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 27px,
+    rgba(91, 91, 246, 0.05) 28px
+  );
 }
 
 /* Signature #2: the ticket notch — punches two half-circle "holes" into
@@ -215,20 +291,4 @@ body {
 }
 .ledger-tear::after {
   right: -7px;
-}
-
-/* Rotated wax-stamp badge, e.g. "ACTIVE" / "APPROVED" on a subscription
-   passbook card. */
-.stamp-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  transform: rotate(-6deg);
-  border: 1.5px solid currentColor;
-  border-radius: 8px;
-  padding: 0.2rem 0.6rem;
-  font-size: 0.65rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }

@@ -9,16 +9,13 @@ import { HealthController } from './health.controller';
 import configuration from './config/configuration';
 import { validateEnvironment } from './config/env.validation';
 import { WalletModule } from './wallet/wallet.module';
-import { PlansModule } from './plans/plans.module';
 import { DepositsModule } from './deposits/deposits.module';
 import { PaymentsModule } from './payments/payments.module';
-import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { ReferralsModule } from './referrals/referrals.module';
 import { TasksModule } from './tasks/tasks.module';
 import { WithdrawalsModule } from './withdrawals/withdrawals.module';
 import { UtilitiesModule } from './utilities/utilities.module';
 import { EarningsModule } from './earnings/earnings.module';
-import { KycModule } from './kyc/kyc.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { SupportModule } from './support/support.module';
 import { AdminModule } from './admin/admin.module';
@@ -29,6 +26,7 @@ import { MailModule } from './mail/mail.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { SiteContentModule } from './site-content/site-content.module';
 import { BonusesModule } from './bonuses/bonuses.module';
+import { AdsModule } from './ads/ads.module';
 
 @Module({
   controllers: [HealthController],
@@ -50,16 +48,13 @@ import { BonusesModule } from './bonuses/bonuses.module';
     ScheduleModule.forRoot(),
     AuthModule,
     WalletModule,
-    PlansModule,
     DepositsModule,
     PaymentsModule,
-    SubscriptionsModule,
     ReferralsModule,
     TasksModule,
     WithdrawalsModule,
     UtilitiesModule,
     EarningsModule,
-    KycModule,
     NotificationsModule,
     SupportModule,
     AdminModule,
@@ -68,6 +63,7 @@ import { BonusesModule } from './bonuses/bonuses.module';
     UploadsModule,
     SiteContentModule,
     BonusesModule,
+    AdsModule,
   ],
 })
 export class AppModule {}

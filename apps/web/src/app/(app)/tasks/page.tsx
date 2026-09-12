@@ -13,16 +13,17 @@ import { tasksApi } from "@/lib/api/tasks";
 import { uploadsApi } from "@/lib/api/uploads";
 import type { Task } from "@/lib/types";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Table, THead, Th, Tr, Td } from "@/components/ui/Table";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Tabs } from "@/components/ui/Tabs";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { Badge } from "@/components/ui/Badge";
+import { Money } from "@/components/ui/Money";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageSkeleton } from "@/components/ui/Skeleton";
 import { ApiRequestError } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
-import { formatDateTime, formatMoney } from "@/lib/utils";
+import { formatDateTime } from "@/lib/utils";
 
 const TASK_TYPE_META: Record<string, { label: string; icon: typeof Play }> = {
   video: { label: "Watch video", icon: Play },
@@ -91,24 +92,23 @@ export default function TasksPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="font-display text-2xl font-semibold text-ink">
-            Tasks
-          </h1>
-          <p className="mt-1 text-sm text-ink-dim">
-            Complete tasks to earn into your earnings wallet.
-          </p>
-        </div>
-        <Tabs
-          tabs={[
-            { key: "browse", label: "Browse" },
-            { key: "completions", label: "My submissions" },
-          ]}
-          active={tab}
-          onChange={(k) => setTab(k as "browse" | "completions")}
-        />
+      <div>
+        <h1 className="font-display text-2xl font-semibold text-ink">
+          Tasks
+        </h1>
+        <p className="mt-1 text-sm text-ink-dim">
+          Complete tasks to earn into your earnings wallet.
+        </p>
       </div>
+
+      <Tabs
+        tabs={[
+          { key: "browse", label: "Browse" },
+          { key: "completions", label: "My submissions" },
+        ]}
+        active={tab}
+        onChange={(k) => setTab(k as "browse" | "completions")}
+      />
 
       {tab === "browse" ? (
         <Card>
@@ -125,7 +125,7 @@ export default function TasksPage() {
                 description="Check back later for new tasks."
               />
             ) : (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-3">
                 {tasks.map((t) => {
                   const meta = TASK_TYPE_META[t.taskType ?? "other"] ?? {
                     label: "Open link",
@@ -138,15 +138,23 @@ export default function TasksPage() {
                   return (
                     <div
                       key={t.id}
-                      className="rounded-xl border border-base-border bg-base-raised p-4"
+                      className="rounded-xl border border-base-border bg-base-raised p-4 transition-colors hover:border-base-borderStrong"
                     >
                       <div className="flex items-start justify-between gap-3">
-                        <h3 className="text-sm font-medium text-ink">
-                          {t.title}
-                        </h3>
-                        <span className="shrink-0 font-mono text-sm font-semibold tabular text-mint">
-                          {formatMoney(t.reward)}
-                        </span>
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <h3 className="text-sm font-medium text-ink">
+                            {t.title}
+                          </h3>
+                          {t.source === "ad" && (
+                            <Badge tone="secondary">Sponsored</Badge>
+                          )}
+                        </div>
+                        <Money
+                          value={t.reward}
+                          size="md"
+                          tone="primary"
+                          className="shrink-0"
+                        />
                       </div>
                       {t.description && (
                         <p className="mt-1.5 text-xs text-ink-dim">
@@ -158,17 +166,17 @@ export default function TasksPage() {
                           href={t.targetUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="mt-2.5 inline-flex items-center gap-1.5 text-xs font-medium text-mint hover:underline"
+                          className="mt-2.5 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
                         >
                           <Icon className="h-3.5 w-3.5" /> {meta.label}
                         </a>
                       )}
                       {completion?.status === "pending" ? (
-                        <div className="mt-3 rounded-lg border border-amber-dim/40 bg-amber-soft px-3 py-2 text-center text-xs font-medium text-amber">
+                        <div className="mt-3 rounded-lg border border-secondary-dim/40 bg-secondary-soft px-3 py-2 text-center text-xs font-medium text-secondary">
                           Awaiting review
                         </div>
                       ) : completion?.status === "approved" ? (
-                        <div className="mt-3 rounded-lg border border-mint-dim/40 bg-mint-soft px-3 py-2 text-center text-xs font-medium text-mint">
+                        <div className="mt-3 rounded-lg border border-primary-dim/40 bg-primary-soft px-3 py-2 text-center text-xs font-medium text-primary">
                           Task approved
                         </div>
                       ) : completion?.status === "rejected" ? (
@@ -207,28 +215,29 @@ export default function TasksPage() {
                 description="Complete a task to see it here."
               />
             ) : (
-              <Table>
-                <THead>
-                  <Th>Task</Th>
-                  <Th>Submitted</Th>
-                  <Th>Status</Th>
-                  <Th>Note</Th>
-                </THead>
-                <tbody>
-                  {completions.map((c) => (
-                    <Tr key={c.id}>
-                      <Td className="text-ink">{c.task?.title ?? "—"}</Td>
-                      <Td className="text-ink-dim">
+              <div className="space-y-2.5">
+                {completions.map((c) => (
+                  <div
+                    key={c.id}
+                    className="flex items-center gap-4 rounded-xl border border-base-border bg-base-raised p-4"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-ink">
+                        {c.task?.title ?? "—"}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-ink-faint">
                         {formatDateTime(c.completedAt ?? c.createdAt)}
-                      </Td>
-                      <Td>
-                        <StatusPill status={c.status} />
-                      </Td>
-                      <Td className="text-ink-faint">{c.reviewNote ?? "—"}</Td>
-                    </Tr>
-                  ))}
-                </tbody>
-              </Table>
+                      </p>
+                      {c.reviewNote && (
+                        <p className="mt-1 text-xs text-ink-dim">
+                          {c.reviewNote}
+                        </p>
+                      )}
+                    </div>
+                    <StatusPill status={c.status} />
+                  </div>
+                ))}
+              </div>
             )}
           </CardBody>
         </Card>
@@ -241,17 +250,14 @@ export default function TasksPage() {
       >
         <form onSubmit={onSubmit} className="space-y-4">
           <p className="text-sm text-ink-dim">
-            Reward:{" "}
-            <span className="font-mono font-semibold text-mint">
-              {formatMoney(selected?.reward)}
-            </span>
+            Reward: <Money value={selected?.reward} tone="primary" />
           </p>
           {selected?.targetUrl && (
             <a
               href={selected.targetUrl}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-1.5 rounded-lg border border-base-border bg-base-raised px-3.5 py-2.5 text-sm font-medium text-mint hover:bg-base-surface2"
+              className="flex items-center gap-1.5 rounded-lg border border-base-border bg-base-raised px-3.5 py-2.5 text-sm font-medium text-primary hover:bg-base-surface2"
             >
               {(() => {
                 const Icon =
@@ -292,7 +298,7 @@ export default function TasksPage() {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex w-full flex-col items-center gap-2 rounded-xl border border-dashed border-base-border bg-base-raised px-4 py-8 text-ink-faint transition-colors hover:border-mint-dim/50 hover:text-mint"
+                className="flex w-full flex-col items-center gap-2 rounded-xl border border-dashed border-base-border bg-base-raised px-4 py-8 text-ink-faint transition-colors hover:border-primary-dim/50 hover:text-primary"
               >
                 <ImagePlus className="h-6 w-6" />
                 <span className="text-xs font-medium">

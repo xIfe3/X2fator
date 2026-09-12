@@ -10,7 +10,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-import { genderEnum, kycStatusEnum, userStatusEnum } from "./enums";
+import { genderEnum, userStatusEnum } from "./enums";
 
 export const users = pgTable(
   "users",
@@ -49,8 +49,6 @@ export const users = pgTable(
 
     status: userStatusEnum("status").notNull().default("pending"),
 
-    kycStatus: kycStatusEnum("kyc_status").notNull().default("not_submitted"),
-
     emailVerified: boolean("email_verified").notNull().default(false),
 
     phoneVerified: boolean("phone_verified").notNull().default(false),
@@ -60,6 +58,16 @@ export const users = pgTable(
     }),
 
     loginCount: integer("login_count").notNull().default(0),
+
+    // Daily login-bonus streak tracking.
+    currentStreak: integer("current_streak").notNull().default(0),
+
+    longestStreak: integer("longest_streak").notNull().default(0),
+
+    lastBonusClaimDate: timestamp("last_bonus_claim_date", {
+      withTimezone: true,
+      mode: "date",
+    }),
 
     createdAt: timestamp("created_at", {
       withTimezone: true,

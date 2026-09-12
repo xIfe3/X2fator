@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, sql } from 'drizzle-orm';
 
 import { db, withdrawals } from '@2xfactor/database';
 
@@ -19,6 +19,23 @@ export class AdminWithdrawalsService {
       where: eq(withdrawals.status, 'pending'),
       orderBy: [desc(withdrawals.createdAt)],
     });
+  }
+
+  async getAdminStats() {
+    const [stats] = await db
+      .select({
+        totalCount: sql<number>`count(*)::int`,
+        totalAmount: sql<string>`coalesce(sum(${withdrawals.amount}), 0)::text`,
+        pendingCount: sql<number>`count(*) filter (where ${withdrawals.status} in ('pending', 'processing'))::int`,
+        pendingAmount: sql<string>`coalesce(sum(${withdrawals.amount}) filter (where ${withdrawals.status} in ('pending', 'processing')), 0)::text`,
+        completedCount: sql<number>`count(*) filter (where ${withdrawals.status} = 'completed')::int`,
+        completedAmount: sql<string>`coalesce(sum(${withdrawals.amount}) filter (where ${withdrawals.status} = 'completed'), 0)::text`,
+        rejectedCount: sql<number>`count(*) filter (where ${withdrawals.status} in ('rejected', 'cancelled'))::int`,
+        rejectedAmount: sql<string>`coalesce(sum(${withdrawals.amount}) filter (where ${withdrawals.status} in ('rejected', 'cancelled')), 0)::text`,
+      })
+      .from(withdrawals);
+
+    return stats;
   }
 
   async getWithdrawal(withdrawalId: string) {

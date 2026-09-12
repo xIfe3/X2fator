@@ -1,11 +1,17 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
-import { db, earnings } from '@2xfactor/database';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { eq } from 'drizzle-orm';
+import { db, earnings, users } from '@2xfactor/database';
 import { WalletService } from '../wallet/wallet.service';
 
 import { SiteContentService } from '../site-content/site-content.service';
 
-const DEFAULT_DAILY_BONUS = { enabled: true, amount: '50.00' };
+const STREAK_MILESTONE_DAYS = 30;
+
+const DEFAULT_DAILY_BONUS = {
+  enabled: true,
+  amount: '50.00',
+  milestoneAmount: '5000.00',
+};
 
 @Injectable()
 export class BonusesService {
@@ -18,37 +24,61 @@ export class BonusesService {
     return this.getSettings();
   }
 
-  async updateAdminSettings(params: { enabled?: boolean; amount?: string }) {
+  async updateAdminSettings(params: {
+    enabled?: boolean;
+    amount?: string;
+    milestoneAmount?: string;
+  }) {
     const current = await this.getSettings();
     const amount = params.amount ?? current.amount;
+    const milestoneAmount = params.milestoneAmount ?? current.milestoneAmount;
 
     if (!/^\d+(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0) {
       throw new BadRequestException('Bonus amount must be greater than zero');
     }
 
+    if (
+      !/^\d+(\.\d{1,2})?$/.test(milestoneAmount) ||
+      Number(milestoneAmount) <= 0
+    ) {
+      throw new BadRequestException(
+        'Milestone amount must be greater than zero',
+      );
+    }
+
     await this.siteContentService.updateSection('daily_bonus', {
       enabled: params.enabled ?? current.enabled,
       amount: Number(amount).toFixed(2),
+      milestoneAmount: Number(milestoneAmount).toFixed(2),
     });
 
     return this.getSettings();
   }
 
   async getDailyStatus(userId: string) {
-    const today = this.todayKey();
     const settings = await this.getSettings();
-    const claim = await this.findClaim(userId, today);
+    const user = await this.getUser(userId);
+    const today = this.todayKey();
+    const lastClaim = this.dateKey(user.lastBonusClaimDate);
+    const claimed = lastClaim === today;
+
+    const nextStreak = this.computeNextStreak(user, today);
+    const nextIsMilestone = !claimed && nextStreak === STREAK_MILESTONE_DAYS;
+
     return {
       enabled: settings.enabled,
-      claimed: Boolean(claim),
-      amount: settings.amount,
-      claimDate: today,
-      nextClaimAt: claim ? this.nextClaimDate().toISOString() : null,
+      claimed,
+      amount: nextIsMilestone ? settings.milestoneAmount : settings.amount,
+      currentStreak: user.currentStreak,
+      longestStreak: user.longestStreak,
+      nextStreak: claimed ? user.currentStreak : nextStreak,
+      nextIsMilestone,
+      milestoneDays: STREAK_MILESTONE_DAYS,
+      nextClaimAt: claimed ? this.nextClaimDate().toISOString() : null,
     };
   }
 
   async claimDailyBonus(userId: string) {
-    const today = this.todayKey();
     const settings = await this.getSettings();
 
     if (!settings.enabled) {
@@ -56,25 +86,43 @@ export class BonusesService {
     }
 
     return db.transaction(async (tx) => {
-      const existing = await tx.query.earnings.findFirst({
-        where: and(eq(earnings.userId, userId), eq(earnings.source, 'bonus')),
-      });
-      const claimedToday =
-        existing && this.claimDate(existing.metadata) === today;
+      const [user] = await tx
+        .select()
+        .from(users)
+        .where(eq(users.id, userId))
+        .for('update');
 
-      if (claimedToday) {
+      if (!user) throw new NotFoundException('User not found');
+
+      const today = this.todayKey();
+      const lastClaim = this.dateKey(user.lastBonusClaimDate);
+
+      if (lastClaim === today) {
         throw new BadRequestException('Daily bonus already claimed');
       }
 
+      let newStreak = this.computeNextStreak(user, today);
+      const isMilestone = newStreak === STREAK_MILESTONE_DAYS;
+      const amount = isMilestone ? settings.milestoneAmount : settings.amount;
+
+      if (isMilestone) {
+        // Reset after paying out so tomorrow's claim cleanly starts day 1.
+        newStreak = 0;
+      }
+
+      const longestStreak = Math.max(user.longestStreak, newStreak);
       const reference = `BONUS_${today.replace(/-/g, '')}_${Date.now()}`;
+
       await this.walletService.credit(
         {
           userId,
-          walletType: 'earnings',
-          amount: settings.amount,
+          walletType: 'task',
+          amount,
           type: 'adjustment',
           reference: `WALLET_${reference}`,
-          description: 'Daily login bonus',
+          description: isMilestone
+            ? '30-day login streak bonus'
+            : 'Daily login bonus',
           metadata: { source: 'daily_login_bonus', claimDate: today },
         },
         tx,
@@ -85,55 +133,92 @@ export class BonusesService {
         .values({
           userId,
           source: 'bonus',
-          amount: settings.amount,
+          amount,
           status: 'credited',
           reference,
-          description: 'Daily login bonus',
+          description: isMilestone
+            ? '30-day login streak bonus'
+            : 'Daily login bonus',
           metadata: { claimDate: today },
           earningDate: new Date(),
         })
         .returning();
 
+      await tx
+        .update(users)
+        .set({
+          currentStreak: newStreak,
+          longestStreak,
+          lastBonusClaimDate: new Date(today),
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, userId));
+
       return {
         earning,
-        amount: settings.amount,
+        amount,
+        isMilestone,
+        currentStreak: newStreak,
+        longestStreak,
         claimDate: today,
         nextClaimAt: this.nextClaimDate().toISOString(),
       };
     });
   }
 
-  private async findClaim(userId: string, claimDate: string) {
-    const bonusEarnings = await db.query.earnings.findMany({
-      where: and(eq(earnings.userId, userId), eq(earnings.source, 'bonus')),
+  private async getUser(userId: string) {
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, userId),
     });
-    return bonusEarnings.find(
-      (earning) => this.claimDate(earning.metadata) === claimDate,
-    );
+    if (!user) throw new NotFoundException('User not found');
+    return user;
+  }
+
+  /**
+   * Streak continues (currentStreak + 1) only if the last claim was
+   * exactly yesterday (UTC). Otherwise — never claimed, or a day was
+   * missed — the streak restarts at 1.
+   */
+  private computeNextStreak(
+    user: { currentStreak: number; lastBonusClaimDate: Date | null },
+    today: string,
+  ) {
+    const lastClaim = this.dateKey(user.lastBonusClaimDate);
+    const yesterday = this.dateKey(this.addDays(new Date(today), -1));
+    return lastClaim === yesterday ? user.currentStreak + 1 : 1;
   }
 
   private async getSettings() {
     const sections = await this.siteContentService.getAll();
     const configured = sections.daily_bonus;
     const amount = configured?.amount;
+    const milestoneAmount = configured?.milestoneAmount;
     return {
       enabled: configured?.enabled !== false,
       amount:
         typeof amount === 'string' && Number(amount) > 0
           ? Number(amount).toFixed(2)
           : DEFAULT_DAILY_BONUS.amount,
+      milestoneAmount:
+        typeof milestoneAmount === 'string' && Number(milestoneAmount) > 0
+          ? Number(milestoneAmount).toFixed(2)
+          : DEFAULT_DAILY_BONUS.milestoneAmount,
     };
-  }
-
-  private claimDate(metadata: unknown) {
-    if (!metadata || typeof metadata !== 'object' || !('claimDate' in metadata))
-      return null;
-    const claimDate = (metadata as { claimDate?: unknown }).claimDate;
-    return typeof claimDate === 'string' ? claimDate : null;
   }
 
   private todayKey() {
     return new Date().toISOString().slice(0, 10);
+  }
+
+  private dateKey(date: Date | string | null) {
+    if (!date) return null;
+    return new Date(date).toISOString().slice(0, 10);
+  }
+
+  private addDays(date: Date, days: number) {
+    const next = new Date(date);
+    next.setUTCDate(next.getUTCDate() + days);
+    return next;
   }
 
   private nextClaimDate() {

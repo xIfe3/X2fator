@@ -20,9 +20,9 @@ export default function AppGroupLayout({
 
   if (isLoading || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0b0d11]">
+      <div className="flex min-h-screen items-center justify-center bg-base">
         <Loader2
-          className="h-7 w-7 animate-spin text-[#e7b64a]"
+          className="h-7 w-7 animate-spin text-secondary"
           style={{ animationDuration: "0.9s" }}
         />
       </div>

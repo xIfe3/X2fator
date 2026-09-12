@@ -12,14 +12,16 @@ export function Tabs({
   onChange: (key: string) => void;
 }) {
   return (
-    <div className="flex gap-1 rounded-xl border border-base-border bg-base-raised p-1">
+    <div className="flex gap-1 rounded-full border border-base-border bg-base-raised p-1">
       {tabs.map((tab) => (
         <button
           key={tab.key}
           onClick={() => onChange(tab.key)}
           className={cn(
-            "rounded-lg px-3.5 py-1.5 text-xs font-medium transition-colors",
-            active === tab.key ? "bg-mint text-base" : "text-ink-dim hover:text-ink",
+            "rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors",
+            active === tab.key
+              ? "bg-primary text-white shadow-sm"
+              : "text-ink-dim hover:text-ink",
           )}
         >
           {tab.label}

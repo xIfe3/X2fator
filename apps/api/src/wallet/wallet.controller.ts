@@ -20,8 +20,12 @@ export class WalletController {
 
     return {
       account: wallets.account.balance,
-      earnings: wallets.earnings.balance,
-      total: Number(wallets.account.balance) + Number(wallets.earnings.balance),
+      task: wallets.task.balance,
+      referral: wallets.referral.balance,
+      total:
+        Number(wallets.account.balance) +
+        Number(wallets.task.balance) +
+        Number(wallets.referral.balance),
     };
   }
 
@@ -29,7 +33,7 @@ export class WalletController {
   async getTransactions(
     @CurrentUser() user: AuthenticatedUser,
     @Query('type')
-    type: 'account' | 'earnings' = 'account',
+    type: 'account' | 'task' | 'referral' = 'account',
   ) {
     return this.walletService.getTransactions(user.id, type);
   }

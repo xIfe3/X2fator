@@ -7,7 +7,8 @@ export const plansApi = {
 };
 
 export const subscriptionsApi = {
-  purchase: (planId: string) => api.post<Subscription>("/subscriptions", { planId }),
+  purchase: (planId: string) =>
+    api.post<Subscription>("/subscriptions", { planId }),
   active: () => api.get<Subscription | null>("/subscriptions/active"),
   list: () => api.get<Subscription[]>("/subscriptions"),
   cancel: (id: string) => api.delete<void>(`/subscriptions/${id}`),

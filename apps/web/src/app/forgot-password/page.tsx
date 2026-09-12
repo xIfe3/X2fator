@@ -17,7 +17,8 @@ export default function ForgotPasswordPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [sent, setSent] = useState(false);
 
-  const emailError = touched && !isValidEmail(email) ? "Enter a valid email address" : undefined;
+  const emailError =
+    touched && !isValidEmail(email) ? "Enter a valid email address" : undefined;
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -30,7 +31,11 @@ export default function ForgotPasswordPage() {
       await authApi.forgotPassword(email.trim());
       setSent(true);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Something went wrong. Try again.");
+      setError(
+        err instanceof ApiRequestError
+          ? err.message
+          : "Something went wrong. Try again.",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -42,18 +47,19 @@ export default function ForgotPasswordPage() {
         title="Check your email"
         subtitle="If an account exists for that address, a reset link is on its way."
         footer={
-          <Link href="/login" className="font-medium text-mint hover:underline">
+          <Link href="/login" className="font-medium text-primary hover:underline">
             Back to log in
           </Link>
         }
       >
         <div className="flex flex-col items-center gap-4 py-2 text-center">
-          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-mint-soft text-mint">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-soft text-primary">
             <MailCheck className="h-5 w-5" />
           </span>
           <p className="text-sm text-ink-dim">
-            We sent instructions to <span className="font-medium text-ink">{email}</span>. The link expires in 30
-            minutes.
+            We sent instructions to{" "}
+            <span className="font-medium text-ink">{email}</span>. The link
+            expires in 30 minutes.
           </p>
           <Button variant="secondary" size="sm" onClick={() => setSent(false)}>
             Use a different email
@@ -70,7 +76,7 @@ export default function ForgotPasswordPage() {
       footer={
         <>
           Remembered it?{" "}
-          <Link href="/login" className="font-medium text-mint hover:underline">
+          <Link href="/login" className="font-medium text-primary hover:underline">
             Back to log in
           </Link>
         </>
@@ -92,7 +98,12 @@ export default function ForgotPasswordPage() {
             {error}
           </p>
         )}
-        <Button type="submit" className="w-full" isLoading={isLoading}>
+        <Button
+          type="submit"
+          variant="auth"
+          className="w-full"
+          isLoading={isLoading}
+        >
           Send reset link
         </Button>
       </form>

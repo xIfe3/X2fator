@@ -14,8 +14,8 @@ export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 
   @Get()
-  async getTasks() {
-    return this.tasksService.getTasks();
+  async getTasks(@CurrentUser() user: AuthenticatedUser) {
+    return this.tasksService.getTasks(user.id);
   }
 
   /**

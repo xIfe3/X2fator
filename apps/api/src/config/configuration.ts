@@ -24,8 +24,11 @@ export default () => ({
     origin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
   },
 
-  paystack: {
-    secretKey: process.env.PAYSTACK_SECRET_KEY,
-    callbackUrl: process.env.PAYSTACK_CALLBACK_URL,
+  flutterwave: {
+    secretKey: process.env.FLUTTERWAVE_SECRET_KEY,
+    publicKey: process.env.FLUTTERWAVE_PUBLIC_KEY,
+    secretHash: process.env.FLUTTERWAVE_SECRET_HASH,
+    callbackUrl: process.env.FLUTTERWAVE_CALLBACK_URL,
+    baseUrl: process.env.FLUTTERWAVE_BASE_URL ?? 'https://api.flutterwave.com/v3',
   },
 });

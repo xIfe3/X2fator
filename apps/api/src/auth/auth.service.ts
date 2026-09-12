@@ -11,6 +11,7 @@ import { createHash, randomBytes } from 'crypto';
 import { Inject } from '@nestjs/common';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { MAILER, type Mailer } from '../mail/mailer.service';
 import {
   db,
@@ -59,14 +60,14 @@ export class AuthService {
 
     const passwordHash = await this.passwordService.hash(dto.password);
 
-    const referralCode = await this.generateReferralCode();
+    const referralCode = await this.generateReferralCode(email);
 
     const result = await db.transaction(async (tx) => {
       let referredById: string | undefined;
 
       if (dto.referralCode) {
         const referrer = await tx.query.users.findFirst({
-          where: eq(users.referralCode, dto.referralCode.trim().toUpperCase()),
+          where: eq(users.referralCode, dto.referralCode.trim().toLowerCase()),
         });
 
         if (!referrer) {
@@ -110,12 +111,8 @@ export class AuthService {
           balance: '0',
           status: 'active',
         },
-        {
-          userId: user.id,
-          type: 'earnings',
-          balance: '0',
-          status: 'active',
-        },
+        { userId: user.id, type: 'task', balance: '0', status: 'active' },
+        { userId: user.id, type: 'referral', balance: '0', status: 'active' },
       ]);
 
       if (referredById) {
@@ -280,20 +277,29 @@ export class AuthService {
     return safeUser;
   }
 
-  private async generateReferralCode() {
-    let code: string;
+  private async generateReferralCode(email: string) {
+    // Extract email slug (part before @)
+    const emailSlug = email.split('@')[0].toLowerCase();
+    let code = emailSlug;
 
-    do {
-      code = 'XF' + Math.random().toString(36).substring(2, 8).toUpperCase();
+    // Check if the base slug exists
+    let existing = await db.query.users.findFirst({
+      where: eq(users.referralCode, code),
+    });
 
-      const existing = await db.query.users.findFirst({
-        where: eq(users.referralCode, code),
-      });
+    // If it exists, append numeric suffix until we find a unique one
+    if (existing) {
+      let counter = 1;
+      do {
+        code = `${emailSlug}${counter}`;
+        existing = await db.query.users.findFirst({
+          where: eq(users.referralCode, code),
+        });
+        counter++;
+      } while (existing && counter < 1000); // Safety limit
+    }
 
-      if (!existing) {
-        return code;
-      }
-    } while (true);
+    return code;
   }
 
   private hashToken(token: string): string {
@@ -364,6 +370,36 @@ export class AuthService {
         .set({ usedAt: new Date() })
         .where(eq(passwordResetTokens.id, record.id));
     });
+
+    return { message: 'Password updated successfully.' };
+  }
+
+  async changePassword(
+    userId: string,
+    dto: ChangePasswordDto,
+  ): Promise<{ message: string }> {
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, userId),
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const currentPasswordValid = await this.passwordService.compare(
+      dto.currentPassword,
+      user.passwordHash,
+    );
+
+    if (!currentPasswordValid) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    const passwordHash = await this.passwordService.hash(dto.newPassword);
+    await db
+      .update(users)
+      .set({ passwordHash, updatedAt: new Date() })
+      .where(eq(users.id, userId));
 
     return { message: 'Password updated successfully.' };
   }

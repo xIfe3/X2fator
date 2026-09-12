@@ -28,6 +28,12 @@ export class AdminWithdrawalsController {
     return this.adminWithdrawalsService.getPendingWithdrawals();
   }
 
+  @Get('stats')
+  @RequirePermission('withdrawals.read')
+  async getStats() {
+    return this.adminWithdrawalsService.getAdminStats();
+  }
+
   @Get(':id')
   @RequirePermission('withdrawals.read')
   async getWithdrawal(@Param('id') id: string) {

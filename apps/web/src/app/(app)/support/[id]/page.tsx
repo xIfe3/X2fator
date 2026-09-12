@@ -101,7 +101,7 @@ export default function TicketThreadPage() {
                     className={cn(
                       "max-w-[80%] rounded-xl border px-4 py-3 text-sm",
                       isMe
-                        ? "border-mint-dim/40 bg-mint-soft text-ink"
+                        ? "border-primary-dim/40 bg-primary-soft text-ink"
                         : "border-base-border bg-base-raised text-ink",
                     )}
                   >

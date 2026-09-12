@@ -5,12 +5,7 @@ import {
 } from '@nestjs/common';
 import { and, desc, eq, gte } from 'drizzle-orm';
 
-import {
-  db,
-  tasks,
-  taskCompletions,
-  planSubscriptions,
-} from '@2xfactor/database';
+import { ads, db, tasks, taskCompletions } from '@2xfactor/database';
 
 import { WalletService } from '../wallet/wallet.service';
 import { AuditService } from '../audit/audit.service';
@@ -54,13 +49,24 @@ export class TasksService {
   }
 
   /**
-   * Get all active tasks.
+   * Get all active tasks available to a user to complete. Excludes
+   * ad-generated tasks the user themselves funded — you can't complete
+   * (and get paid for) your own ad campaign.
    */
-  async getTasks() {
-    return db.query.tasks.findMany({
-      where: eq(tasks.status, 'active'),
-      orderBy: [desc(tasks.createdAt)],
-    });
+  async getTasks(userId: string) {
+    const rows = await db
+      .select({ task: tasks, ad: ads })
+      .from(tasks)
+      .leftJoin(ads, eq(tasks.adId, ads.id))
+      .where(eq(tasks.status, 'active'))
+      .orderBy(desc(tasks.createdAt));
+
+    return rows
+      .filter((r) => !r.ad || r.ad.userId !== userId)
+      .map((r) => ({
+        ...r.task,
+        source: r.task.adId ? ('ad' as const) : ('admin' as const),
+      }));
   }
 
   /**
@@ -156,29 +162,40 @@ export class TasksService {
         throw new NotFoundException('Active task not found');
       }
 
-      const subscription = await tx.query.planSubscriptions.findFirst({
-        where: and(
-          eq(planSubscriptions.userId, userId),
-          eq(planSubscriptions.status, 'active'),
-        ),
-      });
-
-      if (!subscription) {
-        throw new BadRequestException(
-          'You need an active subscription to complete tasks',
-        );
-      }
-
       const existingCompletion = await tx.query.taskCompletions.findFirst({
         where: and(
           eq(taskCompletions.userId, userId),
           eq(taskCompletions.taskId, taskId),
-          eq(taskCompletions.subscriptionId, subscription.id),
         ),
       });
 
       if (existingCompletion) {
         throw new BadRequestException('You have already completed this task');
+      }
+
+      let ad: { id: string } | undefined;
+      if (task.adId) {
+        const adRow = await tx.query.ads.findFirst({
+          where: eq(ads.id, task.adId),
+        });
+
+        if (!adRow || adRow.status !== 'active') {
+          throw new NotFoundException('Active task not found');
+        }
+
+        if (adRow.userId === userId) {
+          throw new BadRequestException(
+            'You cannot complete your own ad campaign',
+          );
+        }
+
+        if (adRow.remainingSlots <= 0) {
+          throw new BadRequestException(
+            'This campaign has no remaining slots',
+          );
+        }
+
+        ad = adRow;
       }
 
       const startOfDay = new Date();
@@ -187,12 +204,12 @@ export class TasksService {
       const todayCompletions = await tx.query.taskCompletions.findMany({
         where: and(
           eq(taskCompletions.userId, userId),
-          eq(taskCompletions.subscriptionId, subscription.id),
           gte(taskCompletions.completedAt, startOfDay),
         ),
       });
 
-      if (todayCompletions.length >= subscription.dailyTaskLimit) {
+      const dailyTaskLimit = 10;
+      if (todayCompletions.length >= dailyTaskLimit) {
         throw new BadRequestException('Daily task limit reached');
       }
 
@@ -203,7 +220,7 @@ export class TasksService {
         .values({
           userId,
           taskId,
-          subscriptionId: subscription.id,
+          adId: ad?.id,
           reward: task.reward,
           submissionData,
           screenshotUrl,
@@ -269,9 +286,13 @@ export class TasksService {
 
   /**
    * Admin: approve a task completion. Credits the reward to the user's
-   * earnings wallet.
+   * task wallet.
    */
-  async approveCompletion(adminId: string, completionId: string, note?: string) {
+  async approveCompletion(
+    adminId: string,
+    completionId: string,
+    note?: string,
+  ) {
     const [row] = await db
       .select({ completion: taskCompletions, task: tasks })
       .from(taskCompletions)
@@ -286,9 +307,7 @@ export class TasksService {
     const completion = { ...row.completion, task: row.task ?? undefined };
 
     if (completion.status !== 'pending') {
-      throw new BadRequestException(
-        'Only pending completions can be approved',
-      );
+      throw new BadRequestException('Only pending completions can be approved');
     }
 
     return db.transaction(async (tx) => {
@@ -306,7 +325,7 @@ export class TasksService {
       await this.walletService.credit(
         {
           userId: completion.userId,
-          walletType: 'earnings',
+          walletType: 'task',
           amount: completion.reward,
           type: 'task_reward',
           reference: completion.id,
@@ -314,6 +333,33 @@ export class TasksService {
         },
         tx,
       );
+
+      if (completion.adId) {
+        const adRow = await tx.query.ads.findFirst({
+          where: eq(ads.id, completion.adId),
+        });
+
+        if (adRow) {
+          const remainingSlots = Math.max(0, adRow.remainingSlots - 1);
+          const campaignDone = remainingSlots === 0;
+
+          await tx
+            .update(ads)
+            .set({
+              remainingSlots,
+              status: campaignDone ? 'completed' : adRow.status,
+              updatedAt: new Date(),
+            })
+            .where(eq(ads.id, adRow.id));
+
+          if (campaignDone && adRow.taskId) {
+            await tx
+              .update(tasks)
+              .set({ status: 'inactive', updatedAt: new Date() })
+              .where(eq(tasks.id, adRow.taskId));
+          }
+        }
+      }
 
       await this.auditService.log({
         actorId: adminId,
@@ -343,9 +389,7 @@ export class TasksService {
     }
 
     if (completion.status !== 'pending') {
-      throw new BadRequestException(
-        'Only pending completions can be rejected',
-      );
+      throw new BadRequestException('Only pending completions can be rejected');
     }
 
     const [updated] = await db

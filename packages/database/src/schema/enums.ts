@@ -10,13 +10,6 @@ export const userStatusEnum = pgEnum("user_status", [
   "pending",
 ]);
 
-export const kycStatusEnum = pgEnum("kyc_status", [
-  "not_submitted",
-  "pending",
-  "approved",
-  "rejected",
-]);
-
 export const genderEnum = pgEnum("gender", ["male", "female", "other"]);
 
 /**
@@ -50,7 +43,11 @@ export const taskCompletionStatusEnum = pgEnum("task_completion_status", [
 /**
  * Wallet
  */
-export const walletTypeEnum = pgEnum("wallet_type", ["account", "earnings"]);
+export const walletTypeEnum = pgEnum("wallet_type", [
+  "account",
+  "task",
+  "referral",
+]);
 
 export const walletStatusEnum = pgEnum("wallet_status", ["active", "frozen"]);
 
@@ -79,6 +76,21 @@ export const transactionStatusEnum = pgEnum("transaction_status", [
   "reversed",
 ]);
 
+export const adTypeEnum = pgEnum("ad_type", [
+  "app_download",
+  "followers",
+  "subscribers",
+  "comments",
+  "likes",
+]);
+export const adStatusEnum = pgEnum("ad_status", [
+  "pending",
+  "active",
+  "paused",
+  "completed",
+  "rejected",
+]);
+
 /**
  * Payments
  */
@@ -92,7 +104,6 @@ export const paymentStatusEnum = pgEnum("payment_status", [
 ]);
 
 export const paymentProviderEnum = pgEnum("payment_provider", [
-  "paystack",
   "flutterwave",
   "manual",
   "mock",
@@ -148,22 +159,6 @@ export const networkProviderEnum = pgEnum("network_provider", [
 ]);
 
 /**
- * KYC
- */
-export const kycDocumentTypeEnum = pgEnum("kyc_document_type", [
-  "national_id",
-  "drivers_license",
-  "passport",
-  "voters_card",
-]);
-
-export const kycDocumentStatusEnum = pgEnum("kyc_document_status", [
-  "pending",
-  "approved",
-  "rejected",
-]);
-
-/**
  * Notifications
  */
 export const notificationTypeEnum = pgEnum("notification_type", [
@@ -215,6 +210,7 @@ export const adminActionEnum = pgEnum("admin_action", [
   "login",
   "logout",
   "adjust",
+  "reset_password",
 ]);
 
 export const auditEntityTypeEnum = pgEnum("audit_entity_type", [
@@ -226,7 +222,6 @@ export const auditEntityTypeEnum = pgEnum("audit_entity_type", [
   "task",
   "withdrawal",
   "deposit",
-  "kyc",
   "payment",
   "utility",
   "ticket",

@@ -42,7 +42,7 @@ export default function ReferralsPage() {
         <CardBody className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
           <div>
             <p className="text-xs text-ink-faint">Your referral code</p>
-            <p className="mt-1 font-mono text-2xl font-semibold tabular text-amber">
+            <p className="mt-1 font-mono text-2xl font-semibold tabular text-secondary">
               {infoLoading ? "···" : info?.referralCode}
             </p>
           </div>
@@ -61,8 +61,8 @@ export default function ReferralsPage() {
           </>
         ) : (
           <>
-            <StatCard label="Total referred" value={String(info?.totalReferrals ?? 0)} icon={Users} tone="mint" />
-            <StatCard label="Earned from referrals" value={formatMoney(info?.totalEarned)} icon={Users} tone="amber" />
+            <StatCard label="Total referred" value={String(info?.totalReferrals ?? 0)} icon={Users} tone="primary" />
+            <StatCard label="Earned from referrals" value={formatMoney(info?.totalEarned)} icon={Users} tone="secondary" />
           </>
         )}
       </div>

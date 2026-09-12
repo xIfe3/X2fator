@@ -52,6 +52,20 @@ export class ApiRequestError extends Error {
 // Prevents a burst of parallel 401s from firing /auth/refresh multiple times.
 let refreshInFlight: Promise<boolean> | null = null;
 
+function accessTokenExpiresSoon(token: string, leewaySeconds = 30) {
+  try {
+    const payloadSegment = token.split(".")[1];
+    if (!payloadSegment) return true;
+    const payload = JSON.parse(atob(payloadSegment)) as { exp?: number };
+    return (
+      typeof payload.exp !== "number" ||
+      payload.exp <= Math.floor(Date.now() / 1000) + leewaySeconds
+    );
+  } catch {
+    return true;
+  }
+}
+
 async function doRefresh(): Promise<boolean> {
   const refreshToken = tokenStore.getRefresh();
   if (!refreshToken) return false;
@@ -74,6 +88,13 @@ async function doRefresh(): Promise<boolean> {
   }
 }
 
+function notifySessionExpired() {
+  tokenStore.clear();
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("session-expired"));
+  }
+}
+
 interface RequestOptions extends RequestInit {
   auth?: boolean; // defaults to true
   skipRefreshRetry?: boolean;
@@ -90,7 +111,17 @@ async function request<T>(
     finalHeaders.set("Content-Type", "application/json");
   }
   if (auth) {
-    const token = tokenStore.getAccess();
+    let token = tokenStore.getAccess();
+    if (token && accessTokenExpiresSoon(token)) {
+      if (!refreshInFlight)
+        refreshInFlight = doRefresh().finally(() => (refreshInFlight = null));
+      const refreshed = await refreshInFlight;
+      if (!refreshed) {
+        notifySessionExpired();
+        throw new ApiRequestError("Session expired", 401);
+      }
+      token = tokenStore.getAccess();
+    }
     if (token) finalHeaders.set("Authorization", `Bearer ${token}`);
   }
 
@@ -115,8 +146,7 @@ async function request<T>(
     if (refreshed) {
       return request<T>(path, { ...options, skipRefreshRetry: true });
     }
-    tokenStore.clear();
-    if (typeof window !== "undefined") window.location.href = "/login";
+    notifySessionExpired();
     throw new ApiRequestError("Session expired", 401);
   }
 

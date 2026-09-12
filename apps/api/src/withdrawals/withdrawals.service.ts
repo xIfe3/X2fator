@@ -41,11 +41,11 @@ export class WithdrawalsService {
 
     return db.transaction(async (tx) => {
       const wallet = await tx.query.wallets.findFirst({
-        where: and(eq(wallets.userId, userId), eq(wallets.type, 'earnings')),
+        where: and(eq(wallets.userId, userId), eq(wallets.type, 'task')),
       });
 
       if (!wallet) {
-        throw new NotFoundException('Earnings wallet not found');
+        throw new NotFoundException('Task wallet not found');
       }
 
       if (wallet.status !== 'active') {
@@ -184,12 +184,12 @@ export class WithdrawalsService {
         const wallet = await tx.query.wallets.findFirst({
           where: and(
             eq(wallets.userId, withdrawal.userId),
-            eq(wallets.type, 'earnings'),
+            eq(wallets.type, 'task'),
           ),
         });
 
         if (!wallet) {
-          throw new NotFoundException('Earnings wallet not found');
+          throw new NotFoundException('Task wallet not found');
         }
 
         const balanceBefore = Number(wallet.balance);

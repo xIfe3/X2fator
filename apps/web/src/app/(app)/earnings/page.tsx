@@ -44,8 +44,8 @@ export default function EarningsPage() {
           </>
         ) : (
           <>
-            <StatCard label="Lifetime earnings" value={formatMoney(summary?.total)} icon={Coins} tone="mint" />
-            <StatCard label="Earned today" value={formatMoney(summary?.todayTotal ?? 0)} icon={Coins} tone="amber" />
+            <StatCard label="Lifetime earnings" value={formatMoney(summary?.total)} icon={Coins} tone="primary" />
+            <StatCard label="Earned today" value={formatMoney(summary?.todayTotal ?? 0)} icon={Coins} tone="secondary" />
           </>
         )}
       </div>
@@ -74,7 +74,7 @@ export default function EarningsPage() {
                     <Td>{e.description || "—"}</Td>
                     <Td className="capitalize text-ink-dim">{e.source}</Td>
                     <Td className="text-ink-dim">{formatDateTime(e.createdAt)}</Td>
-                    <Td className="text-right font-mono tabular font-medium text-mint">+{formatMoney(e.amount)}</Td>
+                    <Td className="text-right font-mono tabular font-medium text-primary">+{formatMoney(e.amount)}</Td>
                   </Tr>
                 ))}
               </tbody>

@@ -18,7 +18,7 @@ export class AdminWalletsService {
     adminId: string,
     userId: string,
     params: {
-      walletType: 'account' | 'earnings';
+      walletType: 'account' | 'task' | 'referral';
       amount: string;
       direction: 'credit' | 'debit';
       description: string;

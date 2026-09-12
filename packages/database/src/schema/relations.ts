@@ -10,7 +10,6 @@ import { planTasks } from "./plan-tasks";
 import { tasks, taskCompletions } from "./tasks";
 import { wallets, walletTransactions } from "./wallets";
 import { referrals } from "./referrals";
-import { kycDocuments } from "./kyc";
 import { withdrawals } from "./withdrawals";
 import { userBankAccounts } from "./user-bank-accounts";
 import { notifications } from "./notifications";
@@ -19,6 +18,7 @@ import { auditLogs } from "./audit";
 import { deposits } from "./deposits";
 import { payments } from "./payments";
 import { utilityPurchases } from "./utilities";
+import { ads } from "./ads";
 
 // Every `with: { ... }` usage in the API relies on the relation names
 // defined here (e.g. `with: { plan: true }` needs `planSubscriptionsRelations`
@@ -50,7 +50,6 @@ export const usersRelations = relations(users, ({ one, many }) => ({
     relationName: "referredUser",
   }),
 
-  kycDocuments: many(kycDocuments),
   withdrawals: many(withdrawals),
   bankAccounts: many(userBankAccounts),
   notifications: many(notifications),
@@ -59,6 +58,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   deposits: many(deposits),
   payments: many(payments),
   utilityPurchases: many(utilityPurchases),
+  ads: many(ads),
 }));
 
 export const refreshTokensRelations = relations(refreshTokens, ({ one }) => ({
@@ -105,9 +105,10 @@ export const planTasksRelations = relations(planTasks, ({ one }) => ({
   task: one(tasks, { fields: [planTasks.taskId], references: [tasks.id] }),
 }));
 
-export const tasksRelations = relations(tasks, ({ many }) => ({
+export const tasksRelations = relations(tasks, ({ one, many }) => ({
   completions: many(taskCompletions),
   planTasks: many(planTasks),
+  ad: one(ads, { fields: [tasks.adId], references: [ads.id] }),
 }));
 
 export const taskCompletionsRelations = relations(taskCompletions, ({ one }) => ({
@@ -118,6 +119,12 @@ export const taskCompletionsRelations = relations(taskCompletions, ({ one }) => 
     references: [planSubscriptions.id],
   }),
   reviewer: one(users, { fields: [taskCompletions.reviewedBy], references: [users.id] }),
+  ad: one(ads, { fields: [taskCompletions.adId], references: [ads.id] }),
+}));
+
+export const adsRelations = relations(ads, ({ one }) => ({
+  user: one(users, { fields: [ads.userId], references: [users.id] }),
+  task: one(tasks, { fields: [ads.taskId], references: [tasks.id] }),
 }));
 
 export const walletsRelations = relations(wallets, ({ one, many }) => ({
@@ -144,11 +151,6 @@ export const referralsRelations = relations(referrals, ({ one }) => ({
     fields: [referrals.sourceSubscriptionId],
     references: [planSubscriptions.id],
   }),
-}));
-
-export const kycDocumentsRelations = relations(kycDocuments, ({ one }) => ({
-  user: one(users, { fields: [kycDocuments.userId], references: [users.id] }),
-  reviewer: one(users, { fields: [kycDocuments.reviewedBy], references: [users.id] }),
 }));
 
 export const withdrawalsRelations = relations(withdrawals, ({ one }) => ({

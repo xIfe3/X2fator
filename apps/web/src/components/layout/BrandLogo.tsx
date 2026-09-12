@@ -18,17 +18,33 @@ export function BrandLogo({
       <span
         aria-hidden="true"
         className={cn(
-          "relative flex shrink-0 items-center justify-center overflow-hidden border font-mono font-semibold leading-none shadow-stamp transition-transform duration-200 group-hover:-translate-y-0.5",
-          compact
-            ? "h-8 w-8 rounded-lg text-[11px]"
-            : "h-10 w-10 rounded-xl text-xs",
+          "relative flex shrink-0 items-center justify-center overflow-hidden border leading-none shadow-stamp transition-transform duration-200 group-hover:-translate-y-0.5",
+          compact ? "h-8 w-8 rounded-lg" : "h-10 w-10 rounded-xl",
           admin
-            ? "border-amber/50 bg-amber text-base"
-            : "border-mint/50 bg-mint text-base",
+            ? "border-secondary/50 bg-secondary text-base"
+            : "border-primary/50 bg-primary text-base",
         )}
       >
-        <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-current opacity-30" />
-        <span className="relative tracking-[-0.12em]">X2</span>
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          className={compact ? "h-4 w-4" : "h-5 w-5"}
+        >
+          <path
+            d="M4 5l7 7-7 7"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M13 5l7 7-7 7"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
       </span>
       <span
         className={cn(
@@ -36,7 +52,7 @@ export function BrandLogo({
           compact ? "text-base" : "text-lg",
         )}
       >
-        X2<span className={admin ? "text-amber" : "text-mint"}>Factor</span>
+        X2<span className={admin ? "text-secondary" : "text-primary"}>Factor</span>
       </span>
       {admin && <span className="sr-only">Admin console</span>}
     </Link>

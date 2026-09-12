@@ -7,8 +7,8 @@ import {
 } from 'class-validator';
 
 export class AdjustWalletDto {
-  @IsIn(['account', 'earnings'])
-  walletType!: 'account' | 'earnings';
+  @IsIn(['account', 'task', 'referral'])
+  walletType!: 'account' | 'task' | 'referral';
 
   @IsNumberString()
   amount!: string;

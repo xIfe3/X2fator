@@ -1,13 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowDownToLine, ArrowUpFromLine, Wallet as WalletIcon } from "lucide-react";
+import {
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  ChevronLeft,
+  ChevronRight,
+  Wallet as WalletIcon,
+  Users,
+} from "lucide-react";
 import { useApiQuery } from "@/hooks/useApiQuery";
 import { walletApi } from "@/lib/api/wallet";
-import { StatCard } from "@/components/ui/StatCard";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Table, THead, Th, Tr, Td } from "@/components/ui/Table";
 import { Tabs } from "@/components/ui/Tabs";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -15,91 +20,181 @@ import { PageSkeleton } from "@/components/ui/Skeleton";
 import { formatDateTime, formatMoney } from "@/lib/utils";
 
 export default function WalletPage() {
-  const [type, setType] = useState<"account" | "earnings">("account");
-  const { data: wallets, isLoading: walletsLoading } = useApiQuery(() => walletApi.getWallets());
-  const { data: txns, isLoading: txnsLoading } = useApiQuery(() => walletApi.getTransactions(type), [type]);
+  const [type, setType] = useState<"account" | "task" | "referral">("account");
+  const { data: wallets, isLoading: walletsLoading } = useApiQuery(() =>
+    walletApi.getWallets(),
+  );
+  const { data: txns, isLoading: txnsLoading } = useApiQuery(
+    () => walletApi.getTransactions(type),
+    [type],
+  );
+  const [slide, setSlide] = useState(0);
+
+  const cards = [
+    {
+      key: "account" as const,
+      label: "Account wallet",
+      balance: wallets?.account.balance,
+      status: wallets?.account.status ?? "—",
+      icon: ArrowDownToLine,
+      tone: "primary" as const,
+      actions: [
+        { href: "/deposits", label: "Deposit", variant: "primary" as const },
+        { href: "/withdrawals", label: "Withdraw", variant: "outline" as const },
+      ],
+    },
+    {
+      key: "task" as const,
+      label: "Task wallet",
+      balance: wallets?.task.balance,
+      status: wallets?.task.status ?? "—",
+      icon: WalletIcon,
+      tone: "secondary" as const,
+      actions: [
+        { href: "/withdrawals", label: "Withdraw", variant: "primary" as const },
+        { href: "/tasks", label: "Earn more", variant: "outline" as const },
+      ],
+    },
+    {
+      key: "referral" as const,
+      label: "Referral wallet",
+      balance: wallets?.referral.balance,
+      status: "Referral bonuses only",
+      icon: Users,
+      tone: "secondary" as const,
+      actions: [
+        {
+          href: "/referrals",
+          label: "View referrals",
+          variant: "outline" as const,
+        },
+      ],
+    },
+  ];
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setSlide((current) => (current + 1) % cards.length);
+    }, 4000);
+    return () => window.clearInterval(timer);
+  }, [cards.length]);
 
   if (walletsLoading) return <PageSkeleton />;
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl font-semibold text-ink">Wallet</h1>
-          <p className="mt-1 text-sm text-ink-dim">Your account and earnings balances, side by side.</p>
-        </div>
-        <div className="flex gap-2">
-          <Link href="/deposits">
-            <Button size="sm">
-              <ArrowDownToLine className="h-4 w-4" /> Deposit
-            </Button>
-          </Link>
-          <Link href="/withdrawals">
-            <Button size="sm" variant="secondary">
-              <ArrowUpFromLine className="h-4 w-4" /> Withdraw
-            </Button>
-          </Link>
-        </div>
+      <div>
+        <h1 className="font-display text-2xl font-semibold text-ink">
+          Wallet
+        </h1>
+        <p className="mt-1 text-sm text-ink-dim">
+          Keep funding, task rewards, and referral bonuses separate.
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Card className="relative overflow-hidden">
-          <CardBody className="space-y-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-wider text-ink-faint">Account wallet</p>
-                <p className="mt-2 font-mono text-2xl font-semibold tabular text-ink">
-                  {formatMoney(wallets?.account.balance)}
-                </p>
-                <p className="mt-1 text-xs text-ink-faint">Status: {wallets?.account.status ?? "—"}</p>
-              </div>
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-mint-soft text-mint">
-                <ArrowDownToLine className="h-4 w-4" />
-              </span>
-            </div>
-            <div className="flex gap-2 border-t border-base-border pt-4">
-              <Link href="/deposits" className="flex-1">
-                <Button size="sm" className="w-full">
-                  Deposit
-                </Button>
-              </Link>
-              <Link href="/withdrawals" className="flex-1">
-                <Button size="sm" variant="outline" className="w-full">
-                  Withdraw
-                </Button>
-              </Link>
-            </div>
-          </CardBody>
-        </Card>
+      <div>
+        <div className="group relative overflow-hidden rounded-2xl">
+          <div
+            className="flex transition-transform duration-500 ease-out"
+            style={{ transform: `translateX(-${slide * 100}%)` }}
+          >
+            {cards.map((card) => {
+              const Icon = card.icon;
+              return (
+                <div key={card.key} className="w-full shrink-0">
+                  <Card className="relative min-h-55 overflow-hidden sm:min-h-45">
+                    <CardBody className="flex h-full flex-col justify-between gap-6 sm:flex-row sm:items-center">
+                      <div className="flex items-center gap-4">
+                        <span
+                          className={
+                            "flex h-12 w-12 shrink-0 items-center justify-center rounded-full sm:h-14 sm:w-14 " +
+                            (card.tone === "primary"
+                              ? "bg-primary-soft text-primary"
+                              : "bg-secondary-soft text-secondary")
+                          }
+                        >
+                          <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium uppercase tracking-wider text-ink-faint">
+                            {card.label}
+                          </p>
+                          <p className="mt-1.5 whitespace-nowrap font-mono text-2xl font-semibold tabular text-ink sm:text-3xl">
+                            {formatMoney(card.balance)}
+                          </p>
+                          <p className="mt-1.5 text-xs capitalize text-ink-faint">
+                            {card.status}
+                          </p>
+                        </div>
+                      </div>
 
-        <Card className="relative overflow-hidden">
-          <CardBody className="space-y-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-wider text-ink-faint">Earnings wallet</p>
-                <p className="mt-2 font-mono text-2xl font-semibold tabular text-ink">
-                  {formatMoney(wallets?.earnings.balance)}
-                </p>
-                <p className="mt-1 text-xs text-ink-faint">Status: {wallets?.earnings.status ?? "—"}</p>
-              </div>
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-soft text-amber">
-                <WalletIcon className="h-4 w-4" />
-              </span>
-            </div>
-            <div className="flex gap-2 border-t border-base-border pt-4">
-              <Link href="/withdrawals" className="flex-1">
-                <Button size="sm" className="w-full">
-                  Withdraw earnings
-                </Button>
-              </Link>
-              <Link href="/tasks" className="flex-1">
-                <Button size="sm" variant="outline" className="w-full">
-                  Earn more
-                </Button>
-              </Link>
-            </div>
-          </CardBody>
-        </Card>
+                      <div className="grid grid-cols-2 gap-2 border-t border-base-border pt-4 sm:w-56 sm:shrink-0 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0">
+                        {card.actions.map((action) => (
+                          <Link
+                            key={action.href + action.label}
+                            href={action.href}
+                            className={
+                              card.actions.length === 1
+                                ? "col-span-2"
+                                : undefined
+                            }
+                          >
+                            <Button
+                              size="sm"
+                              variant={
+                                action.variant === "primary"
+                                  ? "primary"
+                                  : "outline"
+                              }
+                              className="w-full whitespace-nowrap"
+                            >
+                              {action.label}
+                            </Button>
+                          </Link>
+                        ))}
+                      </div>
+                    </CardBody>
+                  </Card>
+                </div>
+              );
+            })}
+          </div>
+
+          <button
+            type="button"
+            aria-label="Previous wallet"
+            onClick={() =>
+              setSlide(
+                (current) => (current - 1 + cards.length) % cards.length,
+              )
+            }
+            className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-base-border bg-base-surface/90 text-ink-dim opacity-0 shadow-panel backdrop-blur transition-opacity hover:text-ink group-hover:opacity-100 sm:opacity-100"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            aria-label="Next wallet"
+            onClick={() => setSlide((current) => (current + 1) % cards.length)}
+            className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-base-border bg-base-surface/90 text-ink-dim opacity-0 shadow-panel backdrop-blur transition-opacity hover:text-ink group-hover:opacity-100 sm:opacity-100"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mt-3 flex items-center justify-center gap-1.5">
+          {cards.map((card, index) => (
+            <button
+              key={card.key}
+              type="button"
+              aria-label={`Show ${card.label}`}
+              onClick={() => setSlide(index)}
+              className={`h-1.5 rounded-full transition-all ${
+                slide === index ? "w-6 bg-primary" : "w-1.5 bg-base-border"
+              }`}
+            />
+          ))}
+        </div>
       </div>
 
       <Card>
@@ -108,10 +203,11 @@ export default function WalletPage() {
           <Tabs
             tabs={[
               { key: "account", label: "Account" },
-              { key: "earnings", label: "Earnings" },
+              { key: "task", label: "Tasks & bonus" },
+              { key: "referral", label: "Referrals" },
             ]}
             active={type}
-            onChange={(k) => setType(k as "account" | "earnings")}
+            onChange={(k) => setType(k as "account" | "task" | "referral")}
           />
         </CardHeader>
         <CardBody>
@@ -124,32 +220,48 @@ export default function WalletPage() {
               description={`No ${type} wallet activity yet.`}
             />
           ) : (
-            <Table>
-              <THead>
-                <Th>Description</Th>
-                <Th>Type</Th>
-                <Th>Date</Th>
-                <Th className="text-right">Amount</Th>
-              </THead>
-              <tbody>
-                {txns.map((t) => (
-                  <Tr key={t.id}>
-                    <Td className="capitalize">{t.description || t.type.replace(/_/g, " ")}</Td>
-                    <Td className="capitalize text-ink-dim">{t.direction}</Td>
-                    <Td className="text-ink-dim">{formatDateTime(t.createdAt)}</Td>
-                    <Td
-                      className={
-                        "text-right font-mono tabular font-medium " +
-                        (t.direction === "credit" ? "text-mint" : "text-danger")
-                      }
-                    >
-                      {t.direction === "credit" ? "+" : "−"}
-                      {formatMoney(t.amount)}
-                    </Td>
-                  </Tr>
-                ))}
-              </tbody>
-            </Table>
+            <div className="space-y-2.5">
+              {txns.map((t) => (
+                <div
+                  key={t.id}
+                  className="flex items-center gap-4 rounded-xl border border-base-border bg-base-raised p-4 transition-colors hover:border-base-borderStrong"
+                >
+                  <span
+                    className={
+                      "flex h-10 w-10 shrink-0 items-center justify-center rounded-full " +
+                      (t.direction === "credit"
+                        ? "bg-primary-soft text-primary"
+                        : "bg-danger-soft text-danger")
+                    }
+                  >
+                    {t.direction === "credit" ? (
+                      <ArrowDownToLine className="h-4.5 w-4.5" />
+                    ) : (
+                      <ArrowUpFromLine className="h-4.5 w-4.5" />
+                    )}
+                  </span>
+
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium capitalize text-ink">
+                      {t.description || t.type.replace(/_/g, " ")}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-ink-faint">
+                      {formatDateTime(t.createdAt)}
+                    </p>
+                  </div>
+
+                  <span
+                    className={
+                      "shrink-0 font-mono text-sm font-semibold tabular " +
+                      (t.direction === "credit" ? "text-primary" : "text-danger")
+                    }
+                  >
+                    {t.direction === "credit" ? "+" : "−"}
+                    {formatMoney(t.amount)}
+                  </span>
+                </div>
+              ))}
+            </div>
           )}
         </CardBody>
       </Card>

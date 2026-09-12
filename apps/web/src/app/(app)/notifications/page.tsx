@@ -73,7 +73,7 @@ export default function NotificationsPage() {
                   )}
                 >
                   <span
-                    className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", n.isRead ? "bg-transparent" : "bg-mint")}
+                    className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", n.isRead ? "bg-transparent" : "bg-primary")}
                   />
                   <div className="min-w-0 flex-1">
                     <p className={cn("text-sm", n.isRead ? "text-ink-dim" : "font-medium text-ink")}>{n.title}</p>

@@ -22,8 +22,8 @@ export class PaymentsService {
   /**
    * Initialize a payment.
    *
-   * Actual Paystack/Flutterwave API integration
-   * will be added behind this method.
+   * Provider integrations stay behind this method so the rest of the app only
+   * deals with deposits and payment records.
    */
   async initializePayment(userId: string, depositId: string) {
     const deposit = await db.query.deposits.findFirst({
@@ -46,10 +46,17 @@ export class PaymentsService {
       throw new NotFoundException('Payment record not found');
     }
 
-    if (payment.provider === 'paystack') {
-      const secretKey = this.configService?.get<string>('paystack.secretKey');
-      if (!secretKey) {
-        throw new BadRequestException('Paystack is not configured');
+    if (payment.provider === 'flutterwave') {
+      const secretKey = this.configService?.get<string>(
+        'flutterwave.secretKey',
+      );
+      const baseUrl = this.configService?.get<string>('flutterwave.baseUrl');
+      const callbackUrl = this.configService?.get<string>(
+        'flutterwave.callbackUrl',
+      );
+
+      if (!secretKey || !baseUrl || !callbackUrl) {
+        throw new BadRequestException('Flutterwave is not configured');
       }
 
       const user = await db.query.users.findFirst({
@@ -57,35 +64,36 @@ export class PaymentsService {
       });
       if (!user) throw new NotFoundException('User not found');
 
-      const response = await fetch(
-        'https://api.paystack.co/transaction/initialize',
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${secretKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: user.email,
-            amount: Math.round(Number(payment.amount) * 100),
-            reference: payment.reference,
-            currency: deposit.currency,
-            callback_url: this.configService?.get<string>(
-              'paystack.callbackUrl',
-            ),
-          }),
+      const response = await fetch(`${baseUrl}/payments`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${secretKey}`,
+          'Content-Type': 'application/json',
         },
-      );
+        body: JSON.stringify({
+          tx_ref: payment.reference,
+          amount: Number(payment.amount),
+          currency: deposit.currency,
+          redirect_url: callbackUrl,
+          customer: {
+            email: user.email,
+            name: `${user.firstName} ${user.lastName}`,
+          },
+          customizations: {
+            title: 'X2Factor wallet deposit',
+          },
+        }),
+      });
 
       const body = (await response.json()) as {
-        status?: boolean;
+        status?: string;
         message?: string;
-        data?: { authorization_url?: string; access_code?: string };
+        data?: { link?: string };
       };
 
-      if (!response.ok || !body.status || !body.data?.authorization_url) {
+      if (!response.ok || body.status !== 'success' || !body.data?.link) {
         throw new BadRequestException(
-          body.message ?? 'Paystack initialization failed',
+          body.message ?? 'Flutterwave initialization failed',
         );
       }
 
@@ -96,8 +104,7 @@ export class PaymentsService {
         amount: payment.amount,
         currency: deposit.currency,
         status: payment.status,
-        authorizationUrl: body.data.authorization_url,
-        accessCode: body.data.access_code,
+        authorizationUrl: body.data.link,
       };
     }
 
@@ -114,19 +121,7 @@ export class PaymentsService {
   /**
    * Get payment by reference.
    */
-  async getPaymentByReference(reference: string) {
-    const payment = await db.query.payments.findFirst({
-      where: eq(payments.reference, reference),
-    });
-
-    if (!payment) {
-      throw new NotFoundException('Payment not found');
-    }
-
-    return payment;
-  }
-
-  async verifyPaystackPayment(userId: string, reference: string) {
+  async getPaymentByReference(userId: string, reference: string) {
     const payment = await db.query.payments.findFirst({
       where: eq(payments.reference, reference),
     });
@@ -134,31 +129,77 @@ export class PaymentsService {
     if (!payment || payment.userId !== userId) {
       throw new NotFoundException('Payment not found');
     }
-    if (payment.provider !== 'paystack') {
-      throw new BadRequestException('Payment is not a Paystack payment');
+
+    return payment;
+  }
+
+  async getUserPayments(userId: string) {
+    return db.query.payments.findMany({
+      where: eq(payments.userId, userId),
+      orderBy: (table, { desc }) => [desc(table.createdAt)],
+    });
+  }
+
+  async verifyPayment(userId: string, reference: string) {
+    const payment = await db.query.payments.findFirst({
+      where: eq(payments.reference, reference),
+    });
+
+    if (!payment || payment.userId !== userId) {
+      throw new NotFoundException('Payment not found');
     }
     if (payment.status === 'successful') return payment;
 
-    const secretKey = this.configService?.get<string>('paystack.secretKey');
-    if (!secretKey) throw new BadRequestException('Paystack is not configured');
-
-    const response = await fetch(
-      `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
-      { headers: { Authorization: `Bearer ${secretKey}` } },
-    );
-    const body = (await response.json()) as {
-      status?: boolean;
-      message?: string;
-      data?: { status?: string; reference?: string };
-    };
-
-    if (!response.ok || !body.status || body.data?.status !== 'success') {
+    if (payment.provider !== 'flutterwave') {
       throw new BadRequestException(
-        body.message ?? 'Paystack payment is not successful',
+        'This payment provider has no verification adapter',
       );
     }
 
-    return this.completePayment(reference, body.data.reference ?? reference);
+    return this.verifyFlutterwavePayment(payment.reference);
+  }
+
+  private async verifyFlutterwavePayment(reference: string) {
+    const secretKey = this.configService?.get<string>(
+      'flutterwave.secretKey',
+    );
+    const baseUrl = this.configService?.get<string>('flutterwave.baseUrl');
+
+    if (!secretKey || !baseUrl) {
+      throw new BadRequestException('Flutterwave is not configured');
+    }
+
+    const response = await fetch(
+      `${baseUrl}/transactions/verify_by_reference?tx_ref=${encodeURIComponent(reference)}`,
+      { headers: { Authorization: `Bearer ${secretKey}` } },
+    );
+    const body = (await response.json()) as {
+      status?: string;
+      message?: string;
+      data?: { status?: string; tx_ref?: string; amount?: number; currency?: string };
+    };
+
+    if (!response.ok || body.status !== 'success' || body.data?.status !== 'successful') {
+      throw new BadRequestException(
+        body.message ?? 'Flutterwave payment is not successful',
+      );
+    }
+
+    const payment = await db.query.payments.findFirst({
+      where: eq(payments.reference, reference),
+    });
+    if (!payment) throw new NotFoundException('Payment not found');
+
+    if (
+      body.data.amount !== undefined &&
+      Number(body.data.amount) < Number(payment.amount)
+    ) {
+      throw new BadRequestException(
+        'Flutterwave payment amount does not match expected amount',
+      );
+    }
+
+    return this.completePayment(reference, body.data.tx_ref ?? reference);
   }
 
   /**
@@ -232,6 +273,32 @@ export class PaymentsService {
       .where(eq(deposits.id, deposit.id));
 
     return updatedPayment;
+  }
+
+  /**
+   * Verifies the `verif-hash` header Flutterwave sends with every webhook
+   * call against our configured secret hash, then completes the payment.
+   * Amount/status are always re-checked server-side against Flutterwave's
+   * API rather than trusted from the webhook body directly.
+   */
+  async handleFlutterwaveWebhook(signature: string | undefined, body: {
+    data?: { tx_ref?: string; status?: string };
+  }) {
+    const secretHash = this.configService?.get<string>(
+      'flutterwave.secretHash',
+    );
+
+    if (!secretHash || !signature || signature !== secretHash) {
+      throw new BadRequestException('Invalid webhook signature');
+    }
+
+    const txRef = body.data?.tx_ref;
+    if (!txRef || body.data?.status !== 'successful') {
+      return { received: true };
+    }
+
+    await this.verifyFlutterwavePayment(txRef);
+    return { received: true };
   }
 
   async failPayment(reference: string, reason?: string) {

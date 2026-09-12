@@ -18,6 +18,11 @@ export class AdminDepositsController {
     return this.depositsService.getAllDeposits();
   }
 
+  @Get('stats')
+  getStats() {
+    return this.depositsService.getAdminStats();
+  }
+
   @Patch(':id/review')
   reviewDeposit(
     @CurrentUser() _admin: AuthenticatedUser,

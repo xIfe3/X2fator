@@ -16,7 +16,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PageSkeleton } from "@/components/ui/Skeleton";
 import { ApiRequestError } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
-import { formatMoney } from "@/lib/utils";
+import { Money } from "@/components/ui/Money";
 
 interface TaskFormState {
   title: string;
@@ -176,7 +176,7 @@ export default function AdminTasksPage() {
                       <p className="font-medium text-ink">{t.title}</p>
                       {t.description && <p className="mt-0.5 text-xs text-ink-faint">{t.description}</p>}
                     </Td>
-                    <Td className="text-right font-mono tabular text-ink">{formatMoney(t.reward)}</Td>
+                    <Td className="text-right"><Money value={t.reward} size="sm" /></Td>
                     <Td className="text-right text-ink-dim">{formatDuration(t.durationSeconds)}</Td>
                     <Td>
                       <StatusPill status={t.status} />

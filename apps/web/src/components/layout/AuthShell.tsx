@@ -19,18 +19,17 @@ export function AuthShell({
   width?: "sm" | "md";
 }) {
   return (
-    <div className="ledger-surface flex min-h-screen flex-col items-center justify-center bg-base px-5 py-10">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-base px-5 py-10">
       <div className="mb-8">
         <BrandLogo />
       </div>
 
       <div className={cn("w-full", width === "md" ? "max-w-md" : "max-w-sm")}>
-        <div className="ticket-notch ticket-notch--raised overflow-hidden rounded-2xl border border-base-border bg-base-surface shadow-panel">
-          <div className="h-1 w-full bg-mint" />
+        <div className="ticket-notch ticket-notch--raised overflow-hidden rounded-2xl border border-base-border bg-base-surface">
           {typeof progress === "number" && (
             <div className="h-0.5 w-full bg-base-border">
               <div
-                className="h-full bg-mint transition-all duration-300"
+                className="h-full bg-primary transition-all duration-300"
                 style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
               />
             </div>
@@ -47,10 +46,6 @@ export function AuthShell({
         {footer && (
           <div className="mt-6 text-center text-sm text-ink-dim">{footer}</div>
         )}
-
-        <p className="mt-8 text-center text-xs text-ink-faint">
-          Sandbox learning environment — not a real financial product.
-        </p>
       </div>
     </div>
   );

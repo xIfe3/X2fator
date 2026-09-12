@@ -1,6 +1,8 @@
-import { Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
 
 import { AdminUsersService } from '../services/admin-users.service';
+import { UpdateUserDto } from '../dto/update-user.dto';
+import { ResetUserPasswordDto } from '../dto/reset-user-password.dto';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -34,6 +36,30 @@ export class AdminUsersController {
   @RequirePermission('users.read')
   async getUserWalletDetails(@Param('id') id: string) {
     return this.adminUsersService.getUserWalletDetails(id);
+  }
+
+  @Patch(':id')
+  @RequirePermission('users.update')
+  async updateUser(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Param('id') userId: string,
+    @Body() dto: UpdateUserDto,
+  ) {
+    return this.adminUsersService.updateUser(admin.id, userId, dto);
+  }
+
+  @Patch(':id/password')
+  @RequirePermission('users.update')
+  async resetUserPassword(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Param('id') userId: string,
+    @Body() dto: ResetUserPasswordDto,
+  ) {
+    return this.adminUsersService.resetUserPassword(
+      admin.id,
+      userId,
+      dto.password,
+    );
   }
 
   @Patch(':id/suspend')

@@ -4,7 +4,7 @@ import { Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { passwordChecks, scorePassword } from "@/lib/password";
 
-const segmentTone = ["bg-base-border", "bg-danger", "bg-danger", "bg-amber", "bg-mint"];
+const segmentTone = ["bg-base-border", "bg-danger", "bg-danger", "bg-secondary", "bg-primary"];
 
 export function PasswordStrength({ password }: { password: string }) {
   if (!password) return null;
@@ -27,7 +27,7 @@ export function PasswordStrength({ password }: { password: string }) {
         <span
           className={cn(
             "text-[11px] font-medium",
-            score <= 1 ? "text-danger" : score <= 3 ? "text-amber" : "text-mint",
+            score <= 1 ? "text-danger" : score <= 3 ? "text-secondary" : "text-primary",
           )}
         >
           {label}
@@ -38,7 +38,7 @@ export function PasswordStrength({ password }: { password: string }) {
           const ok = passed.includes(c.key);
           return (
             <li key={c.key} className={cn("flex items-center gap-1.5 text-[11px]", ok ? "text-ink-dim" : "text-ink-faint")}>
-              {ok ? <Check className="h-3 w-3 text-mint" /> : <X className="h-3 w-3 text-ink-faint" />}
+              {ok ? <Check className="h-3 w-3 text-primary" /> : <X className="h-3 w-3 text-ink-faint" />}
               {c.label}
             </li>
           );

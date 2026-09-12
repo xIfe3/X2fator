@@ -83,7 +83,7 @@ export default function AdminAuditPage() {
                       )}
                       {(l.oldValues || l.newValues) && (
                         <details className="mt-1 text-xs">
-                          <summary className="cursor-pointer text-mint">
+                          <summary className="cursor-pointer text-primary">
                             View changes
                           </summary>
                           <pre className="mt-2 max-w-full overflow-x-auto whitespace-pre-wrap rounded-lg bg-base-raised p-2 font-mono text-[10px] text-ink-faint">

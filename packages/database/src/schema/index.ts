@@ -19,7 +19,6 @@ export * from "./withdrawals";
 export * from "./utilities";
 export * from "./user-bank-accounts";
 
-export * from "./kyc";
 export * from "./notifications";
 
 export * from "./support";
@@ -30,5 +29,6 @@ export * from "./deposits";
 
 export * from "./password-reset-tokens";
 export * from "./site-content";
+export * from "./ads";
 
 export * from "./relations";

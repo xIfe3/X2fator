@@ -13,7 +13,8 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PageSkeleton } from "@/components/ui/Skeleton";
 import { ApiRequestError } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
-import { formatDateTime, formatMoney, resolveFileUrl } from "@/lib/utils";
+import { formatDateTime, resolveFileUrl } from "@/lib/utils";
+import { Money } from "@/components/ui/Money";
 
 export default function AdminTaskSubmissionsPage() {
   const { data: completions, isLoading, refetch } = useApiQuery(() => adminApi.tasks.pendingCompletions());
@@ -82,7 +83,7 @@ export default function AdminTaskSubmissionsPage() {
                   <p className="font-medium text-ink">{c.task?.title ?? "Task"}</p>
                   <p className="mt-0.5 text-xs text-ink-faint">{formatDateTime(c.completedAt ?? c.createdAt)}</p>
                 </div>
-                <p className="font-mono text-sm font-semibold tabular text-mint">{formatMoney(c.reward ?? c.task?.reward)}</p>
+                <Money value={c.reward ?? c.task?.reward} size="sm" tone="primary" />
                 <div className="flex gap-2">
                   <Button size="sm" className="flex-1" isLoading={busyId === c.id} onClick={() => approve(c)}>
                     <ThumbsUp className="h-3.5 w-3.5" /> Approve

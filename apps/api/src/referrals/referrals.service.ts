@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, Optional } from '@nestjs/common';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 
 import { db } from '@2xfactor/database';
 import {
@@ -66,6 +66,24 @@ export class ReferralsService {
       where: and(eq(earnings.userId, userId), eq(earnings.source, 'referral')),
       orderBy: (earnings, { desc }) => [desc(earnings.createdAt)],
     });
+  }
+
+  async getLeaderboard() {
+    const referralCount = sql<number>`count(${referrals.id})::int`;
+
+    return db
+      .select({
+        userId: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        referralCount,
+      })
+      .from(referrals)
+      .innerJoin(users, eq(referrals.referrerId, users.id))
+      .where(eq(referrals.status, 'active'))
+      .groupBy(users.id, users.firstName, users.lastName)
+      .orderBy(desc(referralCount), users.createdAt)
+      .limit(3);
   }
 
   /**
@@ -161,7 +179,7 @@ export class ReferralsService {
     await this.walletService!.credit(
       {
         userId: referrerId,
-        walletType: 'earnings',
+        walletType: 'referral',
         amount: commission.toFixed(2),
         type: 'referral_commission',
         reference,

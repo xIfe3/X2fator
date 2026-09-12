@@ -30,17 +30,15 @@ export default function AdminLayout({
   if (isLoading || !user || !isAdmin) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-base">
-        <Loader2 className="h-6 w-6 animate-spin text-amber" />
+        <Loader2 className="h-6 w-6 animate-spin text-secondary" />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen">
-      <AdminSidebar />
-
+    <div className="app-shell-frame h-dvh overflow-hidden bg-base">
       {open && (
-        <div className="fixed inset-0 z-50 lg:hidden">
+        <div className="fixed inset-0 z-50">
           <div
             className="absolute inset-0 bg-black/70 backdrop-blur-sm"
             onClick={() => setOpen(false)}
@@ -69,7 +67,7 @@ export default function AdminLayout({
                     className={cn(
                       "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium",
                       active
-                        ? "bg-amber-soft text-amber"
+                        ? "bg-secondary-soft text-secondary"
                         : "text-ink-dim hover:bg-base-surface2 hover:text-ink",
                     )}
                   >
@@ -90,11 +88,17 @@ export default function AdminLayout({
         </div>
       )}
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar onMenuClick={() => setOpen(true)} />
-        <main className="flex-1 overflow-y-auto p-4 pb-24 sm:p-6 lg:p-8 lg:pb-8">
-          <div className="mx-auto max-w-6xl animate-fade-up">{children}</div>
-        </main>
+      <div className="flex h-dvh">
+        <AdminSidebar />
+
+        <div className="flex h-dvh min-w-0 flex-1 flex-col">
+          <Topbar homeHref="/admin" wide />
+          <main className="flex-1 overflow-y-auto px-4 py-4 pb-28 sm:px-6 sm:py-6 sm:pb-10 lg:pb-10">
+            <div className="mx-auto max-w-[1200px] animate-fade-up">
+              {children}
+            </div>
+          </main>
+        </div>
       </div>
 
       <AdminMobileTabBar onMore={() => setOpen(true)} />

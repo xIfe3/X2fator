@@ -10,12 +10,15 @@ import { Table, THead, Th, Tr, Td } from "@/components/ui/Table";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Input, Select, Textarea } from "@/components/ui/Input";
+import { PasswordField } from "@/components/ui/PasswordField";
+import { PasswordStrength } from "@/components/ui/PasswordStrength";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageSkeleton } from "@/components/ui/Skeleton";
 import { ApiRequestError } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
 import { formatDate, formatDateTime, formatMoney } from "@/lib/utils";
+import { Money } from "@/components/ui/Money";
 
 export default function AdminUsersPage() {
   const {
@@ -27,7 +30,7 @@ export default function AdminUsersPage() {
   const [actingId, setActingId] = useState<string | null>(null);
   const [adjustTarget, setAdjustTarget] = useState<AdminUser | null>(null);
   const [adjustForm, setAdjustForm] = useState({
-    walletType: "account" as "account" | "earnings",
+    walletType: "account" as "account" | "task" | "referral",
     amount: "",
     direction: "credit" as "credit" | "debit",
     description: "",
@@ -39,6 +42,17 @@ export default function AdminUsersPage() {
     null,
   );
   const [walletLoading, setWalletLoading] = useState(false);
+  const [editTarget, setEditTarget] = useState<AdminUser | null>(null);
+  const [editForm, setEditForm] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    gender: "" as "" | "male" | "female" | "other",
+    newPassword: "",
+  });
+  const [confirmEdit, setConfirmEdit] = useState(false);
+  const [editSubmitting, setEditSubmitting] = useState(false);
 
   useEffect(() => {
     if (!walletTarget) {
@@ -105,6 +119,53 @@ export default function AdminUsersPage() {
       );
     } finally {
       setAdjustSubmitting(false);
+    }
+  }
+
+  function openEdit(user: AdminUser) {
+    setEditTarget(user);
+    setEditForm({
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      phone: user.phone ?? "",
+      gender: user.gender ?? "",
+      newPassword: "",
+    });
+  }
+
+  function requestEditSave(e: FormEvent) {
+    e.preventDefault();
+    setConfirmEdit(true);
+  }
+
+  async function saveEdit() {
+    if (!editTarget) return;
+    setEditSubmitting(true);
+    try {
+      await adminApi.users.update(editTarget.id, {
+        firstName: editForm.firstName.trim(),
+        lastName: editForm.lastName.trim(),
+        email: editForm.email.trim(),
+        phone: editForm.phone.trim() || null,
+        gender: editForm.gender || null,
+      });
+      if (editForm.newPassword) {
+        await adminApi.users.resetPassword(editTarget.id, editForm.newPassword);
+      }
+      push("success", "User details saved.");
+      setConfirmEdit(false);
+      setEditTarget(null);
+      refetch();
+    } catch (err) {
+      push(
+        "error",
+        err instanceof ApiRequestError
+          ? err.message
+          : "Could not save user details.",
+      );
+    } finally {
+      setEditSubmitting(false);
     }
   }
 
@@ -177,6 +238,13 @@ export default function AdminUsersPage() {
                         <Button
                           size="sm"
                           variant="ghost"
+                          onClick={() => openEdit(u)}
+                        >
+                          Edit user
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
                           onClick={() => setAdjustTarget(u)}
                         >
                           Adjust wallet
@@ -199,6 +267,104 @@ export default function AdminUsersPage() {
       </Card>
 
       <Modal
+        open={!!editTarget && !confirmEdit}
+        onClose={() => setEditTarget(null)}
+        title={`Edit user — ${editTarget?.firstName ?? ""} ${editTarget?.lastName ?? ""}`}
+      >
+        <form onSubmit={requestEditSave} className="space-y-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Input
+              label="First name"
+              required
+              value={editForm.firstName}
+              onChange={(e) =>
+                setEditForm((f) => ({ ...f, firstName: e.target.value }))
+              }
+            />
+            <Input
+              label="Last name"
+              required
+              value={editForm.lastName}
+              onChange={(e) =>
+                setEditForm((f) => ({ ...f, lastName: e.target.value }))
+              }
+            />
+          </div>
+          <Input
+            label="Email"
+            type="email"
+            required
+            value={editForm.email}
+            onChange={(e) =>
+              setEditForm((f) => ({ ...f, email: e.target.value }))
+            }
+          />
+          <Input
+            label="Phone"
+            value={editForm.phone}
+            onChange={(e) =>
+              setEditForm((f) => ({ ...f, phone: e.target.value }))
+            }
+          />
+          <Select
+            label="Gender"
+            value={editForm.gender}
+            onChange={(e) =>
+              setEditForm((f) => ({
+                ...f,
+                gender: e.target.value as typeof f.gender,
+              }))
+            }
+          >
+            <option value="">Not specified</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="other">Other</option>
+          </Select>
+          <div className="border-t border-base-border pt-4">
+            <p className="mb-3 text-xs text-ink-faint">
+              Passwords are never viewable. Enter a new password only if you
+              need to reset this user&apos;s password.
+            </p>
+            <PasswordField
+              label="New password (optional)"
+              autoComplete="new-password"
+              value={editForm.newPassword}
+              onChange={(e) =>
+                setEditForm((f) => ({ ...f, newPassword: e.target.value }))
+              }
+            />
+            <PasswordStrength password={editForm.newPassword} />
+          </div>
+          <Button type="submit" className="w-full">
+            Review changes
+          </Button>
+        </form>
+      </Modal>
+
+      <Modal
+        open={confirmEdit}
+        onClose={() => setConfirmEdit(false)}
+        title="Confirm user changes"
+      >
+        <div className="space-y-4">
+          <p className="text-sm leading-6 text-ink-dim">
+            Save these account changes for{" "}
+            <span className="font-medium text-ink">{editForm.email}</span>? This
+            action will be recorded in the audit log.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setConfirmEdit(false)}>
+              Cancel
+            </Button>
+            <Button isLoading={editSubmitting} onClick={saveEdit}>
+              Confirm and save
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
         open={!!adjustTarget}
         onClose={() => setAdjustTarget(null)}
         title={`Adjust wallet — ${adjustTarget?.firstName ?? ""} ${adjustTarget?.lastName ?? ""}`}
@@ -210,11 +376,13 @@ export default function AdminUsersPage() {
             onChange={(e) =>
               setAdjustForm((f) => ({
                 ...f,
-                walletType: e.target.value as "account" | "earnings",
+                walletType: e.target.value as "account" | "task" | "referral",
               }))
             }
           >
             <option value="account">Account</option>
+            <option value="task">Task</option>
+            <option value="referral">Referral</option>
             <option value="earnings">Earnings</option>
           </Select>
           <Select
@@ -270,7 +438,7 @@ export default function AdminUsersPage() {
         ) : walletDetails ? (
           <div className="space-y-5">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {(["account", "earnings"] as const).map((walletType) => {
+              {(["account", "task", "referral"] as const).map((walletType) => {
                 const wallet = walletDetails.wallets[walletType];
                 return (
                   <div
@@ -280,9 +448,7 @@ export default function AdminUsersPage() {
                     <p className="text-xs uppercase tracking-wider text-ink-faint">
                       {walletType} wallet
                     </p>
-                    <p className="mt-2 font-mono text-2xl font-semibold tabular text-ink">
-                      {formatMoney(wallet?.balance ?? "0")}
-                    </p>
+                    <Money value={wallet?.balance ?? "0"} size="lg" className="mt-2 block" />
                     <p className="mt-1 text-xs text-ink-faint">
                       Status: {wallet?.status ?? "not created"}
                     </p>
@@ -293,7 +459,7 @@ export default function AdminUsersPage() {
 
             <div>
               <div className="mb-2 flex items-center justify-between">
-                <h3 className="font-display text-base font-semibold text-ink">
+                <h3 className="font-display text-sm font-semibold text-ink">
                   Wallet transactions
                 </h3>
                 <span className="text-xs text-ink-faint">
@@ -324,12 +490,16 @@ export default function AdminUsersPage() {
                         </p>
                       </div>
                       <div className="shrink-0 text-right">
-                        <p
-                          className={`font-mono text-sm font-semibold tabular ${transaction.direction === "credit" ? "text-mint" : "text-danger"}`}
-                        >
-                          {transaction.direction === "credit" ? "+" : "−"}
-                          {formatMoney(transaction.amount)}
-                        </p>
+                        <Money
+                          value={transaction.amount}
+                          size="sm"
+                          tone={
+                            transaction.direction === "credit"
+                              ? "primary"
+                              : "danger"
+                          }
+                          signed={transaction.direction}
+                        />
                         <p className="text-[11px] text-ink-faint">
                           Balance: {formatMoney(transaction.balanceAfter)}
                         </p>
