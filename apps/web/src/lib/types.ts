@@ -196,6 +196,7 @@ export interface Plan {
   description?: string;
   price: string;
   durationDays: number;
+  rank: number;
   dailyTaskLimit?: number;
   dailyReward?: string;
   referralRewardRate?: string;
@@ -209,9 +210,14 @@ export interface Subscription {
   userId: string;
   planId: string;
   plan?: Plan;
-  status: "active" | "completed" | "cancelled";
-  startedAt: string;
-  endsAt?: string;
+  amountPaid: string;
+  dailyTaskLimit: number;
+  dailyReward: string;
+  referralRewardRate: string;
+  status: "pending" | "active" | "completed" | "cancelled" | "expired";
+  startsAt: string;
+  endsAt: string;
+  createdAt?: string;
 }
 
 // ---- Tasks ----

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   ArrowLeft,
+  Award,
   ClipboardList,
   LayoutDashboard,
   ArrowDownToLine,
@@ -21,6 +22,7 @@ export const adminNav = [
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/withdrawals", label: "Withdrawals", icon: Wallet },
   { href: "/admin/tasks", label: "Tasks", icon: ClipboardList },
+  { href: "/admin/plans", label: "Plans", icon: Award },
   { href: "/admin/ads", label: "Ad campaigns", icon: Megaphone },
   { href: "/admin/audit", label: "Audit log", icon: ScrollText },
 ];

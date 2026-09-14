@@ -2,13 +2,20 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
 import { join } from 'path';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  app.use(helmet());
+
+  // In production, an unset CORS_ORIGIN must fail closed (no origins
+  // allowed) rather than reflect any origin back — `true` is only safe
+  // for local development where nothing sensitive is at stake.
+  const corsOrigin = process.env.CORS_ORIGIN?.split(',');
   app.enableCors({
-    origin: process.env.CORS_ORIGIN?.split(',') ?? true,
+    origin: corsOrigin ?? (process.env.NODE_ENV === 'production' ? false : true),
     credentials: true,
   });
   app.setGlobalPrefix('api');

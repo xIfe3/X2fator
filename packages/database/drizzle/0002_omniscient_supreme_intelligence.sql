@@ -1,0 +1,1 @@
+ALTER TABLE "plans" ADD COLUMN "rank" integer DEFAULT 0 NOT NULL;

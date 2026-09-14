@@ -34,7 +34,6 @@ export class SiteContentController {
       actorId: admin.id,
       action: 'update',
       entityType: 'system',
-      entityId: section,
       description: `Updated "${section}" landing page content`,
       newValues: body.content,
     });

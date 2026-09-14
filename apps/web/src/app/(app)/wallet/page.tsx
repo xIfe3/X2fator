@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import useEmblaCarousel from "embla-carousel-react";
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -16,7 +17,7 @@ import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Tabs } from "@/components/ui/Tabs";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { PageSkeleton } from "@/components/ui/Skeleton";
+import { PageSkeleton, Skeleton } from "@/components/ui/Skeleton";
 import { formatDateTime, formatMoney } from "@/lib/utils";
 
 export default function WalletPage() {
@@ -28,8 +29,6 @@ export default function WalletPage() {
     () => walletApi.getTransactions(type),
     [type],
   );
-  const [slide, setSlide] = useState(0);
-
   const cards = [
     {
       key: "account" as const,
@@ -72,12 +71,30 @@ export default function WalletPage() {
     },
   ];
 
+  // `loop: false` -- Embla stops at the first/last slide instead of
+  // wrapping back around, per the user's explicit request.
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false });
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [canScrollPrev, setCanScrollPrev] = useState(false);
+  const [canScrollNext, setCanScrollNext] = useState(false);
+
+  const onSelect = useCallback(() => {
+    if (!emblaApi) return;
+    setSelectedIndex(emblaApi.selectedScrollSnap());
+    setCanScrollPrev(emblaApi.canScrollPrev());
+    setCanScrollNext(emblaApi.canScrollNext());
+  }, [emblaApi]);
+
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      setSlide((current) => (current + 1) % cards.length);
-    }, 4000);
-    return () => window.clearInterval(timer);
-  }, [cards.length]);
+    if (!emblaApi) return;
+    onSelect();
+    emblaApi.on("select", onSelect);
+    emblaApi.on("reInit", onSelect);
+    return () => {
+      emblaApi.off("select", onSelect);
+      emblaApi.off("reInit", onSelect);
+    };
+  }, [emblaApi, onSelect]);
 
   if (walletsLoading) return <PageSkeleton />;
 
@@ -93,15 +110,12 @@ export default function WalletPage() {
       </div>
 
       <div>
-        <div className="group relative overflow-hidden rounded-2xl">
-          <div
-            className="flex transition-transform duration-500 ease-out"
-            style={{ transform: `translateX(-${slide * 100}%)` }}
-          >
+        <div className="group relative overflow-hidden rounded-2xl" ref={emblaRef}>
+          <div className="flex">
             {cards.map((card) => {
               const Icon = card.icon;
               return (
-                <div key={card.key} className="w-full shrink-0">
+                <div key={card.key} className="min-w-0 flex-[0_0_100%] px-0.5">
                   <Card className="relative min-h-55 overflow-hidden sm:min-h-45">
                     <CardBody className="flex h-full flex-col justify-between gap-6 sm:flex-row sm:items-center">
                       <div className="flex items-center gap-4">
@@ -163,20 +177,18 @@ export default function WalletPage() {
           <button
             type="button"
             aria-label="Previous wallet"
-            onClick={() =>
-              setSlide(
-                (current) => (current - 1 + cards.length) % cards.length,
-              )
-            }
-            className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-base-border bg-base-surface/90 text-ink-dim opacity-0 shadow-panel backdrop-blur transition-opacity hover:text-ink group-hover:opacity-100 sm:opacity-100"
+            onClick={() => emblaApi?.scrollPrev()}
+            disabled={!canScrollPrev}
+            className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-base-border bg-base-surface/90 text-ink-dim opacity-0 shadow-panel backdrop-blur transition-opacity hover:text-ink group-hover:opacity-100 disabled:pointer-events-none disabled:opacity-0 sm:opacity-100"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
           <button
             type="button"
             aria-label="Next wallet"
-            onClick={() => setSlide((current) => (current + 1) % cards.length)}
-            className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-base-border bg-base-surface/90 text-ink-dim opacity-0 shadow-panel backdrop-blur transition-opacity hover:text-ink group-hover:opacity-100 sm:opacity-100"
+            onClick={() => emblaApi?.scrollNext()}
+            disabled={!canScrollNext}
+            className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-base-border bg-base-surface/90 text-ink-dim opacity-0 shadow-panel backdrop-blur transition-opacity hover:text-ink group-hover:opacity-100 disabled:pointer-events-none disabled:opacity-0 sm:opacity-100"
           >
             <ChevronRight className="h-4 w-4" />
           </button>
@@ -188,9 +200,9 @@ export default function WalletPage() {
               key={card.key}
               type="button"
               aria-label={`Show ${card.label}`}
-              onClick={() => setSlide(index)}
+              onClick={() => emblaApi?.scrollTo(index)}
               className={`h-1.5 rounded-full transition-all ${
-                slide === index ? "w-6 bg-primary" : "w-1.5 bg-base-border"
+                selectedIndex === index ? "w-6 bg-primary" : "w-1.5 bg-base-border"
               }`}
             />
           ))}
@@ -211,8 +223,12 @@ export default function WalletPage() {
           />
         </CardHeader>
         <CardBody>
-          {txnsLoading ? (
-            <PageSkeleton />
+          {txnsLoading && !txns ? (
+            <div className="space-y-2.5">
+              <Skeleton className="h-16" />
+              <Skeleton className="h-16" />
+              <Skeleton className="h-16" />
+            </div>
           ) : !txns || txns.length === 0 ? (
             <EmptyState
               icon={ArrowUpFromLine}

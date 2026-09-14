@@ -10,7 +10,7 @@ import { StatCard } from "@/components/ui/StatCard";
 import { Tabs } from "@/components/ui/Tabs";
 import { Money } from "@/components/ui/Money";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { PageSkeleton, Skeleton } from "@/components/ui/Skeleton";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { formatDateTime, formatMoney } from "@/lib/utils";
 
 const sources: { key: EarningSource | "all"; label: string }[] = [
@@ -76,8 +76,12 @@ export default function EarningsPage() {
           />
         </CardHeader>
         <CardBody>
-          {isLoading ? (
-            <PageSkeleton />
+          {isLoading && !earnings ? (
+            <div className="space-y-2.5">
+              <Skeleton className="h-16" />
+              <Skeleton className="h-16" />
+              <Skeleton className="h-16" />
+            </div>
           ) : !earnings || earnings.length === 0 ? (
             <EmptyState
               icon={Coins}

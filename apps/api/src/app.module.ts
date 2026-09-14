@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
 import { APP_GUARD, APP_INTERCEPTOR, APP_FILTER } from '@nestjs/core';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -31,6 +32,7 @@ import { AdsModule } from './ads/ads.module';
 @Module({
   controllers: [HealthController],
   providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_INTERCEPTOR, useClass: ResponseInterceptor },
@@ -45,6 +47,7 @@ import { AdsModule } from './ads/ads.module';
 
       cache: true,
     }),
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 20 }]),
     ScheduleModule.forRoot(),
     AuthModule,
     WalletModule,

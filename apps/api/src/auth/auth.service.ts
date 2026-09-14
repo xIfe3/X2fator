@@ -135,6 +135,11 @@ export class AuthService {
       userRolesList,
     );
 
+    // Best-effort — a failed welcome email should never block signup.
+    this.mailer
+      .sendWelcome(result.email, result.firstName)
+      .catch(() => undefined);
+
     return {
       user: {
         ...this.sanitizeUser(result),
@@ -145,14 +150,11 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    console.log('Request DTO ', dto);
     const email = dto.email.trim().toLowerCase();
-    console.log('Email', email);
 
     const user = await db.query.users.findFirst({
       where: eq(users.email, email),
     });
-    console.log('User: ', user);
 
     if (!user) {
       throw new UnauthorizedException('Invalid email or password');
@@ -162,7 +164,6 @@ export class AuthService {
       dto.password,
       user.passwordHash,
     );
-    console.log('Password Valid', passwordValid);
 
     if (!passwordValid) {
       throw new UnauthorizedException('Invalid email or password');
@@ -172,7 +173,6 @@ export class AuthService {
       throw new UnauthorizedException(`Account is ${user.status}`);
     }
 
-    console.log('Before updating the user');
     await db
       .update(users)
       .set({

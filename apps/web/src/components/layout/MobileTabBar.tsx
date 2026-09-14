@@ -26,7 +26,7 @@ export function MobileTabBar({ onMore }: { onMore: () => void }) {
       className="fixed inset-x-0 bottom-0 z-40 border-t border-base-border bg-base-surface/95 shadow-[0_-8px_24px_-20px_rgba(31,67,135,0.6)] backdrop-blur"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      <div className="mx-auto flex w-full max-w-[512px] items-stretch">
+      <div className="mx-auto flex w-full max-w-3xl items-stretch">
         {tabs.map((tab) => {
           const active =
             pathname === tab.href || pathname.startsWith(tab.href + "/");

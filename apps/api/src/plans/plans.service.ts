@@ -72,6 +72,7 @@ export class PlansService {
     description?: string;
     price: string;
     durationDays: number;
+    rank?: number;
     dailyTaskLimit?: number;
     dailyReward?: string;
     referralRewardRate?: string;
@@ -124,6 +125,7 @@ export class PlansService {
         description: data.description,
         price: data.price,
         durationDays: data.durationDays,
+        rank: data.rank ?? 0,
         dailyTaskLimit: data.dailyTaskLimit ?? 0,
         dailyReward: data.dailyReward ?? '0',
         referralRewardRate: data.referralRewardRate ?? '0',
@@ -156,6 +158,7 @@ export class PlansService {
       description?: string;
       price?: string;
       durationDays?: number;
+      rank?: number;
       dailyTaskLimit?: number;
       dailyReward?: string;
       referralRewardRate?: string;

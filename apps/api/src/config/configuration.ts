@@ -31,4 +31,17 @@ export default () => ({
     callbackUrl: process.env.FLUTTERWAVE_CALLBACK_URL,
     baseUrl: process.env.FLUTTERWAVE_BASE_URL ?? 'https://api.flutterwave.com/v3',
   },
+
+  resend: {
+    apiKey: process.env.RESEND_API_KEY,
+    fromEmail: process.env.MAIL_FROM ?? 'X2Factor <onboarding@resend.dev>',
+  },
+
+  s3: {
+    endpoint: process.env.S3_ENDPOINT,
+    accessKeyId: process.env.S3_ACCESS_KEY_ID,
+    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
+    bucket: process.env.S3_BUCKET,
+    publicUrl: process.env.S3_PUBLIC_URL,
+  },
 });

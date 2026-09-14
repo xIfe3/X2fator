@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Moon, Sun } from "lucide-react";
+import { ArrowRight, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { BrandLogo } from "./BrandLogo";
 import { Button } from "@/components/ui/Button";
@@ -22,20 +22,6 @@ export function PublicPage({
         <div className="mx-auto flex h-20 max-w-5xl items-center justify-between px-5 sm:px-8">
           <BrandLogo />
           <div className="flex items-center gap-2">
-            <nav className="hidden items-center gap-5 text-sm text-ink-dim md:flex">
-              <Link href="/how-it-works" className="hover:text-ink">
-                How it works
-              </Link>
-              <Link href="/earnings" className="hover:text-ink">
-                Earnings
-              </Link>
-              <Link href="/security" className="hover:text-ink">
-                Security
-              </Link>
-              <Link href="/faq" className="hover:text-ink">
-                FAQ
-              </Link>
-            </nav>
             <button
               type="button"
               aria-label="Toggle theme"
@@ -51,9 +37,9 @@ export function PublicPage({
                 <Moon className="h-4 w-4" />
               )}
             </button>
-            <Link href="/">
+            <Link href="/login">
               <Button variant="ghost" size="sm">
-                <ArrowLeft className="h-4 w-4" /> Home
+                Log in
               </Button>
             </Link>
           </div>

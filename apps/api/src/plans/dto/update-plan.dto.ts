@@ -31,6 +31,11 @@ export class UpdatePlanDto {
   @IsOptional()
   @IsInt()
   @Min(0)
+  rank?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
   dailyTaskLimit?: number;
 
   @IsOptional()

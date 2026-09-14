@@ -53,7 +53,7 @@ export function Topbar({
       <div
         className={cn(
           "mx-auto flex h-full w-full items-center justify-between px-5",
-          wide ? "max-w-[1200px] lg:justify-end" : "max-w-[512px]",
+          wide ? "max-w-[1200px] lg:justify-end" : "max-w-3xl",
         )}
       >
         <span className={wide ? "lg:hidden" : undefined}>

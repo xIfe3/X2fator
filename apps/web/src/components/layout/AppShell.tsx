@@ -11,6 +11,7 @@ import { BrandLogo } from "./BrandLogo";
 
 const mobileNav = [
   ["/dashboard", "Dashboard"],
+  ["/plans", "Plans"],
   ["/wallet", "Wallet"],
   ["/deposits", "Deposits"],
   ["/withdrawals", "Withdrawals"],
@@ -72,7 +73,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex h-dvh min-w-0 flex-1 flex-col">
         <Topbar />
         <main className="flex-1 overflow-y-auto px-4 py-4 pb-28 sm:px-6 sm:py-6 sm:pb-28">
-          <div className="mx-auto max-w-[512px] animate-fade-up">
+          <div className="mx-auto max-w-3xl animate-fade-up">
             {children}
           </div>
         </main>

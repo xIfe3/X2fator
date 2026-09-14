@@ -32,6 +32,10 @@ export const plans = pgTable(
 
     durationDays: integer("duration_days").notNull(),
 
+    // Plans are ordered by rank (higher = better tier). Users may only
+    // ever move up in rank — see SubscriptionsService.purchasePlan.
+    rank: integer("rank").notNull().default(0),
+
     dailyTaskLimit: integer("daily_task_limit").notNull().default(0),
 
     dailyReward: numeric("daily_reward", {

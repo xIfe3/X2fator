@@ -74,11 +74,19 @@ export default function SettingsPage() {
             firstName={user?.firstName}
             lastName={user?.lastName}
           />
-          <div>
-            <p className="font-display text-lg font-semibold text-ink">
-              {user?.firstName} {user?.lastName}
-            </p>
-            <p className="text-sm text-ink-dim">{user?.email}</p>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="font-display text-lg font-semibold text-ink">
+                {user?.firstName} {user?.lastName}
+              </p>
+              <StatusPill status={user?.status} />
+            </div>
+            <p className="truncate text-sm text-ink-dim">{user?.email}</p>
+            {user?.createdAt && (
+              <p className="mt-0.5 text-xs text-ink-faint">
+                Member since {formatDate(user.createdAt)}
+              </p>
+            )}
           </div>
         </CardBody>
       </Card>
@@ -90,19 +98,6 @@ export default function SettingsPage() {
         <CardBody className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <Field label="Phone" value={user?.phone ?? ""} />
           <Field label="Referral code" value={user?.referralCode ?? ""} />
-          <Field
-            label="Member since"
-            value={user?.createdAt ? formatDate(user.createdAt) : ""}
-          />
-          <Field label="Roles" value={user?.roles?.join(", ") ?? "user"} />
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-ink-faint">
-              Status
-            </p>
-            <div className="mt-1.5">
-              <StatusPill status={user?.status} />
-            </div>
-          </div>
         </CardBody>
       </Card>
 
