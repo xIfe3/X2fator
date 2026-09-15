@@ -12,28 +12,29 @@
  * also directly usable as var(--color-base-border) etc. outside of
  * utility classes (see the `* { border-color }` rule below).
  *
- * Palette: a deep ink-navy surface with two accurately-named accents:
- * an electric indigo primary (CTAs, links, active states) and a
- * lime-leaning green secondary (confirmations, admin accent). These
- * are the canonical dark-mode values — `.dark` no longer redeclares
- * them (see the note above `:root:not(.dark)` below).
+ * Palette: a deep navy surface matched to the X2Factor logo, with two
+ * accurately-named accents: a teal primary (CTAs, links, active states)
+ * pulled from the logo's teal blade, and a lime-leaning green secondary
+ * (confirmations, admin accent) chosen to stay distinct from the teal
+ * primary. These are the canonical dark-mode values — `.dark` no longer
+ * redeclares them (see the note above `:root:not(.dark)` below).
  */
 @theme {
-  --color-base: #0a0d16;
-  --color-base-raised: #10141f;
-  --color-base-surface: #151a27;
-  --color-base-surface2: #1c2233;
-  --color-base-border: #262e42;
-  --color-base-borderStrong: #38445e;
+  --color-base: #0a121e;
+  --color-base-raised: #0f1c2d;
+  --color-base-surface: #142438;
+  --color-base-surface2: #1a2d44;
+  --color-base-border: #24384f;
+  --color-base-borderStrong: #384f6b;
 
-  --color-ink: #f2f4fa;
-  --color-ink-dim: #97a2ba;
-  --color-ink-faint: #5f6b85;
+  --color-ink: #f2f5fa;
+  --color-ink-dim: #94a4bc;
+  --color-ink-faint: #5c6f8a;
 
-  /* primary — electric indigo */
-  --color-primary: #5b5bf6;
-  --color-primary-dim: #4645d1;
-  --color-primary-soft: #191a3d;
+  /* primary — logo teal */
+  --color-primary: #1f8b93;
+  --color-primary-dim: #196f75;
+  --color-primary-soft: #10262b;
 
   /* secondary — lime-leaning green */
   --color-secondary: #34d399;
@@ -56,7 +57,7 @@
     0 8px 24px -12px rgba(0, 0, 0, 0.6);
   --shadow-stamp:
     0 1px 0 0 rgba(255, 255, 255, 0.03) inset,
-    0 12px 32px -14px rgba(91, 91, 246, 0.22);
+    0 12px 32px -14px rgba(31, 139, 147, 0.22);
 }
 
 /* `inline` because these values reference CSS variables that next/font
@@ -71,8 +72,8 @@
 
 :root {
   color-scheme: light;
-  --page-background: #f7f8fc;
-  --page-foreground: #0f1220;
+  --page-background: #f6f9fa;
+  --page-foreground: #0f1f33;
 }
 
 /* `.dark`'s color tokens used to be redeclared here byte-for-byte
@@ -81,23 +82,23 @@
    and the page bg/fg vars; it inherits every --color-* token as-is. */
 .dark {
   color-scheme: dark;
-  --page-background: #0a0d16;
-  --page-foreground: #f2f4fa;
+  --page-background: #0a121e;
+  --page-foreground: #f2f5fa;
 }
 
 :root:not(.dark) {
-  --color-base: #f7f8fc;
+  --color-base: #f6f9fa;
   --color-base-raised: #ffffff;
   --color-base-surface: #ffffff;
-  --color-base-surface2: #eef0fa;
-  --color-base-border: #e2e5f3;
-  --color-base-borderStrong: #cbd0e8;
-  --color-ink: #0f1220;
-  --color-ink-dim: #5a6482;
-  --color-ink-faint: #838da8;
-  --color-primary: #4645d1;
-  --color-primary-dim: #3634ad;
-  --color-primary-soft: #ecebff;
+  --color-base-surface2: #eaf1f2;
+  --color-base-border: #dce6ea;
+  --color-base-borderStrong: #c2d2d8;
+  --color-ink: #0f1f33;
+  --color-ink-dim: #526176;
+  --color-ink-faint: #7c8ca0;
+  --color-primary: #196f75;
+  --color-primary-dim: #145a5f;
+  --color-primary-soft: #e6f2f2;
   --color-secondary: #0f9d6f;
   --color-secondary-dim: #0c7f59;
   --color-secondary-soft: #e4f7ee;
@@ -121,7 +122,7 @@ body {
   background:
     radial-gradient(
       circle at 50% -10%,
-      rgba(91, 91, 246, 0.12),
+      rgba(31, 139, 147, 0.12),
       transparent 34rem
     ),
     var(--page-background);
@@ -152,7 +153,7 @@ html:has(.app-shell-frame) {
     var(--color-primary) 55%,
     var(--color-info) 100%
   );
-  box-shadow: 0 18px 35px -22px rgba(91, 91, 246, 0.7);
+  box-shadow: 0 18px 35px -22px rgba(31, 139, 147, 0.7);
 }
 
 .font-mono,
@@ -162,7 +163,7 @@ html:has(.app-shell-frame) {
 }
 
 ::selection {
-  background: rgba(91, 91, 246, 0.25);
+  background: rgba(31, 139, 147, 0.25);
 }
 
 ::-webkit-scrollbar {
@@ -173,15 +174,15 @@ html:has(.app-shell-frame) {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #262e42;
+  background: #24384f;
   border-radius: 8px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #38445e;
+  background: #384f6b;
 }
 
 :focus-visible {
-  outline: 2px solid #5b5bf6;
+  outline: 2px solid #1f8b93;
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -203,7 +204,7 @@ html:has(.app-shell-frame) {
     to bottom,
     transparent,
     transparent 27px,
-    rgba(91, 91, 246, 0.05) 28px
+    rgba(31, 139, 147, 0.05) 28px
   );
 }
 

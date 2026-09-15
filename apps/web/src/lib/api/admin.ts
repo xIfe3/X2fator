@@ -3,6 +3,7 @@ import type {
   Ad,
   AdPricing,
   AdType,
+  AdWithRequester,
   AdminDeposit,
   AdminDepositStats,
   AdminWalletDetails,
@@ -31,11 +32,14 @@ export const adminApi = {
   },
   ads: {
     all: () => api.get<Ad[]>("/admin/ads"),
+    get: (id: string) => api.get<AdWithRequester>(`/admin/ads/${id}`),
     pricing: () => api.get<AdPricing>("/admin/ads/pricing"),
     updatePricing: (prices: Partial<Record<AdType, string>>) =>
       api.patch<AdPricing>("/admin/ads/pricing", prices),
-    review: (id: string, body: { action: "approve" | "reject"; reason?: string }) =>
-      api.patch<Ad>(`/admin/ads/${id}/review`, body),
+    review: (
+      id: string,
+      body: { action: "approve" | "reject"; reward?: string; reason?: string },
+    ) => api.patch<Ad>(`/admin/ads/${id}/review`, body),
   },
   users: {
     list: () => api.get<AdminUser[]>("/admin/users"),

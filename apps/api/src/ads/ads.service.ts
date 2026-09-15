@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { desc, eq } from 'drizzle-orm';
-import { ads, db, tasks } from '@2xfactor/database';
+import { ads, db, tasks, users } from '@2xfactor/database';
 import { WalletService } from '../wallet/wallet.service';
 import { SiteContentService } from '../site-content/site-content.service';
 import { AuditService } from '../audit/audit.service';
@@ -129,24 +129,38 @@ export class AdsService {
     });
   }
 
-  async approveAd(adminId: string, adId: string) {
+  async approveAd(adminId: string, adId: string, reward?: string) {
     const ad = await this.getAd(adId);
 
     if (ad.status !== 'pending') {
       throw new BadRequestException('Only pending campaigns can be approved');
     }
 
+    if (reward !== undefined) {
+      if (!/^\d+(\.\d{1,2})?$/.test(reward) || Number(reward) <= 0) {
+        throw new BadRequestException('Reward must be greater than zero');
+      }
+    }
+
     return db.transaction(async (tx) => {
       const [updated] = await tx
         .update(ads)
-        .set({ status: 'active', updatedAt: new Date() })
+        .set({
+          status: 'active',
+          ...(reward !== undefined ? { pricePerUnit: reward } : {}),
+          updatedAt: new Date(),
+        })
         .where(eq(ads.id, adId))
         .returning();
 
       if (ad.taskId) {
         await tx
           .update(tasks)
-          .set({ status: 'active', updatedAt: new Date() })
+          .set({
+            status: 'active',
+            ...(reward !== undefined ? { reward } : {}),
+            updatedAt: new Date(),
+          })
           .where(eq(tasks.id, ad.taskId));
       }
 
@@ -156,8 +170,11 @@ export class AdsService {
         entityType: 'task',
         entityId: ad.taskId ?? adId,
         description: `Approved ad campaign "${ad.title}"`,
-        oldValues: { status: ad.status },
-        newValues: { status: 'active' },
+        oldValues: { status: ad.status, pricePerUnit: ad.pricePerUnit },
+        newValues: {
+          status: 'active',
+          ...(reward !== undefined ? { pricePerUnit: reward } : {}),
+        },
         tx,
       });
 
@@ -213,6 +230,24 @@ export class AdsService {
 
       return updated;
     });
+  }
+
+  async getAdWithDetails(adId: string) {
+    const ad = await this.getAd(adId);
+    const requester = await db.query.users.findFirst({
+      where: eq(users.id, ad.userId),
+    });
+
+    return {
+      ...ad,
+      requester: requester
+        ? {
+            id: requester.id,
+            name: `${requester.firstName} ${requester.lastName}`.trim(),
+            email: requester.email,
+          }
+        : null,
+    };
   }
 
   private async getAd(adId: string) {

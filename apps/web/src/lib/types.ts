@@ -90,6 +90,10 @@ export interface Ad {
   createdAt: string;
 }
 
+export interface AdWithRequester extends Ad {
+  requester: { id: string; name: string; email: string } | null;
+}
+
 export interface CreateAdInput {
   adType: AdType;
   title: string;

@@ -28,6 +28,8 @@ import { UploadsModule } from './uploads/uploads.module';
 import { SiteContentModule } from './site-content/site-content.module';
 import { BonusesModule } from './bonuses/bonuses.module';
 import { AdsModule } from './ads/ads.module';
+import { PlansModule } from './plans/plans.module';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 
 @Module({
   controllers: [HealthController],
@@ -67,6 +69,8 @@ import { AdsModule } from './ads/ads.module';
     SiteContentModule,
     BonusesModule,
     AdsModule,
+    PlansModule,
+    SubscriptionsModule,
   ],
 })
 export class AppModule {}

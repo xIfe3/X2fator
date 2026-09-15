@@ -29,14 +29,20 @@ export class AdminAdsController {
     return this.adsService.updatePricing(body);
   }
 
+  @Get(':id')
+  getAd(@Param('id') id: string) {
+    return this.adsService.getAdWithDetails(id);
+  }
+
   @Patch(':id/review')
   reviewAd(
     @CurrentUser() admin: AuthenticatedUser,
     @Param('id') id: string,
-    @Body() body: { action: 'approve' | 'reject'; reason?: string },
+    @Body()
+    body: { action: 'approve' | 'reject'; reward?: string; reason?: string },
   ) {
     return body.action === 'approve'
-      ? this.adsService.approveAd(admin.id, id)
+      ? this.adsService.approveAd(admin.id, id, body.reward)
       : this.adsService.rejectAd(admin.id, id, body.reason);
   }
 }
