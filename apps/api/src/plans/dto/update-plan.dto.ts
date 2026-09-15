@@ -25,11 +25,6 @@ export class UpdatePlanDto {
 
   @IsOptional()
   @IsInt()
-  @Min(1)
-  durationDays?: number;
-
-  @IsOptional()
-  @IsInt()
   @Min(0)
   rank?: number;
 

@@ -2,6 +2,7 @@ import {
   IsEmail,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   MaxLength,
   MinLength,
@@ -10,6 +11,9 @@ import {
 export class RegisterDto {
   @IsEmail()
   email!: string;
+
+  @IsUUID()
+  planId!: string;
 
   @IsString()
   @MinLength(8)

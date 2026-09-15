@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 
 import { AuthService } from './auth.service';
@@ -28,6 +28,15 @@ export class AuthController {
   @Post('login')
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Get('register/confirm/:paymentReference')
+  confirmRegistrationPayment(
+    @Param('paymentReference') paymentReference: string,
+  ) {
+    return this.authService.confirmRegistrationPayment(paymentReference);
   }
 
   @Public()

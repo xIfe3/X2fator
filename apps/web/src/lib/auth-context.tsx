@@ -11,7 +11,7 @@ import {
 import { useRouter } from "next/navigation";
 import { authApi } from "./api/auth";
 import { tokenStore } from "./api-client";
-import type { User } from "./types";
+import type { RegisterInitResponse, User } from "./types";
 
 interface AuthContextValue {
   user: User | null;
@@ -25,7 +25,9 @@ interface AuthContextValue {
     lastName: string;
     phone?: string;
     referralCode?: string;
-  }) => Promise<void>;
+    planId: string;
+  }) => Promise<RegisterInitResponse>;
+  completeRegistration: (paymentReference: string) => Promise<User>;
   logout: () => void;
   refreshUser: () => Promise<void>;
 }
@@ -100,15 +102,22 @@ export function AuthProvider({ children }: { children: any }) {
       lastName: string;
       phone?: string;
       referralCode?: string;
+      planId: string;
     }) => {
-      const res = await authApi.register(dto);
-      console.log("Register response", res);
-      tokenStore.set(res.accessToken, res.refreshToken);
-      tokenStore.setCachedUser(res.user);
-      setUser(res.user);
+      // No tokens yet — the account stays inactive until the chosen
+      // plan's Flutterwave payment succeeds (see completeRegistration).
+      return authApi.register(dto);
     },
     [],
   );
+
+  const completeRegistration = useCallback(async (paymentReference: string) => {
+    const res = await authApi.confirmRegistrationPayment(paymentReference);
+    tokenStore.set(res.accessToken, res.refreshToken);
+    tokenStore.setCachedUser(res.user);
+    setUser(res.user);
+    return res.user;
+  }, []);
 
   const logout = useCallback(() => {
     tokenStore.clear();
@@ -125,10 +134,20 @@ export function AuthProvider({ children }: { children: any }) {
       isAdmin,
       login,
       register,
+      completeRegistration,
       logout,
       refreshUser: loadUser,
     }),
-    [user, isLoading, isAdmin, login, register, logout, loadUser],
+    [
+      user,
+      isLoading,
+      isAdmin,
+      login,
+      register,
+      completeRegistration,
+      logout,
+      loadUser,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

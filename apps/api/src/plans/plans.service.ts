@@ -71,7 +71,6 @@ export class PlansService {
     name: string;
     description?: string;
     price: string;
-    durationDays: number;
     rank?: number;
     dailyTaskLimit?: number;
     dailyReward?: string;
@@ -82,10 +81,6 @@ export class PlansService {
   }) {
     if (Number(data.price) <= 0) {
       throw new BadRequestException('Plan price must be greater than zero');
-    }
-
-    if (data.durationDays <= 0) {
-      throw new BadRequestException('Duration must be greater than zero');
     }
 
     if (data.dailyTaskLimit !== undefined && data.dailyTaskLimit < 0) {
@@ -124,7 +119,6 @@ export class PlansService {
         name: data.name,
         description: data.description,
         price: data.price,
-        durationDays: data.durationDays,
         rank: data.rank ?? 0,
         dailyTaskLimit: data.dailyTaskLimit ?? 0,
         dailyReward: data.dailyReward ?? '0',
@@ -157,7 +151,6 @@ export class PlansService {
       name?: string;
       description?: string;
       price?: string;
-      durationDays?: number;
       rank?: number;
       dailyTaskLimit?: number;
       dailyReward?: string;
@@ -171,10 +164,6 @@ export class PlansService {
 
     if (data.price !== undefined && Number(data.price) <= 0) {
       throw new BadRequestException('Plan price must be greater than zero');
-    }
-
-    if (data.durationDays !== undefined && data.durationDays <= 0) {
-      throw new BadRequestException('Duration must be greater than zero');
     }
 
     if (data.dailyTaskLimit !== undefined && data.dailyTaskLimit < 0) {

@@ -50,10 +50,6 @@ export const planSubscriptions = pgTable(
       withTimezone: true,
     }).notNull(),
 
-    endsAt: timestamp("ends_at", {
-      withTimezone: true,
-    }).notNull(),
-
     status: subscriptionStatusEnum("status").notNull().default("pending"),
 
     createdAt: timestamp("created_at", {

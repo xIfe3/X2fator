@@ -21,7 +21,6 @@ interface PlanFormState {
   name: string;
   description: string;
   price: string;
-  durationDays: string;
   rank: string;
   dailyTaskLimit: string;
   dailyReward: string;
@@ -35,7 +34,6 @@ const emptyForm: PlanFormState = {
   name: "",
   description: "",
   price: "",
-  durationDays: "30",
   rank: "0",
   dailyTaskLimit: "0",
   dailyReward: "0",
@@ -70,7 +68,6 @@ export default function AdminPlansPage() {
       name: plan.name,
       description: plan.description ?? "",
       price: plan.price,
-      durationDays: String(plan.durationDays),
       rank: String(plan.rank),
       dailyTaskLimit: String(plan.dailyTaskLimit ?? 0),
       dailyReward: plan.dailyReward ?? "0",
@@ -96,7 +93,6 @@ export default function AdminPlansPage() {
       name: form.name.trim(),
       description: form.description.trim() || undefined,
       price: form.price.trim(),
-      durationDays: Number(form.durationDays),
       rank: Number(form.rank),
       dailyTaskLimit: Number(form.dailyTaskLimit),
       dailyReward: form.dailyReward.trim(),
@@ -182,7 +178,6 @@ export default function AdminPlansPage() {
                 <Th>Name</Th>
                 <Th className="text-right">Rank</Th>
                 <Th className="text-right">Price</Th>
-                <Th className="text-right">Duration</Th>
                 <Th>Status</Th>
                 <Th className="text-right">Actions</Th>
               </THead>
@@ -200,9 +195,6 @@ export default function AdminPlansPage() {
                     <Td className="text-right text-ink-dim">{plan.rank}</Td>
                     <Td className="text-right">
                       <Money value={plan.price} size="sm" />
-                    </Td>
-                    <Td className="text-right text-ink-dim">
-                      {plan.durationDays}d
                     </Td>
                     <Td>
                       <StatusPill status={plan.status} />
@@ -253,23 +245,13 @@ export default function AdminPlansPage() {
               setForm((f) => ({ ...f, description: e.target.value }))
             }
           />
-          <div className="grid grid-cols-2 gap-3">
-            <Input
-              label="Price"
-              value={form.price}
-              onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
-              placeholder="5000"
-              inputMode="decimal"
-            />
-            <Input
-              label="Duration (days)"
-              value={form.durationDays}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, durationDays: e.target.value }))
-              }
-              inputMode="numeric"
-            />
-          </div>
+          <Input
+            label="Price"
+            value={form.price}
+            onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
+            placeholder="5000"
+            inputMode="decimal"
+          />
           <Input
             label="Rank"
             value={form.rank}

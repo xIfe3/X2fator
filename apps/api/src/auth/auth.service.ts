@@ -1,6 +1,8 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 
@@ -21,10 +23,13 @@ import {
   userRoles,
   passwordResetTokens,
   referrals,
+  plans,
+  payments,
 } from '@2xfactor/database';
 import { PasswordService } from './password.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { PaymentsService } from '../payments/payments.service';
 
 @Injectable()
 export class AuthService {
@@ -32,6 +37,7 @@ export class AuthService {
     private readonly passwordService: PasswordService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly paymentsService: PaymentsService,
     @Inject(MAILER) private readonly mailer: Mailer,
   ) {}
 
@@ -47,6 +53,16 @@ export class AuthService {
     return results.map((role) => role.name);
   }
 
+  /**
+   * Registration requires paying for a plan up front. This creates the
+   * user as `status: 'pending'` (can't log in yet) plus a pending
+   * Flutterwave payment for the chosen plan, and returns a checkout URL.
+   * The account only becomes active — and the plan subscription only
+   * gets created — once `confirmRegistrationPayment` sees the payment
+   * succeed. This avoids ever activating a login for someone who never
+   * pays, while still keeping the email/referral code reserved so a
+   * duplicate signup attempt is rejected rather than silently allowed.
+   */
   async register(dto: RegisterDto) {
     const email = dto.email.trim().toLowerCase();
 
@@ -58,11 +74,19 @@ export class AuthService {
       throw new ConflictException('An account with this email already exists');
     }
 
+    const plan = await db.query.plans.findFirst({
+      where: and(eq(plans.id, dto.planId), eq(plans.status, 'active')),
+    });
+
+    if (!plan) {
+      throw new NotFoundException('Selected plan is not available');
+    }
+
     const passwordHash = await this.passwordService.hash(dto.password);
 
     const referralCode = await this.generateReferralCode(email);
 
-    const result = await db.transaction(async (tx) => {
+    const { user, payment } = await db.transaction(async (tx) => {
       let referredById: string | undefined;
 
       if (dto.referralCode) {
@@ -77,7 +101,7 @@ export class AuthService {
         referredById = referrer.id;
       }
 
-      const [user] = await tx
+      const [newUser] = await tx
         .insert(users)
         .values({
           email,
@@ -87,7 +111,7 @@ export class AuthService {
           phone: dto.phone,
           referralCode,
           referredById,
-          status: 'active',
+          status: 'pending',
         })
         .returning();
 
@@ -100,49 +124,126 @@ export class AuthService {
       }
 
       await tx.insert(userRoles).values({
-        userId: user.id,
+        userId: newUser.id,
         roleId: defaultRole.id,
       });
 
       await tx.insert(wallets).values([
         {
-          userId: user.id,
+          userId: newUser.id,
           type: 'account',
           balance: '0',
           status: 'active',
         },
-        { userId: user.id, type: 'task', balance: '0', status: 'active' },
-        { userId: user.id, type: 'referral', balance: '0', status: 'active' },
+        { userId: newUser.id, type: 'task', balance: '0', status: 'active' },
+        {
+          userId: newUser.id,
+          type: 'referral',
+          balance: '0',
+          status: 'active',
+        },
       ]);
 
       if (referredById) {
         await tx.insert(referrals).values({
           referrerId: referredById,
-          referredUserId: user.id,
+          referredUserId: newUser.id,
           commissionRate: '0',
           status: 'active',
         });
       }
 
-      return user;
+      const paymentReference = this.generateReference('REG');
+
+      const [newPayment] = await tx
+        .insert(payments)
+        .values({
+          userId: newUser.id,
+          provider: 'flutterwave',
+          reference: paymentReference,
+          amount: plan.price,
+          status: 'pending',
+          metadata: { purpose: 'plan_purchase', planId: plan.id },
+        })
+        .returning();
+
+      return { user: newUser, payment: newPayment };
     });
 
-    const userRolesList = await this.getUserRoles(result.id);
+    const checkout = await this.paymentsService.initializeRawPayment(
+      user.id,
+      payment.reference,
+    );
+
+    return {
+      userId: user.id,
+      paymentReference: payment.reference,
+      authorizationUrl: checkout.authorizationUrl,
+    };
+  }
+
+  /**
+   * Called after the user returns from Flutterwave (or the webhook fires
+   * first). Verifies payment, activates the account, creates the plan
+   * subscription, and — only now — issues login tokens.
+   */
+  async confirmRegistrationPayment(paymentReference: string) {
+    const payment = await db.query.payments.findFirst({
+      where: eq(payments.reference, paymentReference),
+    });
+
+    if (!payment) {
+      throw new NotFoundException('Payment not found');
+    }
+
+    const metadata = payment.metadata as
+      | { purpose?: string; planId?: string }
+      | null;
+
+    if (metadata?.purpose !== 'plan_purchase' || !metadata.planId) {
+      throw new BadRequestException('Not a registration payment');
+    }
+
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, payment.userId),
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.status !== 'active') {
+      // Re-checks with Flutterwave and activates on success. Safe to call
+      // even if the webhook already activated the account in the
+      // meantime — activatePlanPurchase() is idempotent on payment status.
+      await this.paymentsService.verifyFlutterwavePaymentPublic(
+        paymentReference,
+      );
+    }
+
+    const activatedUser = await db.query.users.findFirst({
+      where: eq(users.id, payment.userId),
+    });
+
+    if (!activatedUser) {
+      throw new NotFoundException('User not found');
+    }
+
+    const userRolesList = await this.getUserRoles(activatedUser.id);
 
     const tokens = await this.generateTokens(
-      result.id,
-      result.email,
+      activatedUser.id,
+      activatedUser.email,
       userRolesList,
     );
 
-    // Best-effort — a failed welcome email should never block signup.
     this.mailer
-      .sendWelcome(result.email, result.firstName)
+      .sendWelcome(activatedUser.email, activatedUser.firstName)
       .catch(() => undefined);
 
     return {
       user: {
-        ...this.sanitizeUser(result),
+        ...this.sanitizeUser(activatedUser),
         roles: userRolesList,
       },
       ...tokens,
@@ -304,6 +405,13 @@ export class AuthService {
 
   private hashToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
+  }
+
+  private generateReference(prefix: string): string {
+    return `${prefix}_${Date.now()}_${Math.random()
+      .toString(36)
+      .substring(2, 10)
+      .toUpperCase()}`;
   }
 
   async requestPasswordReset(

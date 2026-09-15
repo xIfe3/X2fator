@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy, Users } from "lucide-react";
+import { Check, Copy, Trophy, Users } from "lucide-react";
 import { useApiQuery } from "@/hooks/useApiQuery";
 import { referralsApi } from "@/lib/api/referrals";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -12,10 +12,14 @@ import { Avatar } from "@/components/ui/Avatar";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageSkeleton, Skeleton } from "@/components/ui/Skeleton";
 import { formatDate, formatMoney } from "@/lib/utils";
+import { Leaderboard } from "./Leaderboard";
 
 export default function ReferralsPage() {
   const { data: info, isLoading: infoLoading } = useApiQuery(() => referralsApi.me());
   const { data: referrals, isLoading } = useApiQuery(() => referralsApi.list());
+  const { data: leaderboard, isLoading: leaderboardLoading } = useApiQuery(() =>
+    referralsApi.leaderboard(),
+  );
   const [copied, setCopied] = useState(false);
 
   const link =
@@ -50,6 +54,21 @@ export default function ReferralsPage() {
             {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
             {copied ? "Copied" : "Copy invite link"}
           </Button>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Trophy className="h-4 w-4 text-primary" /> Top referrers
+          </CardTitle>
+        </CardHeader>
+        <CardBody>
+          {leaderboardLoading ? (
+            <Skeleton className="h-40" />
+          ) : (
+            <Leaderboard entries={leaderboard} />
+          )}
         </CardBody>
       </Card>
 

@@ -42,6 +42,15 @@ export interface AuthResponse extends AuthTokens {
   user: User;
 }
 
+// Returned by POST /auth/register — the account is created as
+// status='pending' and needs the linked Flutterwave payment (for the
+// chosen plan) to succeed before login tokens are ever issued.
+export interface RegisterInitResponse {
+  userId: string;
+  paymentReference: string;
+  authorizationUrl: string;
+}
+
 // GET /auth/me only echoes the JWT payload (CurrentUser decorator), not
 // the full user record — id/email/roles only. Don't rely on it for
 // profile fields like firstName/status; use the cached login/register
@@ -199,7 +208,6 @@ export interface Plan {
   name: string;
   description?: string;
   price: string;
-  durationDays: number;
   rank: number;
   dailyTaskLimit?: number;
   dailyReward?: string;
@@ -220,7 +228,6 @@ export interface Subscription {
   referralRewardRate: string;
   status: "pending" | "active" | "completed" | "cancelled" | "expired";
   startsAt: string;
-  endsAt: string;
   createdAt?: string;
 }
 

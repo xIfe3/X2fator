@@ -1,5 +1,6 @@
 import {
   index,
+  jsonb,
   numeric,
   pgTable,
   text,
@@ -52,6 +53,10 @@ export const payments = pgTable(
     status: paymentStatusEnum("status").notNull().default("pending"),
 
     rawResponse: text("raw_response"),
+
+    // Arbitrary context for non-deposit payments (e.g. { purpose:
+    // 'plan_purchase', planId } for the signup-time plan payment flow).
+    metadata: jsonb("metadata"),
 
     createdAt: timestamp("created_at", {
       withTimezone: true,

@@ -1,20 +1,35 @@
 import type { Metadata } from "next";
-import { Inter, Space_Grotesk, IBM_Plex_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 import { ToastProvider } from "@/components/ui/Toast";
 import { ClientThemeProvider } from "@/lib/theme-provider";
 
-const body = Inter({ subsets: ["latin"], variable: "--body-font" });
-const display = Space_Grotesk({
-  subsets: ["latin"],
-  variable: "--display-font",
-  weight: ["500", "600", "700"],
+// Self-hosted (not next/font/google) so production builds never depend
+// on network access to fonts.gstatic.com — see apps/web/src/fonts.
+const body = localFont({
+  src: [
+    { path: "../fonts/Inter-400.ttf", weight: "400", style: "normal" },
+    { path: "../fonts/Inter-500.ttf", weight: "500", style: "normal" },
+    { path: "../fonts/Inter-600.ttf", weight: "600", style: "normal" },
+  ],
+  variable: "--body-font",
 });
-const mono = IBM_Plex_Mono({
-  subsets: ["latin"],
+const display = localFont({
+  src: [
+    { path: "../fonts/SpaceGrotesk-500.ttf", weight: "500", style: "normal" },
+    { path: "../fonts/SpaceGrotesk-600.ttf", weight: "600", style: "normal" },
+    { path: "../fonts/SpaceGrotesk-700.ttf", weight: "700", style: "normal" },
+  ],
+  variable: "--display-font",
+});
+const mono = localFont({
+  src: [
+    { path: "../fonts/IBMPlexMono-400.ttf", weight: "400", style: "normal" },
+    { path: "../fonts/IBMPlexMono-500.ttf", weight: "500", style: "normal" },
+    { path: "../fonts/IBMPlexMono-600.ttf", weight: "600", style: "normal" },
+  ],
   variable: "--mono-font",
-  weight: ["400", "500", "600"],
 });
 
 export const metadata: Metadata = {

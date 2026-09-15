@@ -71,13 +71,7 @@ export class SubscriptionsService {
           .where(eq(planSubscriptions.id, existingSubscription.id));
       }
 
-      const now = new Date();
-
-      const startsAt = now;
-
-      const endsAt = new Date(
-        now.getTime() + plan.durationDays * 24 * 60 * 60 * 1000,
-      );
+      const startsAt = new Date();
 
       const reference = this.generateReference('PLAN');
 
@@ -111,7 +105,6 @@ export class SubscriptionsService {
           referralRewardRate: plan.referralRewardRate,
 
           startsAt,
-          endsAt,
           status: 'active',
         })
         .returning();

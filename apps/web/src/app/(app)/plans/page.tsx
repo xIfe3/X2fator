@@ -1,11 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { Award, Check, Crown, Users } from "lucide-react";
 import { plansApi, subscriptionsApi } from "@/lib/api/plans";
 import { useApiQuery } from "@/hooks/useApiQuery";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { Modal } from "@/components/ui/Modal";
 import { Money } from "@/components/ui/Money";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -13,6 +15,7 @@ import { PageSkeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { ApiRequestError } from "@/lib/api-client";
 import { formatDate } from "@/lib/utils";
+import type { Plan } from "@/lib/types";
 
 export default function PlansPage() {
   const { data: plans, isLoading: plansLoading } = useApiQuery(() =>
@@ -30,15 +33,24 @@ export default function PlansPage() {
   } = useApiQuery(() => subscriptionsApi.list());
   const { push } = useToast();
 
+  const [confirming, setConfirming] = useState<Plan | null>(null);
+  const [purchasing, setPurchasing] = useState(false);
+
   const highestHeldRank = (history ?? []).reduce(
     (max, sub) => Math.max(max, sub.plan?.rank ?? 0),
     0,
   );
 
-  async function purchase(planId: string) {
+  async function confirmPurchase() {
+    if (!confirming) return;
+    setPurchasing(true);
     try {
-      await subscriptionsApi.purchase(planId);
-      push("success", "Plan activated.");
+      await subscriptionsApi.purchase(confirming.id);
+      push(
+        "success",
+        `You're now subscribed to ${confirming.name}. Plan activated.`,
+      );
+      setConfirming(null);
       refetchActive();
       refetchHistory();
     } catch (error) {
@@ -48,6 +60,8 @@ export default function PlansPage() {
           ? error.message
           : "Could not purchase this plan.",
       );
+    } finally {
+      setPurchasing(false);
     }
   }
 
@@ -96,9 +110,6 @@ export default function PlansPage() {
                 <div>
                   <p className="text-sm font-semibold text-ink">
                     {activeSubscription.plan?.name ?? "Plan"}
-                  </p>
-                  <p className="mt-0.5 text-xs text-ink-faint">
-                    Renews / ends {formatDate(activeSubscription.endsAt)}
                   </p>
                 </div>
               </div>
@@ -149,13 +160,7 @@ export default function PlansPage() {
                   <Money value={plan.price} size="lg" tone="primary" />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 border-t border-base-border pt-4 text-sm sm:grid-cols-4">
-                  <div>
-                    <p className="text-xs text-ink-faint">Duration</p>
-                    <p className="mt-0.5 font-medium text-ink">
-                      {plan.durationDays} days
-                    </p>
-                  </div>
+                <div className="grid grid-cols-3 gap-3 border-t border-base-border pt-4 text-sm">
                   <div>
                     <p className="text-xs text-ink-faint">Daily tasks</p>
                     <p className="mt-0.5 font-medium text-ink">
@@ -185,7 +190,10 @@ export default function PlansPage() {
                     Lower tier — already unlocked
                   </Button>
                 ) : (
-                  <Button className="w-full" onClick={() => purchase(plan.id)}>
+                  <Button
+                    className="w-full"
+                    onClick={() => setConfirming(plan)}
+                  >
                     {activeSubscription ? "Upgrade to this plan" : "Subscribe"}
                   </Button>
                 )}
@@ -220,7 +228,7 @@ export default function PlansPage() {
                       {sub.plan?.name ?? "Plan"}
                     </p>
                     <p className="mt-0.5 text-[11px] text-ink-faint">
-                      {formatDate(sub.startsAt)} – {formatDate(sub.endsAt)}
+                      Purchased {formatDate(sub.startsAt)}
                     </p>
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1.5">
@@ -233,6 +241,44 @@ export default function PlansPage() {
           )}
         </CardBody>
       </Card>
+
+      <Modal
+        open={confirming !== null}
+        onClose={() => setConfirming(null)}
+        title="Confirm subscription"
+      >
+        {confirming && (
+          <div className="space-y-4">
+            <p className="text-sm text-ink-dim">
+              {activeSubscription ? "Upgrade to" : "Subscribe to"}{" "}
+              <span className="font-medium text-ink">{confirming.name}</span>{" "}
+              for{" "}
+              <span className="font-medium text-ink">
+                <Money value={confirming.price} size="sm" />
+              </span>
+              ? This amount will be deducted from your account wallet
+              balance right away.
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setConfirming(null)}
+                disabled={purchasing}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1"
+                isLoading={purchasing}
+                onClick={confirmPurchase}
+              >
+                Confirm & pay
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

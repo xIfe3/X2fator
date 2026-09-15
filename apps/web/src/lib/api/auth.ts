@@ -1,5 +1,5 @@
 import { api, tokenStore } from "../api-client";
-import type { AuthMeResponse, AuthResponse } from "../types";
+import type { AuthMeResponse, AuthResponse, RegisterInitResponse } from "../types";
 
 export const authApi = {
   register: (dto: {
@@ -9,7 +9,15 @@ export const authApi = {
     lastName: string;
     phone?: string;
     referralCode?: string;
-  }) => api.post<AuthResponse>("/auth/register", dto, { auth: false }),
+    planId: string;
+  }) =>
+    api.post<RegisterInitResponse>("/auth/register", dto, { auth: false }),
+
+  confirmRegistrationPayment: (paymentReference: string) =>
+    api.get<AuthResponse>(
+      `/auth/register/confirm/${encodeURIComponent(paymentReference)}`,
+      { auth: false },
+    ),
 
   login: (dto: { email: string; password: string }) =>
     api.post<AuthResponse>("/auth/login", dto, { auth: false }),
