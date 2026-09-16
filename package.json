@@ -1,25 +1,5 @@
 {
   "name": "X2Factor",
   "private": true,
-  "scripts": {
-    "build": "turbo run build",
-    "dev": "turbo run dev",
-    "lint": "turbo run lint",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "check-types": "turbo run check-types"
-  },
-  "devDependencies": {
-    "prettier": "^3.7.4",
-    "turbo": "^2.10.9",
-    "typescript": "5.9.2"
-  },
-  "packageManager": "pnpm@10.32.1",
-  "engines": {
-    "node": ">=18"
-  },
-  "pnpm": {
-    "overrides": {
-      "csstype": "3.2.3"
-    }
-  }
+  "description": "Monorepo root — apps/api and apps/web are independent projects, each with their own package.json and node_modules. Run their scripts from inside each app's folder (cd apps/api && npm run start:dev, etc.)."
 }

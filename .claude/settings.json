@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(PGPASSWORD=postgres psql -h localhost -p 5444 -U postgres -d xfactor -c \"\\\\d users\")",
+      "Bash(docker start *)",
+      "Bash(rm -rf /c/deploy-x2factor)"
+    ],
+    "additionalDirectories": [
+      "C:\\deploy-x2factor"
+    ]
+  }
+}

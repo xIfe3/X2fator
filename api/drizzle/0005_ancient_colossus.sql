@@ -1,0 +1,1 @@
+ALTER TABLE "withdrawals" ADD COLUMN "bank_code" varchar(10);

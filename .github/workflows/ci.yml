@@ -21,22 +21,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile
-
-      - name: Build database package
-        run: pnpm --filter @2xfactor/database build
 
       - name: Build API
-        run: pnpm --filter api build
+        working-directory: apps/api
+        run: |
+          npm ci
+          npm run build
 
       - name: Build web
-        run: pnpm --filter @2xfactor/web build
+        working-directory: apps/web
+        run: |
+          npm ci
+          npm run build
