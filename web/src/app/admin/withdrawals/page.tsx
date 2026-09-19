@@ -1,14 +1,18 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { Settings, Wallet } from "lucide-react";
+import { RefreshCw, Settings, Wallet } from "lucide-react";
 import { useApiQuery } from "@/hooks/useApiQuery";
+import { useAuth } from "@/lib/auth-context";
 import { adminApi } from "@/lib/api/admin";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Table, THead, Th, Tr, Td } from "@/components/ui/Table";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Input, Textarea } from "@/components/ui/Input";
+import { Switch } from "@/components/ui/Switch";
+import { Tabs } from "@/components/ui/Tabs";
+import { StatusPill } from "@/components/ui/StatusPill";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageSkeleton } from "@/components/ui/Skeleton";
 import { ApiRequestError } from "@/lib/api-client";
@@ -16,7 +20,21 @@ import { useToast } from "@/components/ui/Toast";
 import { Money } from "@/components/ui/Money";
 import { formatDateTime } from "@/lib/utils";
 
+const STATUS_TABS = [
+  { key: "all", label: "All" },
+  { key: "pending", label: "Pending" },
+  { key: "processing", label: "Processing" },
+  { key: "completed", label: "Completed" },
+  { key: "rejected", label: "Rejected" },
+  { key: "cancelled", label: "Cancelled" },
+];
+
 export default function AdminWithdrawalsPage() {
+  const { hasPermission } = useAuth();
+  const canApprove = hasPermission("withdrawals.approve");
+  const canReject = hasPermission("withdrawals.reject");
+  const canManageSettings = hasPermission("withdrawals.settings");
+
   const {
     data: pending,
     isLoading,
@@ -35,17 +53,31 @@ export default function AdminWithdrawalsPage() {
   const [rejectTarget, setRejectTarget] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const {
+    data: allWithdrawals,
+    isLoading: allLoading,
+    refetch: refetchAll,
+  } = useApiQuery(
+    () =>
+      adminApi.withdrawals.all(statusFilter === "all" ? undefined : statusFilter),
+    [statusFilter],
+  );
+  const [reconcilingId, setReconcilingId] = useState<string | null>(null);
   const [settingsForm, setSettingsForm] = useState({
     referralMinimumWithdrawal: "",
     taskWithdrawalDay: "",
+    autoPayoutEnabled: true,
   });
   const [settingsSubmitting, setSettingsSubmitting] = useState(false);
+  const [autoPayoutSaving, setAutoPayoutSaving] = useState(false);
 
   useEffect(() => {
     if (!settings) return;
     setSettingsForm({
       referralMinimumWithdrawal: settings.referralMinimumWithdrawal,
       taskWithdrawalDay: String(settings.taskWithdrawalDay),
+      autoPayoutEnabled: settings.autoPayoutEnabled,
     });
   }, [settings]);
 
@@ -71,6 +103,31 @@ export default function AdminWithdrawalsPage() {
     }
   }
 
+  async function toggleAutoPayout(next: boolean) {
+    setSettingsForm((f) => ({ ...f, autoPayoutEnabled: next }));
+    setAutoPayoutSaving(true);
+    try {
+      await adminApi.withdrawals.updateSettings({ autoPayoutEnabled: next });
+      push(
+        "success",
+        next
+          ? "Withdrawals will now pay out automatically via Flutterwave."
+          : "Withdrawals now require manual admin approval.",
+      );
+      refetchSettings();
+    } catch (err) {
+      setSettingsForm((f) => ({ ...f, autoPayoutEnabled: !next }));
+      push(
+        "error",
+        err instanceof ApiRequestError
+          ? err.message
+          : "Could not update payout mode.",
+      );
+    } finally {
+      setAutoPayoutSaving(false);
+    }
+  }
+
   async function approve() {
     if (!approveTarget) return;
     setBusyId(approveTarget);
@@ -82,6 +139,7 @@ export default function AdminWithdrawalsPage() {
       setApproveTarget(null);
       setNote("");
       refetch();
+      refetchAll();
     } catch (err) {
       push(
         "error",
@@ -103,6 +161,7 @@ export default function AdminWithdrawalsPage() {
       setRejectTarget(null);
       setNote("");
       refetch();
+      refetchAll();
     } catch (err) {
       push(
         "error",
@@ -112,6 +171,30 @@ export default function AdminWithdrawalsPage() {
       );
     } finally {
       setBusyId(null);
+    }
+  }
+
+  async function reconcile(id: string) {
+    setReconcilingId(id);
+    try {
+      const updated = await adminApi.withdrawals.reconcile(id);
+      push(
+        "success",
+        updated.status === "processing"
+          ? "Flutterwave still reports this transfer as pending — nothing changed."
+          : `Withdrawal reconciled — now ${updated.status}.`,
+      );
+      refetch();
+      refetchAll();
+    } catch (err) {
+      push(
+        "error",
+        err instanceof ApiRequestError
+          ? err.message
+          : "Could not reconcile withdrawal.",
+      );
+    } finally {
+      setReconcilingId(null);
     }
   }
 
@@ -126,6 +209,7 @@ export default function AdminWithdrawalsPage() {
         </p>
       </div>
 
+      {canManageSettings && (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -136,11 +220,26 @@ export default function AdminWithdrawalsPage() {
           {settingsLoading ? (
             <PageSkeleton />
           ) : (
-            <form
-              onSubmit={saveSettings}
-              className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-end"
-            >
-              <Input
+            <div className="space-y-5">
+              <div className="rounded-xl border border-base-border bg-base-raised p-4">
+                <Switch
+                  checked={settingsForm.autoPayoutEnabled}
+                  onChange={toggleAutoPayout}
+                  disabled={autoPayoutSaving}
+                  label="Automatic payout"
+                  hint={
+                    settingsForm.autoPayoutEnabled
+                      ? "Withdrawals are sent to Flutterwave and paid out automatically."
+                      : "Withdrawals stay pending until an admin manually approves and pays them."
+                  }
+                />
+              </div>
+
+              <form
+                onSubmit={saveSettings}
+                className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-end"
+              >
+                <Input
                 label="Referral wallet minimum withdrawal (NGN)"
                 type="number"
                 min={0}
@@ -178,10 +277,12 @@ export default function AdminWithdrawalsPage() {
                   Save rules
                 </Button>
               </div>
-            </form>
+              </form>
+            </div>
           )}
         </CardBody>
       </Card>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {statsLoading
@@ -267,20 +368,95 @@ export default function AdminWithdrawalsPage() {
                     </Td>
                     <Td className="text-right">
                       <div className="flex justify-end gap-1.5">
-                        <Button
-                          size="sm"
-                          onClick={() => setApproveTarget(w.id)}
-                        >
-                          Approve
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="danger"
-                          onClick={() => setRejectTarget(w.id)}
-                        >
-                          Reject
-                        </Button>
+                        {canApprove && (
+                          <Button
+                            size="sm"
+                            onClick={() => setApproveTarget(w.id)}
+                          >
+                            Approve
+                          </Button>
+                        )}
+                        {canReject && (
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            onClick={() => setRejectTarget(w.id)}
+                          >
+                            Reject
+                          </Button>
+                        )}
+                        {!canApprove && !canReject && (
+                          <span className="text-xs text-ink-faint">
+                            View only
+                          </span>
+                        )}
                       </div>
+                    </Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </Table>
+          )}
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>All withdrawals</CardTitle>
+          <Tabs
+            tabs={STATUS_TABS}
+            active={statusFilter}
+            onChange={setStatusFilter}
+          />
+        </CardHeader>
+        <CardBody>
+          {allLoading ? (
+            <PageSkeleton />
+          ) : !allWithdrawals || allWithdrawals.length === 0 ? (
+            <EmptyState
+              icon={Wallet}
+              title="No withdrawals"
+              description="No withdrawals match this filter."
+            />
+          ) : (
+            <Table>
+              <THead>
+                <Th>Bank</Th>
+                <Th>Account</Th>
+                <Th>Wallet</Th>
+                <Th>Requested</Th>
+                <Th className="text-right">Amount</Th>
+                <Th>Status</Th>
+                <Th className="text-right">Actions</Th>
+              </THead>
+              <tbody>
+                {allWithdrawals.map((w) => (
+                  <Tr key={w.id}>
+                    <Td>{w.bankName}</Td>
+                    <Td className="font-mono text-xs text-ink-dim">
+                      {w.accountNumber} · {w.accountName}
+                    </Td>
+                    <Td className="capitalize text-ink-dim">{w.walletType}</Td>
+                    <Td className="text-ink-dim">
+                      {formatDateTime(w.createdAt)}
+                    </Td>
+                    <Td className="text-right">
+                      <Money value={w.amount} size="sm" />
+                    </Td>
+                    <Td>
+                      <StatusPill status={w.status} />
+                    </Td>
+                    <Td className="text-right">
+                      {w.status === "processing" && canApprove && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          isLoading={reconcilingId === w.id}
+                          onClick={() => reconcile(w.id)}
+                        >
+                          <RefreshCw className="h-3.5 w-3.5" /> Reconcile
+                        </Button>
+                      )}
                     </Td>
                   </Tr>
                 ))}

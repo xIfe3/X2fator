@@ -10,6 +10,13 @@ import type { AuthenticatedUser } from '../common/types/authenticated-request';
 export class UtilitiesController {
   constructor(private readonly utilitiesService: UtilitiesService) {}
 
+  @Get('data-bundles/:provider')
+  async listDataBundles(
+    @Param('provider') provider: 'mtn' | 'airtel' | 'glo' | '9mobile',
+  ) {
+    return this.utilitiesService.listDataBundles(provider);
+  }
+
   @Post('purchase')
   async purchase(
     @CurrentUser() user: AuthenticatedUser,

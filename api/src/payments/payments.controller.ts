@@ -1,24 +1,17 @@
-import { Body, Controller, Get, Headers, HttpCode, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 
 import { PaymentsService } from './payments.service';
 
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { Public } from '../common/decorators/public.decorator';
 import type { AuthenticatedUser } from '../common/types/authenticated-request';
 
+// The Flutterwave webhook used to live here, but Flutterwave only
+// accepts one webhook URL per merchant account — it now lives at the
+// shared POST /webhooks/flutterwave (see WebhooksController), which
+// dispatches to this service's handleFlutterwaveWebhook() by event type.
 @Controller('payments')
 export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
-
-  @Public()
-  @Post('webhook/flutterwave')
-  @HttpCode(200)
-  async flutterwaveWebhook(
-    @Headers('verif-hash') signature: string | undefined,
-    @Body() body: { data?: { tx_ref?: string; status?: string } },
-  ) {
-    return this.paymentsService.handleFlutterwaveWebhook(signature, body);
-  }
 
   @Post('initialize/:depositId')
   async initializePayment(
@@ -34,6 +27,14 @@ export class PaymentsController {
     @Param('reference') reference: string,
   ) {
     return this.paymentsService.verifyPayment(user.id, reference);
+  }
+
+  @Patch('cancel/:reference')
+  async cancelPayment(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('reference') reference: string,
+  ) {
+    return this.paymentsService.cancelPayment(user.id, reference);
   }
 
   @Get()

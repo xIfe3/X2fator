@@ -1,14 +1,16 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { Users } from "lucide-react";
+import { ShieldPlus, Users } from "lucide-react";
 import { useApiQuery } from "@/hooks/useApiQuery";
+import { useAuth } from "@/lib/auth-context";
 import { adminApi } from "@/lib/api/admin";
 import type { AdminUser, AdminWalletDetails } from "@/lib/types";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Table, THead, Th, Tr, Td } from "@/components/ui/Table";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Input, Select, Textarea } from "@/components/ui/Input";
 import { PasswordField } from "@/components/ui/PasswordField";
 import { PasswordStrength } from "@/components/ui/PasswordStrength";
@@ -20,7 +22,19 @@ import { useToast } from "@/components/ui/Toast";
 import { formatDate, formatDateTime, formatMoney } from "@/lib/utils";
 import { Money } from "@/components/ui/Money";
 
+function capitalize(s: string) {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 export default function AdminUsersPage() {
+  const { hasPermission } = useAuth();
+  const canUpdate = hasPermission("users.update");
+  const canSuspend = hasPermission("users.suspend");
+  const canActivate = hasPermission("users.activate");
+  const canBlock = hasPermission("users.block");
+  const canCreateAdmin = hasPermission("users.create_admin");
+  const canAdjustWallet = hasPermission("wallets.adjust");
+
   const {
     data: users,
     isLoading,
@@ -28,6 +42,10 @@ export default function AdminUsersPage() {
   } = useApiQuery(() => adminApi.users.list());
   const { push } = useToast();
   const [actingId, setActingId] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{
+    user: AdminUser;
+    action: "suspend" | "activate" | "block";
+  } | null>(null);
   const [adjustTarget, setAdjustTarget] = useState<AdminUser | null>(null);
   const [adjustForm, setAdjustForm] = useState({
     walletType: "account" as "account" | "task" | "referral",
@@ -54,6 +72,19 @@ export default function AdminUsersPage() {
   const [confirmEdit, setConfirmEdit] = useState(false);
   const [editSubmitting, setEditSubmitting] = useState(false);
 
+  const [createAdminOpen, setCreateAdminOpen] = useState(false);
+  const [createAdminForm, setCreateAdminForm] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    password: "",
+    currentAdminPassword: "",
+  });
+  const [createAdminError, setCreateAdminError] = useState<string | null>(
+    null,
+  );
+  const [createAdminSubmitting, setCreateAdminSubmitting] = useState(false);
+
   useEffect(() => {
     if (!walletTarget) {
       setWalletDetails(null);
@@ -75,14 +106,14 @@ export default function AdminUsersPage() {
       .finally(() => setWalletLoading(false));
   }, [walletTarget, push]);
 
-  async function runAction(
-    id: string,
-    action: "suspend" | "activate" | "block",
-  ) {
-    setActingId(id + action);
+  async function confirmRunAction() {
+    if (!confirmAction) return;
+    const { user, action } = confirmAction;
+    setActingId(user.id + action);
     try {
-      await adminApi.users[action](id);
+      await adminApi.users[action](user.id);
       push("success", `User ${action}d.`);
+      setConfirmAction(null);
       refetch();
     } catch (err) {
       push(
@@ -169,13 +200,53 @@ export default function AdminUsersPage() {
     }
   }
 
+  async function submitCreateAdmin(e: FormEvent) {
+    e.preventDefault();
+    setCreateAdminError(null);
+    setCreateAdminSubmitting(true);
+    try {
+      await adminApi.users.createAdmin({
+        firstName: createAdminForm.firstName.trim(),
+        lastName: createAdminForm.lastName.trim(),
+        email: createAdminForm.email.trim(),
+        password: createAdminForm.password,
+        currentAdminPassword: createAdminForm.currentAdminPassword,
+      });
+      push("success", "Admin account created.");
+      setCreateAdminOpen(false);
+      setCreateAdminForm({
+        firstName: "",
+        lastName: "",
+        email: "",
+        password: "",
+        currentAdminPassword: "",
+      });
+      refetch();
+    } catch (err) {
+      setCreateAdminError(
+        err instanceof ApiRequestError
+          ? err.message
+          : "Could not create admin account.",
+      );
+    } finally {
+      setCreateAdminSubmitting(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-display text-2xl font-semibold text-ink">Users</h1>
-        <p className="mt-1 text-sm text-ink-dim">
-          {users?.length ?? 0} registered users.
-        </p>
+      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+        <div>
+          <h1 className="font-display text-2xl font-semibold text-ink">Users</h1>
+          <p className="mt-1 text-sm text-ink-dim">
+            {users?.length ?? 0} registered users.
+          </p>
+        </div>
+        {canCreateAdmin && (
+          <Button onClick={() => setCreateAdminOpen(true)}>
+            <ShieldPlus className="h-4 w-4" /> Create admin
+          </Button>
+        )}
       </div>
 
       <Card>
@@ -213,44 +284,60 @@ export default function AdminUsersPage() {
                     </Td>
                     <Td className="text-right">
                       <div className="flex justify-end gap-1.5">
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          isLoading={actingId === u.id + "activate"}
-                          onClick={() => runAction(u.id, "activate")}
-                        >
-                          Activate
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          isLoading={actingId === u.id + "suspend"}
-                          onClick={() => runAction(u.id, "suspend")}
-                        >
-                          Suspend
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="danger"
-                          isLoading={actingId === u.id + "block"}
-                          onClick={() => runAction(u.id, "block")}
-                        >
-                          Block
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => openEdit(u)}
-                        >
-                          Edit user
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setAdjustTarget(u)}
-                        >
-                          Adjust wallet
-                        </Button>
+                        {canActivate && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            isLoading={actingId === u.id + "activate"}
+                            onClick={() =>
+                              setConfirmAction({ user: u, action: "activate" })
+                            }
+                          >
+                            Activate
+                          </Button>
+                        )}
+                        {canSuspend && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            isLoading={actingId === u.id + "suspend"}
+                            onClick={() =>
+                              setConfirmAction({ user: u, action: "suspend" })
+                            }
+                          >
+                            Suspend
+                          </Button>
+                        )}
+                        {canBlock && (
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            isLoading={actingId === u.id + "block"}
+                            onClick={() =>
+                              setConfirmAction({ user: u, action: "block" })
+                            }
+                          >
+                            Block
+                          </Button>
+                        )}
+                        {canUpdate && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => openEdit(u)}
+                          >
+                            Edit user
+                          </Button>
+                        )}
+                        {canAdjustWallet && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setAdjustTarget(u)}
+                          >
+                            Adjust wallet
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="outline"
@@ -267,6 +354,85 @@ export default function AdminUsersPage() {
           )}
         </CardBody>
       </Card>
+
+      <Modal
+        open={createAdminOpen}
+        onClose={() => setCreateAdminOpen(false)}
+        title="Create admin account"
+      >
+        <form onSubmit={submitCreateAdmin} className="space-y-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Input
+              label="First name"
+              required
+              value={createAdminForm.firstName}
+              onChange={(e) =>
+                setCreateAdminForm((f) => ({
+                  ...f,
+                  firstName: e.target.value,
+                }))
+              }
+            />
+            <Input
+              label="Last name"
+              required
+              value={createAdminForm.lastName}
+              onChange={(e) =>
+                setCreateAdminForm((f) => ({ ...f, lastName: e.target.value }))
+              }
+            />
+          </div>
+          <Input
+            label="Email"
+            type="email"
+            required
+            value={createAdminForm.email}
+            onChange={(e) =>
+              setCreateAdminForm((f) => ({ ...f, email: e.target.value }))
+            }
+          />
+          <div>
+            <PasswordField
+              label="New admin's password"
+              autoComplete="new-password"
+              required
+              value={createAdminForm.password}
+              onChange={(e) =>
+                setCreateAdminForm((f) => ({
+                  ...f,
+                  password: e.target.value,
+                }))
+              }
+            />
+            <PasswordStrength password={createAdminForm.password} />
+          </div>
+          <div className="border-t border-base-border pt-4">
+            <PasswordField
+              label="Your password (to authorize this)"
+              autoComplete="current-password"
+              required
+              hint="Confirms this is really you, not someone else using your logged-in session."
+              value={createAdminForm.currentAdminPassword}
+              onChange={(e) =>
+                setCreateAdminForm((f) => ({
+                  ...f,
+                  currentAdminPassword: e.target.value,
+                }))
+              }
+            />
+          </div>
+          {createAdminError && (
+            <p className="text-sm text-danger">{createAdminError}</p>
+          )}
+          <Button
+            type="submit"
+            className="w-full"
+            isLoading={createAdminSubmitting}
+          >
+            Create admin
+          </Button>
+        </form>
+      </Modal>
 
       <Modal
         open={!!editTarget && !confirmEdit}
@@ -514,6 +680,38 @@ export default function AdminUsersPage() {
           </div>
         ) : null}
       </Modal>
+
+      <ConfirmDialog
+        open={!!confirmAction}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={confirmRunAction}
+        title={
+          confirmAction
+            ? `${capitalize(confirmAction.action)} user`
+            : ""
+        }
+        description={
+          confirmAction
+            ? `${
+                confirmAction.action === "activate"
+                  ? "Reactivate"
+                  : confirmAction.action === "suspend"
+                    ? "Suspend"
+                    : "Permanently block"
+              } ${confirmAction.user.firstName} ${confirmAction.user.lastName} (${confirmAction.user.email})?${
+                confirmAction.action === "block"
+                  ? " This is a strong action and should only be used for serious violations."
+                  : ""
+              }`
+            : ""
+        }
+        confirmLabel={confirmAction ? capitalize(confirmAction.action) : "Confirm"}
+        variant={confirmAction?.action === "block" ? "danger" : "primary"}
+        isLoading={
+          !!confirmAction &&
+          actingId === confirmAction.user.id + confirmAction.action
+        }
+      />
     </div>
   );
 }

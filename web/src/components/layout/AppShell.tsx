@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { LifeBuoy, Megaphone, X } from "lucide-react";
 import { Topbar } from "./Topbar";
 import { MobileTabBar } from "./MobileTabBar";
+import { TelegramJoinPrompt } from "./TelegramJoinPrompt";
 import { cn } from "@/lib/utils";
 import { BrandLogo } from "./BrandLogo";
 
@@ -94,6 +95,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <Megaphone className="h-5 w-5" />
       </Link>
       <MobileTabBar onMore={() => setOpen(true)} />
+      <TelegramJoinPrompt />
     </div>
   );
 }

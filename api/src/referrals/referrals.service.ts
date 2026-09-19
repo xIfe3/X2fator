@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, Optional } from '@nestjs/common';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, sql } from 'drizzle-orm';
 
 import { db } from '../database';
 import {
@@ -68,22 +68,35 @@ export class ReferralsService {
     });
   }
 
-  async getLeaderboard() {
-    const referralCount = sql<number>`count(${referrals.id})::int`;
+  /**
+   * Top earners by total referral commission earned. `period: 'week'`
+   * restricts to earnings credited in the last 7 days; 'all' (default)
+   * is lifetime.
+   */
+  async getLeaderboard(period: 'week' | 'all' = 'all', limit = 15) {
+    const totalEarned = sql<string>`coalesce(sum(${earnings.amount}), 0)`;
+
+    const conditions = [eq(earnings.source, 'referral')];
+
+    if (period === 'week') {
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      conditions.push(gte(earnings.earningDate, weekAgo));
+    }
 
     return db
       .select({
         userId: users.id,
         firstName: users.firstName,
         lastName: users.lastName,
-        referralCount,
+        totalEarned,
       })
-      .from(referrals)
-      .innerJoin(users, eq(referrals.referrerId, users.id))
-      .where(eq(referrals.status, 'active'))
+      .from(earnings)
+      .innerJoin(users, eq(earnings.userId, users.id))
+      .where(and(...conditions))
       .groupBy(users.id, users.firstName, users.lastName)
-      .orderBy(desc(referralCount), users.createdAt)
-      .limit(3);
+      .orderBy(desc(totalEarned), users.createdAt)
+      .limit(limit);
   }
 
   /**
@@ -218,6 +231,97 @@ export class ReferralsService {
       referredUserId,
       commission: commission.toFixed(2),
     };
+  }
+
+  // ---- Admin ------------------------------------------------------
+
+  /**
+   * Admin: platform-wide referral stats — total referral relationships,
+   * total commission ever paid out, and how many are currently active.
+   */
+  async getAdminStats() {
+    const [row] = await db
+      .select({
+        totalReferrals: sql<number>`count(*)::int`,
+        activeReferrals: sql<number>`count(*) filter (where ${referrals.status} = 'active')::int`,
+        totalCommission: sql<string>`coalesce(sum(${referrals.totalCommission}), 0)::text`,
+      })
+      .from(referrals);
+
+    return row;
+  }
+
+  /**
+   * Admin: every referrer→referred relationship, with both users'
+   * names/emails attached — the referral tree, flattened to one row
+   * per edge (a referrer can appear on multiple rows).
+   */
+  async getAllReferrals() {
+    const rows = await db.execute(sql`
+      select
+        r.id,
+        r.status,
+        r.commission_rate as "commissionRate",
+        r.total_commission as "totalCommission",
+        r.created_at as "createdAt",
+        ru.id as "referrerId",
+        ru.first_name as "referrerFirstName",
+        ru.last_name as "referrerLastName",
+        ru.email as "referrerEmail",
+        du.id as "referredId",
+        du.first_name as "referredFirstName",
+        du.last_name as "referredLastName",
+        du.email as "referredEmail",
+        du.phone as "referredPhone"
+      from referrals r
+      inner join users ru on ru.id = r.referrer_id
+      inner join users du on du.id = r.referred_user_id
+      order by r.created_at desc
+    `);
+
+    return rows.rows as Array<{
+      id: string;
+      status: string;
+      commissionRate: string;
+      totalCommission: string;
+      createdAt: string;
+      referrerId: string;
+      referrerFirstName: string;
+      referrerLastName: string;
+      referrerEmail: string;
+      referredId: string;
+      referredFirstName: string;
+      referredLastName: string;
+      referredEmail: string;
+      referredPhone: string | null;
+    }>;
+  }
+
+  /**
+   * Admin: a simple, explainable fraud signal — referrers who picked
+   * up an unusually large burst of referred signups within a single
+   * hour. Phone/email are unique per user in this schema (no
+   * shared-device signal is possible there), so a rapid signup burst
+   * from one referral code is the clearest available proxy for a
+   * self-referral / bot ring rather than organic word-of-mouth growth.
+   */
+  async getSuspiciousReferrals(burstThreshold = 5) {
+    const rows = await db.execute(sql`
+      select
+        ru.id as "referrerId",
+        ru.first_name as "referrerFirstName",
+        ru.last_name as "referrerLastName",
+        ru.email as "referrerEmail",
+        date_trunc('hour', r.created_at) as "hourBucket",
+        count(*)::int as "signupsInHour"
+      from referrals r
+      inner join users ru on ru.id = r.referrer_id
+      group by ru.id, ru.first_name, ru.last_name, ru.email, date_trunc('hour', r.created_at)
+      having count(*) >= ${burstThreshold}
+      order by count(*) desc, "hourBucket" desc
+    `);
+
+    return rows.rows;
   }
 
   private generateReference(prefix: string) {

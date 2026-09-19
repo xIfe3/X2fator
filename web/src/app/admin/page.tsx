@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   ArrowDownToLine,
+  ArrowUpFromLine,
   ClipboardList,
   Megaphone,
   ScrollText,
@@ -12,13 +13,16 @@ import {
 } from "lucide-react";
 import { useApiQuery } from "@/hooks/useApiQuery";
 import { adminApi } from "@/lib/api/admin";
-import { Card, CardBody } from "@/components/ui/Card";
+import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { Money } from "@/components/ui/Money";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { useToast } from "@/components/ui/Toast";
 import { siteContentApi } from "@/lib/api/site-content";
 import { ApiRequestError } from "@/lib/api-client";
+import { formatDateTime } from "@/lib/utils";
 
 const links = [
   {
@@ -70,6 +74,12 @@ export default function AdminOverviewPage() {
     useApiQuery(() => adminApi.withdrawals.pending());
   const { data: deposits, isLoading: depositsLoading } = useApiQuery(() =>
     adminApi.deposits.all(),
+  );
+  const { data: totals, isLoading: totalsLoading } = useApiQuery(() =>
+    adminApi.wallets.totals(),
+  );
+  const { data: recentTxns, isLoading: recentTxnsLoading } = useApiQuery(() =>
+    adminApi.wallets.recentTransactions(8),
   );
   const { data: siteContent, refetch: refetchSiteContent } = useApiQuery(() =>
     siteContentApi.get(),
@@ -123,6 +133,35 @@ export default function AdminOverviewPage() {
           specific permission for each action (guarded server-side by{" "}
           <span className="font-mono">PermissionsGuard</span>).
         </p>
+      </div>
+
+      <div>
+        <p className="mb-3 text-xs font-medium uppercase tracking-wider text-ink-faint">
+          Platform-wide wallet balances
+        </p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+          {totalsLoading
+            ? [1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-24" />)
+            : [
+                ["Account wallets", totals?.account, "text-ink"],
+                ["Task wallets", totals?.task, "text-secondary"],
+                ["Referral wallets", totals?.referral, "text-primary"],
+                ["Total across all users", totals?.total, "text-primary"],
+              ].map(([label, amount, tone]) => (
+                <Card key={label}>
+                  <CardBody>
+                    <p className="text-xs uppercase tracking-wider text-ink-faint">
+                      {label}
+                    </p>
+                    <Money
+                      value={amount as string | undefined}
+                      size="lg"
+                      className={`mt-2 block ${tone}`}
+                    />
+                  </CardBody>
+                </Card>
+              ))}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
@@ -231,6 +270,64 @@ export default function AdminOverviewPage() {
           </Link>
         ))}
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent activity</CardTitle>
+        </CardHeader>
+        <CardBody>
+          {recentTxnsLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-14" />
+              <Skeleton className="h-14" />
+              <Skeleton className="h-14" />
+            </div>
+          ) : !recentTxns || recentTxns.length === 0 ? (
+            <EmptyState icon={Wallet} title="No activity yet" />
+          ) : (
+            <div className="space-y-1">
+              {recentTxns.map((t) => (
+                <div
+                  key={t.id}
+                  className="flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-base-surface2"
+                >
+                  <span
+                    className={
+                      "flex h-9 w-9 shrink-0 items-center justify-center rounded-full " +
+                      (t.direction === "credit"
+                        ? "bg-secondary-soft text-secondary"
+                        : "bg-danger-soft text-danger")
+                    }
+                  >
+                    {t.direction === "credit" ? (
+                      <ArrowDownToLine className="h-4 w-4" />
+                    ) : (
+                      <ArrowUpFromLine className="h-4 w-4" />
+                    )}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-ink">
+                      {t.userFirstName} {t.userLastName}{" "}
+                      <span className="font-normal capitalize text-ink-faint">
+                        · {t.walletType} · {t.type.replace(/_/g, " ")}
+                      </span>
+                    </p>
+                    <p className="text-[11px] text-ink-faint">
+                      {formatDateTime(t.createdAt)}
+                    </p>
+                  </div>
+                  <Money
+                    value={t.amount}
+                    size="sm"
+                    signed={t.direction}
+                    tone={t.direction === "credit" ? "secondary" : "danger"}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </CardBody>
+      </Card>
     </div>
   );
 }

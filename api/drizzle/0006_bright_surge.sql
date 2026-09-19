@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "withdrawal_pin_hash" text;

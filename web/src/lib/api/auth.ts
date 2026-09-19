@@ -2,7 +2,7 @@ import { api, tokenStore } from "../api-client";
 import type {
   AuthMeResponse,
   AuthResponse,
-  RegisterInitResponse,
+  RegisterResponse,
   User,
 } from "../types";
 
@@ -14,9 +14,8 @@ export const authApi = {
     lastName: string;
     phone?: string;
     referralCode?: string;
-    planId: string;
-  }) =>
-    api.post<RegisterInitResponse>("/auth/register", dto, { auth: false }),
+    planId?: string;
+  }) => api.post<RegisterResponse>("/auth/register", dto, { auth: false }),
 
   confirmRegistrationPayment: (paymentReference: string) =>
     api.get<AuthResponse>(
@@ -24,10 +23,18 @@ export const authApi = {
       { auth: false },
     ),
 
+  cancelRegistrationPayment: (paymentReference: string) =>
+    api.post<{ message: string }>(
+      `/auth/register/cancel/${encodeURIComponent(paymentReference)}`,
+      undefined,
+      { auth: false },
+    ),
+
   login: (dto: { email: string; password: string }) =>
     api.post<AuthResponse>("/auth/login", dto, { auth: false }),
 
-  // Only returns { id, email, roles } — see AuthMeResponse for why.
+  // Only returns { id, email, roles, permissions } — see AuthMeResponse
+  // for why the full profile isn't rehydrated from here.
   me: () => api.get<AuthMeResponse>("/auth/me"),
 
   logout: () => tokenStore.clear(),
@@ -53,4 +60,13 @@ export const authApi = {
     phone?: string | null;
     gender?: "male" | "female" | "other" | null;
   }) => api.patch<User>("/auth/me", dto),
+
+  telegramPromptStatus: () =>
+    api.get<{ shouldShow: boolean; channelUrl: string; groupUrl: string }>(
+      "/auth/telegram-prompt-status",
+    ),
+  markTelegramPromptSeen: () =>
+    api.post<{ message: string }>("/auth/telegram-prompt-seen"),
+  markTelegramJoined: () =>
+    api.post<{ message: string }>("/auth/telegram-joined"),
 };

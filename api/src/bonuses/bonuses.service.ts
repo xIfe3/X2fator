@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { and, desc, eq, gte, sql } from 'drizzle-orm';
 import { db, earnings, users } from '../database';
 import { WalletService } from '../wallet/wallet.service';
 
@@ -22,6 +22,50 @@ export class BonusesService {
 
   async getAdminSettings() {
     return this.getSettings();
+  }
+
+  /**
+   * Check-in overview for the admin dashboard: how many users have
+   * claimed today, total ever paid out via the daily bonus, and the
+   * current streak leaderboard.
+   */
+  async getAdminStats() {
+    const todayStart = new Date();
+    todayStart.setUTCHours(0, 0, 0, 0);
+
+    const [{ claimedToday }] = await db
+      .select({ claimedToday: sql<number>`count(*)::int` })
+      .from(users)
+      .where(gte(users.lastBonusClaimDate, todayStart));
+
+    const [{ totalPaid }] = await db
+      .select({
+        totalPaid: sql<string>`coalesce(sum(${earnings.amount}), 0)::text`,
+      })
+      .from(earnings)
+      .where(
+        and(
+          eq(earnings.source, 'bonus'),
+          sql`${earnings.metadata} ->> 'source' = 'daily_login_bonus'`,
+        ),
+      );
+
+    const topStreaks = await db
+      .select({
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+        currentStreak: users.currentStreak,
+        longestStreak: users.longestStreak,
+        lastBonusClaimDate: users.lastBonusClaimDate,
+      })
+      .from(users)
+      .where(sql`${users.currentStreak} > 0`)
+      .orderBy(desc(users.currentStreak))
+      .limit(10);
+
+    return { claimedToday, totalPaid, topStreaks };
   }
 
   async updateAdminSettings(params: {

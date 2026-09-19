@@ -1,9 +1,17 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common';
 import { desc, eq } from 'drizzle-orm';
 import { ads, db, tasks, users } from '../database';
 import { WalletService } from '../wallet/wallet.service';
 import { SiteContentService } from '../site-content/site-content.service';
 import { AuditService } from '../audit/audit.service';
+import { MAILER, type Mailer } from '../mail/mailer.service';
 import { AD_TYPES, AdType, CreateAdDto } from './dto/create-ad.dto';
 
 const DEFAULT_AD_PRICING: Record<AdType, string> = {
@@ -16,10 +24,13 @@ const DEFAULT_AD_PRICING: Record<AdType, string> = {
 
 @Injectable()
 export class AdsService {
+  private readonly logger = new Logger(AdsService.name);
+
   constructor(
     private readonly walletService: WalletService,
     private readonly siteContentService: SiteContentService,
     private readonly auditService: AuditService,
+    @Optional() @Inject(MAILER) private readonly mailer?: Mailer,
   ) {}
 
   async getPricing() {
@@ -71,6 +82,15 @@ export class AdsService {
   }
 
   async create(userId: string, dto: CreateAdDto) {
+    const sections = await this.siteContentService.getAll();
+    const flags = (sections.feature_flags ?? {}) as Record<string, unknown>;
+
+    if (flags.adsEnabled === false) {
+      throw new BadRequestException(
+        'Ad campaigns are currently disabled by the platform',
+      );
+    }
+
     const pricing = await this.getPricing();
     const pricePerUnit = pricing[dto.adType];
     const totalCost = (Number(pricePerUnit) * dto.quantity).toFixed(2);
@@ -178,8 +198,29 @@ export class AdsService {
         tx,
       });
 
+      await this.notifyAdOwner(ad.userId, (mailer, email, firstName) =>
+        mailer.sendAdApproved(email, firstName, ad.title),
+      );
+
       return updated;
     });
+  }
+
+  private async notifyAdOwner(
+    ownerId: string,
+    send: (mailer: Mailer, email: string, firstName: string) => Promise<void>,
+  ) {
+    if (!this.mailer) return;
+    const owner = await db.query.users.findFirst({
+      where: eq(users.id, ownerId),
+    });
+    if (!owner) return;
+    send(this.mailer, owner.email, owner.firstName).catch((err) =>
+      this.logger.error(
+        `Failed to send ad status email to ${owner.email}`,
+        err instanceof Error ? err.stack : err,
+      ),
+    );
   }
 
   async rejectAd(adminId: string, adId: string, reason?: string) {
@@ -227,6 +268,10 @@ export class AdsService {
         newValues: { status: 'rejected', reason },
         tx,
       });
+
+      await this.notifyAdOwner(ad.userId, (mailer, email, firstName) =>
+        mailer.sendAdRejected(email, firstName, ad.title, reason),
+      );
 
       return updated;
     });

@@ -1,20 +1,44 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { ArrowUpFromLine, CheckCircle2, Plus } from "lucide-react";
+import {
+  ArrowUpFromLine,
+  CheckCircle2,
+  ChevronRight,
+  Landmark,
+  Lock,
+  Plus,
+  Settings2,
+  ShieldCheck,
+  Trash2,
+  XCircle,
+} from "lucide-react";
 import { useApiQuery } from "@/hooks/useApiQuery";
-import { withdrawalsApi } from "@/lib/api/withdrawals";
+import { withdrawalsApi, type SavedBankAccount } from "@/lib/api/withdrawals";
+import { walletApi } from "@/lib/api/wallet";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
-import { Input, Select } from "@/components/ui/Input";
+import { Input } from "@/components/ui/Input";
+import { SearchSelect } from "@/components/ui/SearchSelect";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { Money } from "@/components/ui/Money";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageSkeleton } from "@/components/ui/Skeleton";
 import { ApiRequestError } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
-import { formatDateTime, formatMoney } from "@/lib/utils";
+import { cn, formatDateTime, formatMoney } from "@/lib/utils";
+
+type WalletType = "task" | "referral";
+
+const WALLET_LABEL: Record<WalletType, { title: string; subtitle: string }> = {
+  referral: { title: "Referral", subtitle: "Sales / referral earnings" },
+  task: { title: "Task", subtitle: "Activity / task earnings" },
+};
+
+function maskAccount(accountNumber: string) {
+  return `····${accountNumber.slice(-4)}`;
+}
 
 export default function WithdrawalsPage() {
   const {
@@ -23,90 +47,86 @@ export default function WithdrawalsPage() {
     refetch,
   } = useApiQuery(() => withdrawalsApi.list());
   const { data: settings } = useApiQuery(() => withdrawalsApi.settings());
-  const { data: banks, isLoading: banksLoading } = useApiQuery(() =>
-    withdrawalsApi.banks(),
+  const { data: balance } = useApiQuery(() => walletApi.getBalance());
+  const {
+    data: accounts,
+    refetch: refetchAccounts,
+  } = useApiQuery(() => withdrawalsApi.listAccounts());
+  const { data: pinStatus, refetch: refetchPinStatus } = useApiQuery(() =>
+    withdrawalsApi.pinStatus(),
   );
+
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({
-    walletType: "task" as "task" | "referral",
-    amount: "",
-    bankCode: "",
-    accountNumber: "",
-  });
+  const [pinModalOpen, setPinModalOpen] = useState(false);
+  const [manageOpen, setManageOpen] = useState(false);
+  const [walletType, setWalletType] = useState<WalletType>("referral");
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(
+    null,
+  );
+
+  const [form, setForm] = useState({ amount: "", pin: "" });
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [verifiedName, setVerifiedName] = useState<string | null>(null);
-  const [verifying, setVerifying] = useState(false);
-  const [verifyError, setVerifyError] = useState<string | null>(null);
   const { push } = useToast();
-  const verifyRequestId = useRef(0);
 
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
   useEffect(() => {
-    setVerifiedName(null);
-    setVerifyError(null);
+    if (!accounts || accounts.length === 0) {
+      setSelectedAccountId(null);
+      return;
+    }
+    if (selectedAccountId && accounts.some((a) => a.id === selectedAccountId)) {
+      return;
+    }
+    setSelectedAccountId(accounts.find((a) => a.isDefault)?.id ?? accounts[0]!.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accounts]);
 
-    if (form.accountNumber.length < 10 || !form.bankCode) return;
+  const selectedAccount = accounts?.find((a) => a.id === selectedAccountId);
 
-    const requestId = ++verifyRequestId.current;
-    setVerifying(true);
-    const timeout = setTimeout(() => {
-      withdrawalsApi
-        .verifyAccount({
-          accountNumber: form.accountNumber,
-          bankCode: form.bankCode,
-        })
-        .then((res) => {
-          if (verifyRequestId.current !== requestId) return;
-          setVerifiedName(res.accountName);
-        })
-        .catch((err) => {
-          if (verifyRequestId.current !== requestId) return;
-          setVerifyError(
-            err instanceof ApiRequestError
-              ? err.message
-              : "Could not verify this account.",
-          );
-        })
-        .finally(() => {
-          if (verifyRequestId.current === requestId) setVerifying(false);
-        });
-    }, 500);
-
-    return () => clearTimeout(timeout);
-  }, [form.accountNumber, form.bankCode]);
+  function openWithdrawModal() {
+    if (!pinStatus?.isSet) {
+      setPinModalOpen(true);
+      return;
+    }
+    if (!accounts || accounts.length === 0) {
+      setManageOpen(true);
+      return;
+    }
+    setOpen(true);
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!verifiedName) {
-      setError("Enter a valid bank and account number to verify first.");
+
+    if (!selectedAccount) {
+      setError("Select an account to withdraw to.");
       return;
     }
+    if (form.pin.length !== 4) {
+      setError("Enter your 4-digit withdrawal PIN.");
+      return;
+    }
+
     setError(null);
     setSubmitting(true);
     try {
-      const bank = banks?.find((b) => b.code === form.bankCode);
       await withdrawalsApi.create({
-        walletType: form.walletType,
+        walletType,
         amount: form.amount,
-        bankName: bank?.name ?? form.bankCode,
-        bankCode: form.bankCode,
-        accountNumber: form.accountNumber,
-        accountName: verifiedName,
+        bankName: selectedAccount.bankName,
+        bankCode: selectedAccount.bankCode,
+        accountNumber: selectedAccount.accountNumber,
+        accountName: selectedAccount.accountName,
+        pin: form.pin,
       });
       window.dispatchEvent(new Event("wallet-updated"));
-      push("success", "Withdrawal request submitted for review.");
+      push("success", "Withdrawal submitted — payout is being processed.");
       setOpen(false);
-      setForm({
-        walletType: "task",
-        amount: "",
-        bankCode: "",
-        accountNumber: "",
-      });
-      setVerifiedName(null);
+      setForm({ amount: "", pin: "" });
       refetch();
     } catch (err) {
       setError(
@@ -130,9 +150,14 @@ export default function WithdrawalsPage() {
             Move earnings out to your bank account.
           </p>
         </div>
-        <Button onClick={() => setOpen(true)}>
-          <Plus className="h-4 w-4" /> Request withdrawal
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setManageOpen(true)}>
+            <Settings2 className="h-4 w-4" /> Manage accounts
+          </Button>
+          <Button onClick={openWithdrawModal}>
+            <Plus className="h-4 w-4" /> Request withdrawal
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -146,7 +171,7 @@ export default function WithdrawalsPage() {
             <EmptyState
               icon={ArrowUpFromLine}
               title="No withdrawals yet"
-              description="Requests are reviewed by an admin before payout."
+              description="Payouts are sent to your bank automatically once submitted."
             />
           ) : (
             <div className="space-y-2.5">
@@ -166,7 +191,7 @@ export default function WithdrawalsPage() {
                       </span>
                     </p>
                     <p className="mt-0.5 truncate font-mono text-[11px] text-ink-faint">
-                      {w.accountNumber} · {w.accountName}
+                      {maskAccount(w.accountNumber)} · {w.accountName}
                     </p>
                     <p className="mt-0.5 text-[11px] text-ink-faint">
                       {formatDateTime(w.createdAt)}
@@ -183,23 +208,81 @@ export default function WithdrawalsPage() {
         </CardBody>
       </Card>
 
+      {/* Set withdrawal PIN */}
+      <Modal
+        open={pinModalOpen}
+        onClose={() => setPinModalOpen(false)}
+        title="Set your withdrawal PIN"
+      >
+        <SetPinForm
+          onDone={() => {
+            setPinModalOpen(false);
+            refetchPinStatus();
+            if (!accounts || accounts.length === 0) {
+              setManageOpen(true);
+            } else {
+              setOpen(true);
+            }
+          }}
+        />
+      </Modal>
+
+      {/* Manage saved accounts */}
+      <Modal
+        open={manageOpen}
+        onClose={() => setManageOpen(false)}
+        title="Manage payout accounts"
+      >
+        <ManageAccounts
+          accounts={accounts ?? []}
+          onChanged={refetchAccounts}
+        />
+      </Modal>
+
+      {/* Request withdrawal */}
       <Modal
         open={open}
         onClose={() => setOpen(false)}
         title="Request withdrawal"
       >
         <form onSubmit={onSubmit} className="space-y-4">
-          <Select
-            label="Withdraw from"
-            value={form.walletType}
-            onChange={(e) =>
-              update("walletType", e.target.value as "task" | "referral")
-            }
-          >
-            <option value="task">Task wallet</option>
-            <option value="referral">Referral wallet</option>
-          </Select>
-          {form.walletType === "referral" ? (
+          <div>
+            <span className="mb-1.5 block text-xs font-medium text-ink-dim">
+              Which wallet are you withdrawing from?
+            </span>
+            <div className="grid grid-cols-2 gap-2.5">
+              {(Object.keys(WALLET_LABEL) as WalletType[]).map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setWalletType(type)}
+                  className={cn(
+                    "rounded-xl border p-3.5 text-left transition-colors",
+                    walletType === type
+                      ? "border-primary bg-primary-soft"
+                      : "border-base-border bg-base-raised hover:bg-base-surface2",
+                  )}
+                >
+                  <p
+                    className={cn(
+                      "text-sm font-semibold",
+                      walletType === type ? "text-primary" : "text-ink",
+                    )}
+                  >
+                    {WALLET_LABEL[type].title}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-ink-faint">
+                    {WALLET_LABEL[type].subtitle}
+                  </p>
+                  <p className="mt-2 text-sm font-medium text-ink">
+                    {balance ? formatMoney(balance[type]) : "…"}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {walletType === "referral" ? (
             <p className="text-xs text-ink-faint">
               Referral wallet withdrawals are available anytime. Minimum:{" "}
               {settings
@@ -213,6 +296,7 @@ export default function WithdrawalsPage() {
               {settings?.taskWithdrawalDay ?? "…"} of each month.
             </p>
           )}
+
           <Input
             label="Amount (NGN)"
             type="number"
@@ -222,52 +306,365 @@ export default function WithdrawalsPage() {
             value={form.amount}
             onChange={(e) => update("amount", e.target.value)}
           />
-          <Select
-            label="Bank"
-            required
-            disabled={banksLoading}
-            value={form.bankCode}
-            onChange={(e) => update("bankCode", e.target.value)}
-          >
-            <option value="">
-              {banksLoading ? "Loading banks…" : "Select your bank"}
-            </option>
-            {banks?.map((bank) => (
-              <option key={bank.code} value={bank.code}>
-                {bank.name}
-              </option>
-            ))}
-          </Select>
+
+          <div>
+            <span className="mb-1.5 block text-xs font-medium text-ink-dim">
+              Payout account
+            </span>
+            {!accounts || accounts.length === 0 ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  setManageOpen(true);
+                }}
+                className="flex w-full items-center justify-between gap-3 rounded-xl border border-dashed border-base-border p-3.5 text-left text-sm text-ink-dim hover:border-primary-dim/50 hover:text-ink"
+              >
+                Add a payout account <ChevronRight className="h-4 w-4" />
+              </button>
+            ) : (
+              <div className="space-y-2">
+                {accounts.map((account) => (
+                  <button
+                    key={account.id}
+                    type="button"
+                    onClick={() => setSelectedAccountId(account.id)}
+                    className={cn(
+                      "flex w-full items-center gap-3 rounded-xl border p-3.5 text-left transition-colors",
+                      selectedAccountId === account.id
+                        ? "border-primary bg-primary-soft"
+                        : "border-base-border bg-base-raised hover:bg-base-surface2",
+                    )}
+                  >
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-base-surface2 text-primary">
+                      <Landmark className="h-4.5 w-4.5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="flex items-center gap-1.5 truncate text-sm font-medium text-ink">
+                        {account.bankName}
+                        <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-primary" />
+                      </p>
+                      <p className="truncate font-mono text-[11px] text-ink-faint">
+                        {maskAccount(account.accountNumber)} ·{" "}
+                        {account.accountName}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    setManageOpen(true);
+                  }}
+                  className="text-xs font-medium text-primary hover:underline"
+                >
+                  Add another account
+                </button>
+              </div>
+            )}
+          </div>
+
           <Input
-            label="Account number"
+            label="Withdrawal PIN"
+            type="password"
+            inputMode="numeric"
             required
-            minLength={10}
-            maxLength={20}
-            value={form.accountNumber}
-            onChange={(e) => update("accountNumber", e.target.value)}
+            maxLength={4}
+            value={form.pin}
+            onChange={(e) =>
+              update("pin", e.target.value.replace(/\D/g, "").slice(0, 4))
+            }
+            rightElement={<Lock className="h-4 w-4 text-ink-faint" />}
           />
-          {verifying && (
-            <p className="text-xs text-ink-faint">Verifying account…</p>
-          )}
-          {verifiedName && (
-            <p className="flex items-center gap-1.5 text-sm text-primary">
-              <CheckCircle2 className="h-4 w-4" /> {verifiedName}
-            </p>
-          )}
-          {verifyError && (
-            <p className="text-sm text-danger">{verifyError}</p>
-          )}
+
           {error && <p className="text-sm text-danger">{error}</p>}
+
           <Button
             type="submit"
             className="w-full"
             isLoading={submitting}
-            disabled={!verifiedName || verifying}
+            disabled={!selectedAccount || form.pin.length !== 4}
           >
             Submit request
           </Button>
         </form>
       </Modal>
+    </div>
+  );
+}
+
+function SetPinForm({ onDone }: { onDone: () => void }) {
+  const [pin, setPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (pin.length !== 4) {
+      setError("PIN must be exactly 4 digits.");
+      return;
+    }
+    if (pin !== confirmPin) {
+      setError("PINs do not match.");
+      return;
+    }
+    setError(null);
+    setSubmitting(true);
+    try {
+      await withdrawalsApi.setPin(pin);
+      onDone();
+    } catch (err) {
+      setError(
+        err instanceof ApiRequestError ? err.message : "Could not set PIN.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-4">
+      <p className="text-sm text-ink-dim">
+        You need a withdrawal PIN before you can request a withdrawal. You'll
+        use this PIN to authorize every withdrawal.
+      </p>
+      <Input
+        label="Choose a 4-digit PIN"
+        type="password"
+        inputMode="numeric"
+        required
+        maxLength={4}
+        value={pin}
+        onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+      />
+      <Input
+        label="Confirm PIN"
+        type="password"
+        inputMode="numeric"
+        required
+        maxLength={4}
+        value={confirmPin}
+        onChange={(e) =>
+          setConfirmPin(e.target.value.replace(/\D/g, "").slice(0, 4))
+        }
+      />
+      {error && <p className="text-sm text-danger">{error}</p>}
+      <Button
+        type="submit"
+        className="w-full"
+        isLoading={submitting}
+        disabled={pin.length !== 4 || confirmPin.length !== 4}
+      >
+        Set PIN
+      </Button>
+    </form>
+  );
+}
+
+function ManageAccounts({
+  accounts,
+  onChanged,
+}: {
+  accounts: SavedBankAccount[];
+  onChanged: () => void;
+}) {
+  const { data: banks, isLoading: banksLoading } = useApiQuery(() =>
+    withdrawalsApi.banks(),
+  );
+  const [adding, setAdding] = useState(accounts.length === 0);
+  const [bankCode, setBankCode] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [verifiedName, setVerifiedName] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const { push } = useToast();
+  const verifyRequestId = useRef(0);
+
+  useEffect(() => {
+    setVerifiedName(null);
+    setVerifyError(null);
+
+    if (accountNumber.length < 10 || !bankCode) return;
+
+    const requestId = ++verifyRequestId.current;
+    setVerifying(true);
+    const timeout = setTimeout(() => {
+      withdrawalsApi
+        .verifyAccount({ accountNumber, bankCode })
+        .then((res) => {
+          if (verifyRequestId.current !== requestId) return;
+          setVerifiedName(res.accountName);
+        })
+        .catch((err) => {
+          if (verifyRequestId.current !== requestId) return;
+          setVerifyError(
+            err instanceof ApiRequestError
+              ? err.message
+              : "Could not verify this account.",
+          );
+        })
+        .finally(() => {
+          if (verifyRequestId.current === requestId) setVerifying(false);
+        });
+    }, 500);
+
+    return () => clearTimeout(timeout);
+  }, [accountNumber, bankCode]);
+
+  async function onAdd(e: FormEvent) {
+    e.preventDefault();
+    if (!verifiedName) {
+      setError("Enter a valid bank and account number to verify first.");
+      return;
+    }
+    setError(null);
+    setSubmitting(true);
+    try {
+      const bankName = banks?.find((b) => b.code === bankCode)?.name ?? bankCode;
+      await withdrawalsApi.addAccount({ accountNumber, bankCode, bankName });
+      push("success", "Account added.");
+      setBankCode("");
+      setAccountNumber("");
+      setVerifiedName(null);
+      setAdding(false);
+      onChanged();
+    } catch (err) {
+      setError(
+        err instanceof ApiRequestError ? err.message : "Could not add account.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function onDelete(id: string) {
+    setDeletingId(id);
+    try {
+      await withdrawalsApi.deleteAccount(id);
+      push("success", "Account removed.");
+      onChanged();
+    } catch (err) {
+      push(
+        "error",
+        err instanceof ApiRequestError
+          ? err.message
+          : "Could not remove account.",
+      );
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {accounts.length > 0 && (
+        <div className="space-y-2">
+          {accounts.map((account) => (
+            <div
+              key={account.id}
+              className="flex items-center gap-3 rounded-xl border border-base-border bg-base-raised p-3.5"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary">
+                <Landmark className="h-4.5 w-4.5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="flex items-center gap-1.5 truncate text-sm font-medium text-ink">
+                  {account.bankName}
+                  {account.isDefault && (
+                    <span className="rounded-full bg-primary-soft px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                      Default
+                    </span>
+                  )}
+                </p>
+                <p className="truncate font-mono text-[11px] text-ink-faint">
+                  {maskAccount(account.accountNumber)} · {account.accountName}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onDelete(account.id)}
+                disabled={deletingId === account.id}
+                aria-label="Remove account"
+                className="shrink-0 rounded-lg p-2 text-ink-faint hover:bg-danger-soft hover:text-danger disabled:opacity-50"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {adding ? (
+        <form onSubmit={onAdd} className="space-y-4 border-t border-base-border pt-4">
+          <SearchSelect
+            label="Bank"
+            required
+            disabled={banksLoading}
+            placeholder={banksLoading ? "Loading banks…" : "Select your bank"}
+            searchPlaceholder="Search banks…"
+            value={bankCode}
+            onChange={setBankCode}
+            options={
+              banks?.map((bank) => ({ value: bank.code, label: bank.name })) ?? []
+            }
+          />
+          <Input
+            label="Account number"
+            required
+            minLength={10}
+            maxLength={20}
+            value={accountNumber}
+            onChange={(e) => setAccountNumber(e.target.value)}
+          />
+          {verifying && (
+            <p className="text-xs text-ink-faint">Verifying account…</p>
+          )}
+          {verifiedName && !verifying && (
+            <div className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary-soft px-3.5 py-2.5 text-sm font-medium text-primary">
+              <CheckCircle2 className="h-4 w-4 shrink-0" /> {verifiedName}
+            </div>
+          )}
+          {verifyError && !verifying && (
+            <div className="flex items-center gap-2 rounded-xl border border-danger/30 bg-danger-soft px-3.5 py-2.5 text-sm font-medium text-danger">
+              <XCircle className="h-4 w-4 shrink-0" /> {verifyError}
+            </div>
+          )}
+          {error && <p className="text-sm text-danger">{error}</p>}
+          <div className="flex gap-2">
+            {accounts.length > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => setAdding(false)}
+              >
+                Cancel
+              </Button>
+            )}
+            <Button
+              type="submit"
+              className="flex-1"
+              isLoading={submitting}
+              disabled={!verifiedName || verifying}
+            >
+              Save account
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={() => setAdding(true)}
+        >
+          <Plus className="h-4 w-4" /> Add another account
+        </Button>
+      )}
     </div>
   );
 }

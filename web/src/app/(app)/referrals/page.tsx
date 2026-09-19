@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Check, Copy, Trophy, Users } from "lucide-react";
 import { useApiQuery } from "@/hooks/useApiQuery";
 import { referralsApi } from "@/lib/api/referrals";
@@ -11,14 +12,19 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { Avatar } from "@/components/ui/Avatar";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageSkeleton, Skeleton } from "@/components/ui/Skeleton";
+import { Tabs } from "@/components/ui/Tabs";
 import { formatDate, formatMoney } from "@/lib/utils";
 import { Leaderboard } from "./Leaderboard";
 
 export default function ReferralsPage() {
   const { data: info, isLoading: infoLoading } = useApiQuery(() => referralsApi.me());
   const { data: referrals, isLoading } = useApiQuery(() => referralsApi.list());
-  const { data: leaderboard, isLoading: leaderboardLoading } = useApiQuery(() =>
-    referralsApi.leaderboard(),
+  const [leaderboardPeriod, setLeaderboardPeriod] = useState<"week" | "all">(
+    "week",
+  );
+  const { data: leaderboard, isLoading: leaderboardLoading } = useApiQuery(
+    () => referralsApi.leaderboard(leaderboardPeriod),
+    [leaderboardPeriod],
   );
   const [copied, setCopied] = useState(false);
 
@@ -60,8 +66,16 @@ export default function ReferralsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Trophy className="h-4 w-4 text-primary" /> Top referrers
+            <Trophy className="h-4 w-4 text-primary" /> Top earners
           </CardTitle>
+          <Tabs
+            tabs={[
+              { key: "week", label: "This week" },
+              { key: "all", label: "All time" },
+            ]}
+            active={leaderboardPeriod}
+            onChange={(k) => setLeaderboardPeriod(k as "week" | "all")}
+          />
         </CardHeader>
         <CardBody>
           {leaderboardLoading ? (
@@ -88,7 +102,13 @@ export default function ReferralsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Your referrals</CardTitle>
+          <CardTitle>Recent activity</CardTitle>
+          <Link
+            href="/wallet?type=referral"
+            className="text-xs font-medium text-primary hover:underline"
+          >
+            View all
+          </Link>
         </CardHeader>
         <CardBody>
           {isLoading ? (
@@ -97,7 +117,7 @@ export default function ReferralsPage() {
             <EmptyState icon={Users} title="No referrals yet" description="Share your code above to start earning." />
           ) : (
             <div className="space-y-2.5">
-              {referrals.map((r) => (
+              {referrals.slice(0, 5).map((r) => (
                 <div
                   key={r.id}
                   className="flex items-center gap-3 rounded-xl border border-base-border bg-base-raised p-4"

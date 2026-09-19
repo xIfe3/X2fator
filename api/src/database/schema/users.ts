@@ -49,6 +49,10 @@ export const users = pgTable(
 
     status: userStatusEnum("status").notNull().default("pending"),
 
+    // Hashed 4-6 digit PIN required to authorize a withdrawal. Null until
+    // the user sets one from the withdrawals page.
+    withdrawalPinHash: text("withdrawal_pin_hash"),
+
     emailVerified: boolean("email_verified").notNull().default(false),
 
     phoneVerified: boolean("phone_verified").notNull().default(false),
@@ -67,6 +71,20 @@ export const users = pgTable(
     lastBonusClaimDate: timestamp("last_bonus_claim_date", {
       withTimezone: true,
       mode: "date",
+    }),
+
+    // Set once the user has either confirmed joining Telegram or
+    // explicitly dismissed the prompt without joining — the popup
+    // stops showing either way once this is set.
+    telegramPromptSeenAt: timestamp("telegram_prompt_seen_at", {
+      withTimezone: true,
+    }),
+
+    // Set only when the user checks "I've joined" — self-reported (no
+    // bot integration verifies real membership), distinct from merely
+    // dismissing the prompt.
+    telegramJoinedAt: timestamp("telegram_joined_at", {
+      withTimezone: true,
     }),
 
     createdAt: timestamp("created_at", {

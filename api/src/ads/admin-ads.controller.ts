@@ -2,15 +2,15 @@ import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
 
 import { AdsService } from './ads.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { Roles } from '../common/decorators/roles.decorator';
+import { RequirePermission } from '../common/decorators/required-permission.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
+import { PermissionsGuard } from '../common/guards/permissions.guard';
 import type { AuthenticatedUser } from '../common/types/authenticated-request';
 import type { AdType } from './dto/create-ad.dto';
 
 @Controller('admin/ads')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('admin')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequirePermission('ads.manage')
 export class AdminAdsController {
   constructor(private readonly adsService: AdsService) {}
 

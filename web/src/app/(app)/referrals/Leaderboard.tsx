@@ -3,7 +3,7 @@
 import { Crown, Medal, Trophy } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { cn } from "@/lib/utils";
+import { cn, formatMoney } from "@/lib/utils";
 import type { ReferralLeaderboardEntry } from "@/lib/types";
 
 const PODIUM_ORDER = [1, 0, 2] as const;
@@ -47,6 +47,45 @@ export function Leaderboard({
     );
   }
 
+  const podium = entries.slice(0, 3);
+  const rest = entries.slice(3, 15);
+
+  return (
+    <div className="space-y-6">
+      <Podium entries={podium} />
+      {rest.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-ink-faint">
+            The rest of the top {entries.length > 15 ? 15 : entries.length}
+          </p>
+          {rest.map((entry, index) => (
+            <div
+              key={entry.userId}
+              className="flex items-center gap-3 rounded-xl border border-base-border bg-base-raised p-3"
+            >
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-base-surface2 text-[11px] font-bold text-ink-dim">
+                {index + 4}
+              </span>
+              <Avatar
+                firstName={entry.firstName}
+                lastName={entry.lastName}
+                size="sm"
+              />
+              <p className="min-w-0 flex-1 truncate text-sm text-ink">
+                {entry.firstName} {entry.lastName}
+              </p>
+              <span className="shrink-0 text-sm font-medium text-primary">
+                {formatMoney(entry.totalEarned)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Podium({ entries }: { entries: ReferralLeaderboardEntry[] }) {
   return (
     <div className="flex items-end justify-center gap-3 sm:gap-6">
       {PODIUM_ORDER.map((rank) => {
@@ -80,9 +119,7 @@ export function Leaderboard({
             <p className="max-w-28 truncate text-center text-sm font-medium text-ink">
               {entry.firstName} {entry.lastName}
             </p>
-            <p className="text-xs text-ink-faint">
-              {entry.referralCount} referral{entry.referralCount === 1 ? "" : "s"}
-            </p>
+            <p className="text-xs text-ink-faint">{formatMoney(entry.totalEarned)}</p>
 
             <div
               className={cn(

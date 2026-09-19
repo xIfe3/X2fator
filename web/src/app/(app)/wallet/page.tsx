@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import useEmblaCarousel from "embla-carousel-react";
 import {
   ArrowDownToLine,
@@ -18,17 +19,34 @@ import { Tabs } from "@/components/ui/Tabs";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageSkeleton, Skeleton } from "@/components/ui/Skeleton";
+import { Pagination } from "@/components/ui/Pagination";
 import { formatDateTime, formatMoney } from "@/lib/utils";
 
+const VALID_TYPES = ["account", "task", "referral"] as const;
+
 export default function WalletPage() {
-  const [type, setType] = useState<"account" | "task" | "referral">("account");
+  const searchParams = useSearchParams();
+  const initialType = VALID_TYPES.includes(
+    searchParams.get("type") as (typeof VALID_TYPES)[number],
+  )
+    ? (searchParams.get("type") as "account" | "task" | "referral")
+    : "account";
+  const [type, setType] = useState<"account" | "task" | "referral">(
+    initialType,
+  );
+  const [page, setPage] = useState(1);
   const { data: wallets, isLoading: walletsLoading } = useApiQuery(() =>
     walletApi.getWallets(),
   );
   const { data: txns, isLoading: txnsLoading } = useApiQuery(
-    () => walletApi.getTransactions(type),
-    [type],
+    () => walletApi.getTransactions(type, page, 30),
+    [type, page],
   );
+
+  function onTypeChange(next: "account" | "task" | "referral") {
+    setType(next);
+    setPage(1);
+  }
   const cards = [
     {
       key: "account" as const,
@@ -219,7 +237,7 @@ export default function WalletPage() {
               { key: "referral", label: "Referrals" },
             ]}
             active={type}
-            onChange={(k) => setType(k as "account" | "task" | "referral")}
+            onChange={(k) => onTypeChange(k as "account" | "task" | "referral")}
           />
         </CardHeader>
         <CardBody>
@@ -229,7 +247,7 @@ export default function WalletPage() {
               <Skeleton className="h-16" />
               <Skeleton className="h-16" />
             </div>
-          ) : !txns || txns.length === 0 ? (
+          ) : !txns || txns.items.length === 0 ? (
             <EmptyState
               icon={ArrowUpFromLine}
               title="No transactions"
@@ -237,7 +255,7 @@ export default function WalletPage() {
             />
           ) : (
             <div className="space-y-2.5">
-              {txns.map((t) => (
+              {txns.items.map((t) => (
                 <div
                   key={t.id}
                   className="flex items-center gap-4 rounded-xl border border-base-border bg-base-raised p-4 transition-colors hover:border-base-borderStrong"
@@ -277,6 +295,11 @@ export default function WalletPage() {
                   </span>
                 </div>
               ))}
+              <Pagination
+                page={txns.page}
+                totalPages={txns.totalPages}
+                onChange={setPage}
+              />
             </div>
           )}
         </CardBody>

@@ -1,6 +1,6 @@
 import type { ApiEnvelope } from "./types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4545/api";
 
 const ACCESS_KEY = "2xf_access_token";
 const REFRESH_KEY = "2xf_refresh_token";

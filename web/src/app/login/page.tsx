@@ -53,9 +53,10 @@ export default function LoginPage() {
     try {
       const loggedInUser = await login(email, password);
       push("success", "Welcome back.");
-      router.replace(
-        loggedInUser.roles?.includes("admin") ? "/admin" : "/dashboard",
-      );
+      // Any role beyond the default "user" role is staff — keep this in
+      // sync with the isAdmin check in auth-context.tsx.
+      const isStaff = loggedInUser.roles?.some((role) => role !== "user");
+      router.replace(isStaff ? "/admin" : "/dashboard");
     } catch (err) {
       const message =
         err instanceof ApiRequestError

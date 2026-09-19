@@ -1,9 +1,18 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from 'src/common/types/authenticated-request';
-import { Roles } from '../common/decorators/roles.decorator';
-import { RolesGuard } from '../common/guards/roles.guard';
+import { RequirePermission } from '../common/decorators/required-permission.decorator';
+import { PermissionsGuard } from '../common/guards/permissions.guard';
 
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
@@ -22,8 +31,8 @@ export class TasksController {
    * Admin: list every task, active and inactive.
    */
   @Get('admin/all')
-  @UseGuards(RolesGuard)
-  @Roles('admin')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('tasks.manage')
   async getAllTasks() {
     return this.tasksService.getAllTasks();
   }
@@ -32,8 +41,8 @@ export class TasksController {
    * Admin: list task completions awaiting screenshot review.
    */
   @Get('admin/completions/pending')
-  @UseGuards(RolesGuard)
-  @Roles('admin')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('tasks.review')
   async getPendingCompletions() {
     return this.tasksService.getPendingCompletions();
   }
@@ -60,8 +69,8 @@ export class TasksController {
    * Admin: create task.
    */
   @Post()
-  @UseGuards(RolesGuard)
-  @Roles('admin')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('tasks.manage')
   async createTask(@CurrentUser() admin: AuthenticatedUser, @Body() dto: CreateTaskDto) {
     return this.tasksService.createTask(admin.id, dto);
   }
@@ -88,8 +97,8 @@ export class TasksController {
    * Admin: approve a pending task completion. Credits the reward.
    */
   @Patch('admin/completions/:id/approve')
-  @UseGuards(RolesGuard)
-  @Roles('admin')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('tasks.review')
   async approveCompletion(
     @CurrentUser() admin: AuthenticatedUser,
     @Param('id') id: string,
@@ -102,8 +111,8 @@ export class TasksController {
    * Admin: reject a pending task completion. No reward is credited.
    */
   @Patch('admin/completions/:id/reject')
-  @UseGuards(RolesGuard)
-  @Roles('admin')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('tasks.review')
   async rejectCompletion(
     @CurrentUser() admin: AuthenticatedUser,
     @Param('id') id: string,
@@ -116,13 +125,40 @@ export class TasksController {
    * Admin: update task.
    */
   @Patch(':id')
-  @UseGuards(RolesGuard)
-  @Roles('admin')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('tasks.manage')
   async updateTask(
     @CurrentUser() admin: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: UpdateTaskDto,
   ) {
     return this.tasksService.updateTask(admin.id, id, dto);
+  }
+
+  /**
+   * Admin: delete several tasks at once (only those with no completion
+   * history are removed — see TasksService.bulkDeleteTasks).
+   */
+  @Post('bulk-delete')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('tasks.manage')
+  async bulkDeleteTasks(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Body() body: { taskIds: string[] },
+  ) {
+    return this.tasksService.bulkDeleteTasks(admin.id, body.taskIds ?? []);
+  }
+
+  /**
+   * Admin: delete a task (only if it has no completion history).
+   */
+  @Delete(':id')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('tasks.manage')
+  async deleteTask(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    return this.tasksService.deleteTask(admin.id, id);
   }
 }

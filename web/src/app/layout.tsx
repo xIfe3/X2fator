@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
@@ -31,6 +31,18 @@ const mono = localFont({
   ],
   variable: "--mono-font",
 });
+
+// Without this, mobile browsers render at desktop width and then
+// auto-zoom on input focus (iOS zooms any input styled below 16px) —
+// the exact "page zooms in until you pinch it back out" symptom.
+// maximumScale/userScalable are intentionally omitted so pinch-zoom
+// for accessibility still works; this only stops the *automatic*
+// zoom-on-focus behavior by giving the browser an explicit width.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
 
 export const metadata: Metadata = {
   title: {
@@ -94,7 +106,7 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body
-        className={`${body.variable} ${display.variable} ${mono.variable} font-body bg-white dark:bg-gray-950 text-gray-900 dark:text-white antialiased`}
+        className={`${body.variable} ${display.variable} ${mono.variable} font-body antialiased`}
       >
         <ClientThemeProvider>
           <ToastProvider>

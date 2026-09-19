@@ -30,6 +30,8 @@ import { BonusesModule } from './bonuses/bonuses.module';
 import { AdsModule } from './ads/ads.module';
 import { PlansModule } from './plans/plans.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
+import { CommonModule } from './common/common.module';
 
 @Module({
   controllers: [HealthController],
@@ -51,6 +53,7 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
     }),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 20 }]),
     ScheduleModule.forRoot(),
+    CommonModule,
     AuthModule,
     WalletModule,
     DepositsModule,
@@ -71,6 +74,7 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
     AdsModule,
     PlansModule,
     SubscriptionsModule,
+    WebhooksModule,
   ],
 })
 export class AppModule {}

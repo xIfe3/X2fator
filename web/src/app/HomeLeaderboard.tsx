@@ -15,7 +15,7 @@ export function HomeLeaderboard() {
     <section className="border-b border-base-border bg-base-raised">
       <div className="mx-auto max-w-6xl px-5 py-16 sm:px-8">
         <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">
-          Top referrers
+          Top earners
         </p>
         <h2 className="mt-3 flex items-center gap-2 font-display text-3xl text-ink">
           <Trophy className="h-7 w-7 text-primary" /> Leaderboard

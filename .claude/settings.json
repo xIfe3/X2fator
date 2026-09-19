@@ -3,7 +3,27 @@
     "allow": [
       "Bash(PGPASSWORD=postgres psql -h localhost -p 5444 -U postgres -d xfactor -c \"\\\\d users\")",
       "Bash(docker start *)",
-      "Bash(rm -rf /c/deploy-x2factor)"
+      "Bash(rm -rf /c/deploy-x2factor)",
+      "Bash(grep -v '^$')",
+      "Bash(python3 -c ' *)",
+      "Bash(node -e ' *)",
+      "Bash(chmod +x scripts/build-cpanel.sh)",
+      "Bash(./scripts/build-cpanel.sh)",
+      "Read(//c/deploy-x2factor/api//**)",
+      "Read(//c/deploy-x2factor/api/drizzle//**)",
+      "Read(//c/deploy-x2factor/web//**)",
+      "Bash(curl -s -i -X POST https://api.x2factor.com/api/auth/login -H 'Origin: https://x2factor.com' -H 'Content-Type: application/json' -d '{\"email\":\"nonexistent@example.com\",\"password\":\"wrongpassword\"}')",
+      "Bash(PROD_API_URL=https://api.x2factor.com/api ./scripts/build-cpanel.sh)",
+      "Bash(npx drizzle-kit *)",
+      "Bash(taskkill //PID 27580 //F)",
+      "Bash(taskkill //PID 27744 //F)",
+      "Bash(taskkill //PID 12604 //F)",
+      "Bash(taskkill //PID 28460 //F)",
+      "Bash(taskkill //PID 30772 //F)",
+      "Bash(tasklist //FI \"WINDOWTITLE eq node*\")",
+      "Bash(taskkill //PID 32372 //F)",
+      "Bash(taskkill //PID 26456 //F)",
+      "Bash(taskkill //PID 17616 //F)"
     ],
     "additionalDirectories": [
       "C:\\deploy-x2factor"

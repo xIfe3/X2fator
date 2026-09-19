@@ -32,6 +32,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatDateTime, formatMoney } from "@/lib/utils";
 import { bonusesApi } from "@/lib/api/bonuses";
+import { Leaderboard } from "../referrals/Leaderboard";
 
 const quickActions = [
   { href: "/tasks", label: "Tasks", icon: ListChecks },
@@ -53,7 +54,9 @@ export default function DashboardPage() {
   );
   const { data: summary } = useApiQuery(() => earningsApi.summary());
   const { data: referral } = useApiQuery(() => referralsApi.me());
-  const { data: leaderboard } = useApiQuery(() => referralsApi.leaderboard());
+  const { data: leaderboard } = useApiQuery(() =>
+    referralsApi.leaderboard("week"),
+  );
   const { data: dailyBonus } = useApiQuery(() => bonusesApi.daily());
   const { data: completions } = useApiQuery(() => tasksApi.myCompletions());
 
@@ -248,7 +251,7 @@ export default function DashboardPage() {
                 <Skeleton className="h-14" />
                 <Skeleton className="h-14" />
               </div>
-            ) : !txns || txns.length === 0 ? (
+            ) : !txns || txns.items.length === 0 ? (
               <EmptyState
                 icon={Wallet}
                 title="No transactions yet"
@@ -256,7 +259,7 @@ export default function DashboardPage() {
               />
             ) : (
               <div className="space-y-1">
-                {txns.slice(0, 6).map((t) => (
+                {txns.items.slice(0, 6).map((t) => (
                   <div
                     key={t.id}
                     className="flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-base-surface2"
@@ -324,41 +327,27 @@ export default function DashboardPage() {
             </CardBody>
           </Card>
 
-          {leaderboard && leaderboard.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Top referrers</CardTitle>
-                <Trophy className="h-4 w-4 text-primary" />
-              </CardHeader>
-              <CardBody className="space-y-1">
-                {leaderboard.slice(0, 3).map((entry, index) => (
-                  <div
-                    key={entry.userId}
-                    className="flex items-center gap-3 rounded-lg px-1 py-1.5"
-                  >
-                    <span
-                      className={
-                        "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold " +
-                        (index === 0
-                          ? "bg-secondary text-base"
-                          : "bg-base-surface2 text-ink-dim")
-                      }
-                    >
-                      {index + 1}
-                    </span>
-                    <p className="min-w-0 flex-1 truncate text-sm text-ink">
-                      {entry.firstName} {entry.lastName}
-                    </p>
-                    <span className="shrink-0 text-xs font-medium text-ink-dim">
-                      {entry.referralCount} refs
-                    </span>
-                  </div>
-                ))}
-              </CardBody>
-            </Card>
-          )}
         </div>
       </div>
+
+      {leaderboard && leaderboard.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Trophy className="h-4 w-4 text-primary" /> Top earners this week
+            </CardTitle>
+            <Link
+              href="/referrals"
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              View leaderboard
+            </Link>
+          </CardHeader>
+          <CardBody>
+            <Leaderboard entries={leaderboard.slice(0, 3)} />
+          </CardBody>
+        </Card>
+      )}
     </div>
   );
 }

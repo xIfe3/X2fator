@@ -32,6 +32,8 @@ import { PasswordService } from './password.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { PaymentsService } from '../payments/payments.service';
+import { SiteContentService } from '../site-content/site-content.service';
+import { UserPermissionsService } from '../common/services/user-permissions.service';
 
 @Injectable()
 export class AuthService {
@@ -42,8 +44,25 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly paymentsService: PaymentsService,
+    private readonly siteContentService: SiteContentService,
+    private readonly userPermissionsService: UserPermissionsService,
     @Inject(MAILER) private readonly mailer: Mailer,
   ) {}
+
+  /**
+   * Removes a `pending` user (and its pending signup payment, and any
+   * referral row recording who invited them) that never completed
+   * payment, so the email/phone can be reused by a fresh registration.
+   * `payments.userId` and `referrals.referredUserId` are both
+   * `onDelete: restrict`, so those rows must go before the user row.
+   */
+  private async discardAbandonedPendingUser(userId: string): Promise<void> {
+    await db.transaction(async (tx) => {
+      await tx.delete(payments).where(eq(payments.userId, userId));
+      await tx.delete(referrals).where(eq(referrals.referredUserId, userId));
+      await tx.delete(users).where(eq(users.id, userId));
+    });
+  }
 
   private async getUserRoles(userId: string): Promise<string[]> {
     const results = await db
@@ -63,9 +82,13 @@ export class AuthService {
    * Flutterwave payment for the chosen plan, and returns a checkout URL.
    * The account only becomes active — and the plan subscription only
    * gets created — once `confirmRegistrationPayment` sees the payment
-   * succeed. This avoids ever activating a login for someone who never
-   * pays, while still keeping the email/referral code reserved so a
-   * duplicate signup attempt is rejected rather than silently allowed.
+   * succeed.
+   *
+   * A `pending` user who never completes payment must not permanently
+   * squat the email: if the existing row for this email is still
+   * `pending`, it (and its pending registration payment) is discarded and
+   * registration proceeds fresh. Only a real (`active`/other non-pending)
+   * account blocks a duplicate signup.
    */
   async register(dto: RegisterDto) {
     const email = dto.email.trim().toLowerCase();
@@ -74,21 +97,57 @@ export class AuthService {
       where: eq(users.email, email),
     });
 
-    if (existingUser) {
+    if (existingUser && existingUser.status !== 'pending') {
       throw new ConflictException('An account with this email already exists');
     }
 
-    const plan = await db.query.plans.findFirst({
-      where: and(eq(plans.id, dto.planId), eq(plans.status, 'active')),
-    });
+    if (existingUser && existingUser.status === 'pending') {
+      await this.discardAbandonedPendingUser(existingUser.id);
+    }
 
-    if (!plan) {
-      throw new NotFoundException('Selected plan is not available');
+    if (dto.phone) {
+      const existingPhoneUser = await db.query.users.findFirst({
+        where: eq(users.phone, dto.phone),
+      });
+
+      if (existingPhoneUser) {
+        if (existingPhoneUser.status !== 'pending') {
+          throw new ConflictException(
+            'An account with this phone number already exists',
+          );
+        }
+
+        await this.discardAbandonedPendingUser(existingPhoneUser.id);
+      }
+    }
+
+    const sections = await this.siteContentService.getAll();
+    const flags = (sections.feature_flags ?? {}) as Record<string, unknown>;
+    const requirePlanPurchase = flags.requirePlanPurchase !== false;
+
+    let plan: typeof plans.$inferSelect | undefined;
+
+    if (requirePlanPurchase) {
+      if (!dto.planId) {
+        throw new BadRequestException('A plan is required to register');
+      }
+
+      plan = await db.query.plans.findFirst({
+        where: and(eq(plans.id, dto.planId), eq(plans.status, 'active')),
+      });
+
+      if (!plan) {
+        throw new NotFoundException('Selected plan is not available');
+      }
     }
 
     const passwordHash = await this.passwordService.hash(dto.password);
 
     const referralCode = await this.generateReferralCode(email);
+
+    // When no plan purchase is required, the account activates
+    // immediately — no pending payment, no Flutterwave checkout.
+    const initialStatus = requirePlanPurchase ? 'pending' : 'active';
 
     const { user, payment } = await db.transaction(async (tx) => {
       let referredById: string | undefined;
@@ -115,7 +174,7 @@ export class AuthService {
           phone: dto.phone,
           referralCode,
           referredById,
-          status: 'pending',
+          status: initialStatus,
         })
         .returning();
 
@@ -157,6 +216,10 @@ export class AuthService {
         });
       }
 
+      if (!requirePlanPurchase) {
+        return { user: newUser, payment: undefined };
+      }
+
       const paymentReference = this.generateReference('REG');
 
       const [newPayment] = await tx
@@ -165,25 +228,100 @@ export class AuthService {
           userId: newUser.id,
           provider: 'flutterwave',
           reference: paymentReference,
-          amount: plan.price,
+          amount: plan!.price,
           status: 'pending',
-          metadata: { purpose: 'plan_purchase', planId: plan.id },
+          metadata: { purpose: 'plan_purchase', planId: plan!.id },
         })
         .returning();
 
       return { user: newUser, payment: newPayment };
     });
 
+    if (!requirePlanPurchase) {
+      const userRolesList = await this.getUserRoles(user.id);
+      const permissions = await this.userPermissionsService.getPermissionNames(
+        user.id,
+      );
+      const tokens = await this.generateTokens(
+        user.id,
+        user.email,
+        userRolesList,
+      );
+
+      this.mailer
+        .sendWelcome(user.email, user.firstName)
+        .catch((err) =>
+          this.logger.error(
+            `Failed to send welcome email to ${user.email}`,
+            err instanceof Error ? err.stack : err,
+          ),
+        );
+
+      return {
+        user: {
+          ...this.sanitizeUser(user),
+          roles: userRolesList,
+          permissions,
+        },
+        ...tokens,
+      };
+    }
+
     const checkout = await this.paymentsService.initializeRawPayment(
       user.id,
-      payment.reference,
+      payment!.reference,
     );
 
     return {
       userId: user.id,
-      paymentReference: payment.reference,
+      paymentReference: payment!.reference,
       authorizationUrl: checkout.authorizationUrl,
     };
+  }
+
+  /**
+   * Called when the user cancels the Flutterwave checkout for a signup
+   * plan purchase (Flutterwave's redirect carries `status=cancelled`).
+   * Immediately discards the still-`pending` user and payment so the
+   * email/phone is free to register again right away, instead of leaving
+   * it to be cleaned up lazily on the next registration attempt.
+   *
+   * No-ops (rather than erroring) if the account already activated in
+   * the meantime — e.g. the webhook raced ahead and confirmed payment
+   * before this cancel request arrived.
+   */
+  async cancelRegistrationPayment(
+    paymentReference: string,
+  ): Promise<{ message: string }> {
+    const payment = await db.query.payments.findFirst({
+      where: eq(payments.reference, paymentReference),
+    });
+
+    if (!payment) {
+      throw new NotFoundException('Payment not found');
+    }
+
+    const metadata = payment.metadata as
+      | { purpose?: string; planId?: string }
+      | null;
+
+    if (metadata?.purpose !== 'plan_purchase' || !metadata.planId) {
+      throw new BadRequestException('Not a registration payment');
+    }
+
+    if (payment.status === 'successful') {
+      return { message: 'Registration already completed.' };
+    }
+
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, payment.userId),
+    });
+
+    if (user && user.status === 'pending') {
+      await this.discardAbandonedPendingUser(user.id);
+    }
+
+    return { message: 'Registration cancelled.' };
   }
 
   /**
@@ -234,6 +372,9 @@ export class AuthService {
     }
 
     const userRolesList = await this.getUserRoles(activatedUser.id);
+    const permissions = await this.userPermissionsService.getPermissionNames(
+      activatedUser.id,
+    );
 
     const tokens = await this.generateTokens(
       activatedUser.id,
@@ -254,6 +395,7 @@ export class AuthService {
       user: {
         ...this.sanitizeUser(activatedUser),
         roles: userRolesList,
+        permissions,
       },
       ...tokens,
     };
@@ -293,6 +435,9 @@ export class AuthService {
       .where(eq(users.id, user.id));
 
     const userRolesList = await this.getUserRoles(user.id);
+    const permissions = await this.userPermissionsService.getPermissionNames(
+      user.id,
+    );
 
     const tokens = await this.generateTokens(
       user.id,
@@ -304,6 +449,7 @@ export class AuthService {
       user: {
         ...this.sanitizeUser(user),
         roles: userRolesList,
+        permissions,
       },
       ...tokens,
     };
@@ -519,6 +665,68 @@ export class AuthService {
       .where(eq(users.id, userId));
 
     return { message: 'Password updated successfully.' };
+  }
+
+  /**
+   * Whether the current user still needs to see the "join our Telegram"
+   * popup — false once they've either joined or dismissed it, or once
+   * the feature is turned off platform-wide.
+   */
+  async getTelegramPromptStatus(userId: string) {
+    const sections = await this.siteContentService.getAll();
+    const telegram = (sections.telegram ?? {}) as {
+      enabled?: boolean;
+      channelUrl?: string;
+      groupUrl?: string;
+    };
+
+    if (telegram.enabled === false || !telegram.channelUrl) {
+      return {
+        shouldShow: false,
+        channelUrl: telegram.channelUrl ?? '',
+        groupUrl: telegram.groupUrl ?? '',
+      };
+    }
+
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, userId),
+      columns: { telegramPromptSeenAt: true },
+    });
+
+    return {
+      shouldShow: !user?.telegramPromptSeenAt,
+      channelUrl: telegram.channelUrl,
+      groupUrl: telegram.groupUrl ?? '',
+    };
+  }
+
+  /**
+   * Records that the user says they've joined both the Telegram
+   * channel and group — self-reported (there's no bot integration to
+   * verify actual membership), same trust level as a plain dismiss,
+   * just recorded distinctly so "joined" and "dismissed without
+   * joining" aren't conflated if that distinction is ever needed.
+   */
+  async markTelegramJoined(userId: string): Promise<{ message: string }> {
+    await db
+      .update(users)
+      .set({
+        telegramPromptSeenAt: new Date(),
+        telegramJoinedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+
+    return { message: 'Thanks for joining!' };
+  }
+
+  async markTelegramPromptSeen(userId: string): Promise<{ message: string }> {
+    await db
+      .update(users)
+      .set({ telegramPromptSeenAt: new Date(), updatedAt: new Date() })
+      .where(eq(users.id, userId));
+
+    return { message: 'Preference saved.' };
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto) {

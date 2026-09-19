@@ -1,24 +1,28 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
+  Logger,
   NotFoundException,
   Optional,
 } from '@nestjs/common';
 import { desc, eq, sql } from 'drizzle-orm';
 
 import { db } from '../database';
-import { deposits, payments } from '../database';
+import { deposits, payments, users } from '../database';
 import { WalletService } from '../wallet/wallet.service';
+import { MAILER, type Mailer } from '../mail/mailer.service';
 
 @Injectable()
 export class DepositsService {
-  constructor(@Optional() private readonly walletService?: WalletService) {}
+  private readonly logger = new Logger(DepositsService.name);
 
-  async createDeposit(
-    userId: string,
-    amount: string,
-    provider: 'flutterwave' | 'manual' | 'mock',
-  ) {
+  constructor(
+    @Optional() private readonly walletService?: WalletService,
+    @Optional() @Inject(MAILER) private readonly mailer?: Mailer,
+  ) {}
+
+  async createDeposit(userId: string, amount: string, provider: 'flutterwave') {
     if (Number(amount) <= 0) {
       throw new BadRequestException('Deposit amount must be greater than zero');
     }
@@ -47,13 +51,6 @@ export class DepositsService {
       amount,
       status: 'pending',
     });
-
-    if (provider === 'mock') {
-      // Sandbox provider — there's no real payment to wait on, so
-      // complete it immediately and credit the wallet right away.
-      const completedDeposit = await this.completeDeposit(deposit.id, 'MOCK');
-      return { deposit: completedDeposit, paymentReference };
-    }
 
     return {
       deposit,
@@ -138,14 +135,46 @@ export class DepositsService {
         tx,
       );
 
+      const depositUser = await tx.query.users.findFirst({
+        where: eq(users.id, deposit.userId),
+      });
+      if (depositUser) {
+        this.mailer
+          ?.sendDepositSuccessful(
+            depositUser.email,
+            depositUser.firstName,
+            deposit.amount.toFixed(2),
+          )
+          .catch((err) =>
+            this.logger.error(
+              `Failed to send deposit-successful email to ${depositUser.email}`,
+              err instanceof Error ? err.stack : err,
+            ),
+          );
+      }
+
       return updatedDeposit;
     });
   }
 
   async getAllDeposits() {
-    return db.query.deposits.findMany({
-      orderBy: [desc(deposits.createdAt)],
-    });
+    const rows = await db
+      .select({
+        deposit: deposits,
+        userFirstName: users.firstName,
+        userLastName: users.lastName,
+        userEmail: users.email,
+      })
+      .from(deposits)
+      .innerJoin(users, eq(deposits.userId, users.id))
+      .orderBy(desc(deposits.createdAt));
+
+    return rows.map((r) => ({
+      ...r.deposit,
+      userFirstName: r.userFirstName,
+      userLastName: r.userLastName,
+      userEmail: r.userEmail,
+    }));
   }
 
   async getAdminStats() {
@@ -178,7 +207,11 @@ export class DepositsService {
     return this.failDeposit(depositId, reason);
   }
 
-  async failDeposit(depositId: string, reason?: string) {
+  async failDeposit(
+    depositId: string,
+    reason?: string,
+    options?: { skipEmail?: boolean },
+  ) {
     const deposit = await db.query.deposits.findFirst({
       where: eq(deposits.id, depositId),
     });
@@ -200,6 +233,27 @@ export class DepositsService {
       })
       .where(eq(deposits.id, depositId))
       .returning();
+
+    if (!options?.skipEmail) {
+      const depositUser = await db.query.users.findFirst({
+        where: eq(users.id, deposit.userId),
+      });
+      if (depositUser) {
+        this.mailer
+          ?.sendDepositFailed(
+            depositUser.email,
+            depositUser.firstName,
+            deposit.amount.toFixed(2),
+            reason,
+          )
+          .catch((err) =>
+            this.logger.error(
+              `Failed to send deposit-failed email to ${depositUser.email}`,
+              err instanceof Error ? err.stack : err,
+            ),
+          );
+      }
+    }
 
     return updated;
   }

@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "telegram_joined_at" timestamp with time zone;

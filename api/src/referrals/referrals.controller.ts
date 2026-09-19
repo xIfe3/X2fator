@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 
 import { ReferralsService } from './referrals.service';
 
@@ -27,7 +27,9 @@ export class ReferralsController {
 
   @Public()
   @Get('leaderboard')
-  async getLeaderboard() {
-    return this.referralsService.getLeaderboard();
+  async getLeaderboard(@Query('period') period?: 'week' | 'all') {
+    return this.referralsService.getLeaderboard(
+      period === 'week' ? 'week' : 'all',
+    );
   }
 }

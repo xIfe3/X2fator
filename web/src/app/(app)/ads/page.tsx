@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Megaphone } from "lucide-react";
+import { Lock, Megaphone } from "lucide-react";
 import { adsApi } from "@/lib/api/ads";
+import { siteContentApi } from "@/lib/api/site-content";
 import { useApiQuery } from "@/hooks/useApiQuery";
 import type { AdType } from "@/lib/types";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -10,6 +11,7 @@ import { Button } from "@/components/ui/Button";
 import { Input, Select, Textarea } from "@/components/ui/Input";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { Money } from "@/components/ui/Money";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { useToast } from "@/components/ui/Toast";
 import { ApiRequestError } from "@/lib/api-client";
 import { formatMoney, formatDate } from "@/lib/utils";
@@ -25,6 +27,8 @@ const AD_TYPE_LABELS: Record<AdType, string> = {
 export default function AdsPage() {
   const { data: ads, refetch } = useApiQuery(() => adsApi.mine());
   const { data: pricing } = useApiQuery(() => adsApi.pricing());
+  const { data: siteContent } = useApiQuery(() => siteContentApi.get());
+  const adsEnabled = siteContent?.feature_flags?.adsEnabled !== false;
   const { push } = useToast();
   const [form, setForm] = useState({
     adType: "likes" as AdType,
@@ -81,6 +85,15 @@ export default function AdsPage() {
             <Megaphone className="h-4 w-4 text-primary" /> New campaign
           </CardTitle>
         </CardHeader>
+        {!adsEnabled ? (
+          <CardBody>
+            <EmptyState
+              icon={Lock}
+              title="Promote is currently unavailable"
+              description="Ad campaigns are temporarily disabled by the platform. Check back later."
+            />
+          </CardBody>
+        ) : (
         <CardBody className="grid gap-4 sm:grid-cols-2">
           <Select
             label="Campaign type"
@@ -137,6 +150,7 @@ export default function AdsPage() {
             </Button>
           </div>
         </CardBody>
+        )}
       </Card>
       <Card>
         <CardHeader>

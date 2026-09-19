@@ -31,6 +31,7 @@ export class WithdrawalSettingsService {
   async update(params: {
     referralMinimumWithdrawal?: string;
     taskWithdrawalDay?: number;
+    autoPayoutEnabled?: boolean;
   }) {
     await this.get();
 
@@ -65,6 +66,9 @@ export class WithdrawalSettingsService {
         }),
         ...(params.taskWithdrawalDay !== undefined && {
           taskWithdrawalDay: params.taskWithdrawalDay,
+        }),
+        ...(params.autoPayoutEnabled !== undefined && {
+          autoPayoutEnabled: params.autoPayoutEnabled,
         }),
         updatedAt: new Date(),
       })

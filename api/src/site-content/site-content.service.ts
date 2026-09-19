@@ -132,6 +132,19 @@ const DEFAULT_SECTIONS: Record<string, Record<string, unknown>> = {
     comments: '20.00',
     likes: '10.00',
   },
+  feature_flags: {
+    // When false, registration activates the account immediately —
+    // skipping the plan-purchase/Flutterwave payment step entirely.
+    requirePlanPurchase: true,
+    // When false, the ads/"promote" feature is fully locked — creation
+    // is rejected server-side (not just hidden in the UI).
+    adsEnabled: true,
+  },
+  telegram: {
+    enabled: true,
+    channelUrl: '',
+    groupUrl: '',
+  },
 };
 
 @Injectable()

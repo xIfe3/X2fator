@@ -43,6 +43,41 @@
       "when": 1789528053792,
       "tag": "0005_ancient_colossus",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789585960255,
+      "tag": "0006_bright_surge",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789624240652,
+      "tag": "0007_legal_star_brand",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789626368680,
+      "tag": "0008_glossy_cobalt_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1789718288728,
+      "tag": "0009_fair_diamondback",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1789825263975,
+      "tag": "0010_organic_the_twelve",
+      "breakpoints": true
     }
   ]
 }

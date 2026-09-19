@@ -66,6 +66,13 @@ export const withdrawals = pgTable(
 
     status: withdrawalStatusEnum("status").notNull().default("pending"),
 
+    // Flutterwave's transfer id for this payout, and the id of the
+    // most-recently-processed webhook event (idempotency guard against
+    // Flutterwave's at-least-once delivery).
+    providerTransferId: varchar("provider_transfer_id", { length: 100 }),
+
+    providerEventId: varchar("provider_event_id", { length: 100 }),
+
     rejectionReason: text("rejection_reason"),
 
     adminNote: text("admin_note"),

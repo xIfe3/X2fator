@@ -34,7 +34,14 @@ export class WalletController {
     @CurrentUser() user: AuthenticatedUser,
     @Query('type')
     type: 'account' | 'task' | 'referral' = 'account',
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
   ) {
-    return this.walletService.getTransactions(user.id, type);
+    return this.walletService.getTransactions(
+      user.id,
+      type,
+      page ? Number(page) : undefined,
+      pageSize ? Number(pageSize) : undefined,
+    );
   }
 }

@@ -5,9 +5,10 @@ import { AdsService } from './ads.service';
 import { WalletModule } from '../wallet/wallet.module';
 import { SiteContentModule } from '../site-content/site-content.module';
 import { AuditModule } from '../audit/audit.module';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
-  imports: [WalletModule, SiteContentModule, AuditModule],
+  imports: [WalletModule, SiteContentModule, AuditModule, MailModule],
   controllers: [AdsController, AdminAdsController],
   providers: [AdsService],
 })

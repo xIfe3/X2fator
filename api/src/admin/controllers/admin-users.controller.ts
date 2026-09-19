@@ -1,22 +1,20 @@
-import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 
 import { AdminUsersService } from '../services/admin-users.service';
 import { UpdateUserDto } from '../dto/update-user.dto';
 import { ResetUserPasswordDto } from '../dto/reset-user-password.dto';
+import { CreateAdminDto } from '../dto/create-admin.dto';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
 import { RequirePermission } from '../../common/decorators/required-permission.decorator';
 
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 
 import type { AuthenticatedUser } from '../../common/types/authenticated-request';
 
 @Controller('admin/users')
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-@Roles('admin')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class AdminUsersController {
   constructor(private readonly adminUsersService: AdminUsersService) {}
 
@@ -24,6 +22,15 @@ export class AdminUsersController {
   @RequirePermission('users.read')
   async getUsers() {
     return this.adminUsersService.getUsers();
+  }
+
+  @Post('admins')
+  @RequirePermission('users.create_admin')
+  async createAdmin(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Body() dto: CreateAdminDto,
+  ) {
+    return this.adminUsersService.createAdmin(admin.id, dto);
   }
 
   @Get(':id')

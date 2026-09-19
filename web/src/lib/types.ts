@@ -31,6 +31,7 @@ export interface User {
   lastLoginAt?: string | null;
   createdAt?: string;
   roles?: string[];
+  permissions?: string[];
 }
 
 export interface AuthTokens {
@@ -42,14 +43,20 @@ export interface AuthResponse extends AuthTokens {
   user: User;
 }
 
-// Returned by POST /auth/register — the account is created as
-// status='pending' and needs the linked Flutterwave payment (for the
-// chosen plan) to succeed before login tokens are ever issued.
+// Returned by POST /auth/register when a plan purchase is required —
+// the account is created as status='pending' and needs the linked
+// Flutterwave payment to succeed before login tokens are ever issued.
 export interface RegisterInitResponse {
   userId: string;
   paymentReference: string;
   authorizationUrl: string;
 }
+
+// Returned by POST /auth/register instead, when the platform's
+// requirePlanPurchase feature flag is off — the account activates
+// immediately and login tokens are issued right away, same shape as a
+// normal login response.
+export type RegisterResponse = RegisterInitResponse | AuthResponse;
 
 // GET /auth/me only echoes the JWT payload (CurrentUser decorator), not
 // the full user record — id/email/roles only. Don't rely on it for
@@ -59,6 +66,7 @@ export interface AuthMeResponse {
   id: string;
   email: string;
   roles: string[];
+  permissions: string[];
 }
 
 // ---- Wallet ----
@@ -132,6 +140,13 @@ export interface WalletTransaction {
   description?: string;
   createdAt: string;
 }
+export interface PaginatedTransactions {
+  items: WalletTransaction[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
 export interface DailyBonusStatus {
   enabled: boolean;
   claimed: boolean;
@@ -144,11 +159,34 @@ export interface DailyBonusStatus {
   nextClaimAt: string | null;
 }
 
+export interface AdminBonusSettings {
+  enabled: boolean;
+  amount: string;
+  milestoneAmount: string;
+}
+
+export interface AdminBonusStats {
+  claimedToday: number;
+  totalPaid: string;
+  topStreaks: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    currentStreak: number;
+    longestStreak: number;
+    lastBonusClaimDate: string | null;
+  }[];
+}
+
 // ---- Deposits / Payments ----
 export type DepositProvider = "flutterwave" | "manual" | "mock";
 export interface AdminDeposit {
   id: string;
   userId: string;
+  userFirstName: string;
+  userLastName: string;
+  userEmail: string;
   amount: number;
   currency: string;
   provider: DepositProvider;
@@ -175,6 +213,7 @@ export interface Deposit {
   provider: DepositProvider;
   status: "pending" | "processing" | "successful" | "failed" | "rejected";
   reference?: string;
+  failureReason?: string | null;
   createdAt: string;
 }
 
@@ -199,6 +238,7 @@ export interface WithdrawalSettings {
   id: number;
   referralMinimumWithdrawal: string;
   taskWithdrawalDay: number;
+  autoPayoutEnabled: boolean;
   updatedAt: string;
 }
 export interface WithdrawalStats {
@@ -298,7 +338,7 @@ export interface ReferralLeaderboardEntry {
   userId: string;
   firstName: string;
   lastName: string;
-  referralCount: number;
+  totalEarned: string;
 }
 export interface Referral {
   id: string;
@@ -324,10 +364,18 @@ export interface Notification {
 export interface SupportTicket {
   id: string;
   userId: string;
+  assignedTo?: string | null;
   subject: string;
-  status: "open" | "pending" | "closed";
-  priority?: "low" | "medium" | "high" | "urgent";
+  status: "open" | "in_progress" | "resolved" | "closed";
+  priority: "low" | "medium" | "high" | "urgent";
   createdAt: string;
+  updatedAt?: string;
+  resolvedAt?: string | null;
+}
+export interface AdminSupportTicket extends SupportTicket {
+  requesterFirstName: string;
+  requesterLastName: string;
+  requesterEmail: string;
 }
 export interface SupportMessage {
   id: string;
@@ -337,17 +385,57 @@ export interface SupportMessage {
   isFromSupport?: boolean;
   createdAt: string;
 }
+export interface AdminSupportTicketDetail extends SupportTicket {
+  requester: { id: string; name: string; email: string } | null;
+  messages: SupportMessage[];
+}
+
+// ---- Roles & staff ----
+export interface Permission {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
+export interface RoleWithPermissions {
+  id: string;
+  name: string;
+  description: string | null;
+  isSystemRole: boolean;
+  permissions: string[];
+  staffCount: number;
+}
+
+export interface StaffMember {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  status: string;
+  roles: { id: string; name: string }[];
+}
 
 // ---- Utilities ----
 export interface UtilityPurchase {
   id: string;
   userId: string;
-  type?: string;
-  provider?: string;
+  type?: "airtime" | "data";
+  provider?: "mtn" | "airtel" | "glo" | "9mobile";
+  phoneNumber?: string;
   amount: string;
   reference: string;
-  status: string;
+  status: "pending" | "processing" | "successful" | "failed" | "reversed";
+  responseMessage?: string | null;
   createdAt: string;
+}
+
+export interface DataBundle {
+  biller_code: string;
+  item_code: string;
+  name: string;
+  biller_name: string;
+  amount: number | null;
+  is_airtime: boolean;
 }
 
 // ---- Admin ----
@@ -406,4 +494,6 @@ export interface SiteContentSections {
   faq?: { items: { question: string; answer: string }[] };
   daily_bonus: { enabled: boolean; amount: string };
   welcome_bonus: { enabled: boolean; amount: string };
+  feature_flags?: { requirePlanPurchase: boolean; adsEnabled: boolean };
+  telegram?: { enabled: boolean; channelUrl: string; groupUrl?: string };
 }

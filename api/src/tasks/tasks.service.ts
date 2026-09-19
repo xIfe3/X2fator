@@ -1,22 +1,29 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
+  Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { and, desc, eq, gte } from 'drizzle-orm';
 
-import { ads, db, tasks, taskCompletions } from '../database';
+import { ads, db, tasks, taskCompletions, users } from '../database';
 
 import { WalletService } from '../wallet/wallet.service';
 import { AuditService } from '../audit/audit.service';
+import { MAILER, type Mailer } from '../mail/mailer.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 
 @Injectable()
 export class TasksService {
+  private readonly logger = new Logger(TasksService.name);
+
   constructor(
     private readonly walletService: WalletService,
     private readonly auditService: AuditService,
+    @Optional() @Inject(MAILER) private readonly mailer?: Mailer,
   ) {}
 
   /**
@@ -133,6 +140,77 @@ export class TasksService {
     });
 
     return updated;
+  }
+
+  /**
+   * Admin: permanently delete a task. Refuses if any completions exist
+   * for it (approved, rejected, or pending) — `task_completions.task_id`
+   * is `onDelete: restrict`, and those rows are reward/audit history
+   * that must never be silently destroyed. Deactivate the task instead
+   * (`updateTask` with `status: 'inactive'`) if it has history.
+   */
+  async deleteTask(adminId: string, taskId: string) {
+    const existing = await db.query.tasks.findFirst({
+      where: eq(tasks.id, taskId),
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Task not found');
+    }
+
+    const hasCompletions = await db.query.taskCompletions.findFirst({
+      where: eq(taskCompletions.taskId, taskId),
+    });
+
+    if (hasCompletions) {
+      throw new BadRequestException(
+        'This task has completion history and cannot be deleted — set it to inactive instead',
+      );
+    }
+
+    await db.delete(tasks).where(eq(tasks.id, taskId));
+
+    await this.auditService.log({
+      actorId: adminId,
+      action: 'delete',
+      entityType: 'task',
+      entityId: taskId,
+      description: `Deleted task "${existing.title}"`,
+      oldValues: { ...existing },
+    });
+
+    return { message: 'Task deleted.' };
+  }
+
+  /**
+   * Admin: delete several tasks at once. Best-effort, not all-or-
+   * nothing — each id is attempted independently through the same
+   * completion-history guard as a single delete, so one task with
+   * history doesn't block the rest of the selection from being
+   * removed. Returns which ids succeeded and which were skipped (with
+   * why), so the admin UI can report a clear outcome for a mixed
+   * selection.
+   */
+  async bulkDeleteTasks(adminId: string, taskIds: string[]) {
+    const deleted: string[] = [];
+    const skipped: { id: string; reason: string }[] = [];
+
+    for (const taskId of taskIds) {
+      try {
+        await this.deleteTask(adminId, taskId);
+        deleted.push(taskId);
+      } catch (err) {
+        skipped.push({
+          id: taskId,
+          reason:
+            err instanceof BadRequestException || err instanceof NotFoundException
+              ? err.message
+              : 'Could not delete this task',
+        });
+      }
+    }
+
+    return { deleted, skipped };
   }
 
   /**
@@ -372,6 +450,25 @@ export class TasksService {
         tx,
       });
 
+      const completionUser = await tx.query.users.findFirst({
+        where: eq(users.id, completion.userId),
+      });
+      if (completionUser) {
+        this.mailer
+          ?.sendTaskApproved(
+            completionUser.email,
+            completionUser.firstName,
+            completion.task?.title ?? 'Task',
+            completion.reward,
+          )
+          .catch((err) =>
+            this.logger.error(
+              `Failed to send task-approved email to ${completionUser.email}`,
+              err instanceof Error ? err.stack : err,
+            ),
+          );
+      }
+
       return updated;
     });
   }
@@ -380,13 +477,18 @@ export class TasksService {
    * Admin: reject a task completion. No reward is credited.
    */
   async rejectCompletion(adminId: string, completionId: string, note?: string) {
-    const completion = await db.query.taskCompletions.findFirst({
-      where: eq(taskCompletions.id, completionId),
-    });
+    const [row] = await db
+      .select({ completion: taskCompletions, task: tasks })
+      .from(taskCompletions)
+      .leftJoin(tasks, eq(taskCompletions.taskId, tasks.id))
+      .where(eq(taskCompletions.id, completionId))
+      .limit(1);
 
-    if (!completion) {
+    if (!row) {
       throw new NotFoundException('Task completion not found');
     }
+
+    const completion = { ...row.completion, task: row.task ?? undefined };
 
     if (completion.status !== 'pending') {
       throw new BadRequestException('Only pending completions can be rejected');
@@ -412,6 +514,25 @@ export class TasksService {
       oldValues: { status: completion.status },
       newValues: { status: 'rejected', rejectionReason: note },
     });
+
+    const completionUser = await db.query.users.findFirst({
+      where: eq(users.id, completion.userId),
+    });
+    if (completionUser) {
+      this.mailer
+        ?.sendTaskRejected(
+          completionUser.email,
+          completionUser.firstName,
+          completion.task?.title ?? 'Task',
+          note,
+        )
+        .catch((err) =>
+          this.logger.error(
+            `Failed to send task-rejected email to ${completionUser.email}`,
+            err instanceof Error ? err.stack : err,
+          ),
+        );
+    }
 
     return updated;
   }

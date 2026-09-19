@@ -1,6 +1,8 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
+  Logger,
   NotFoundException,
   Optional,
 } from '@nestjs/common';
@@ -12,13 +14,17 @@ import { deposits, payments, users } from '../database';
 
 import { WalletService } from '../wallet/wallet.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { MAILER, type Mailer } from '../mail/mailer.service';
 
 @Injectable()
 export class PaymentsService {
+  private readonly logger = new Logger(PaymentsService.name);
+
   constructor(
     @Optional() private readonly walletService?: WalletService,
     @Optional() private readonly configService?: ConfigService,
     @Optional() private readonly subscriptionsService?: SubscriptionsService,
+    @Optional() @Inject(MAILER) private readonly mailer?: Mailer,
   ) {}
 
   /**
@@ -240,6 +246,14 @@ export class PaymentsService {
       data?: { status?: string; tx_ref?: string; amount?: number; currency?: string };
     };
 
+    // Keep the raw provider response on the payment row — the admin
+    // payment-gateway view surfaces this for debugging without needing
+    // to dig through Flutterwave's own dashboard.
+    await db
+      .update(payments)
+      .set({ rawResponse: JSON.stringify(body), updatedAt: new Date() })
+      .where(eq(payments.reference, reference));
+
     if (!response.ok || body.status !== 'success' || body.data?.status !== 'successful') {
       throw new BadRequestException(
         body.message ?? 'Flutterwave payment is not successful',
@@ -346,6 +360,20 @@ export class PaymentsService {
       })
       .where(eq(deposits.id, deposit.id));
 
+    const depositUser = await db.query.users.findFirst({
+      where: eq(users.id, payment.userId),
+    });
+    if (depositUser) {
+      this.mailer
+        ?.sendDepositSuccessful(depositUser.email, depositUser.firstName, payment.amount)
+        .catch((err) =>
+          this.logger.error(
+            `Failed to send deposit-successful email to ${depositUser.email}`,
+            err instanceof Error ? err.stack : err,
+          ),
+        );
+    }
+
     return updatedPayment;
   }
 
@@ -411,10 +439,17 @@ export class PaymentsService {
    * call against our configured secret hash, then completes the payment.
    * Amount/status are always re-checked server-side against Flutterwave's
    * API rather than trusted from the webhook body directly.
+   *
+   * Flutterwave only allows one webhook URL per account, so this and
+   * transfer events (see WithdrawalsService.handleTransferWebhook) both
+   * arrive at the same shared endpoint (see WebhooksController) and are
+   * routed here by event type — only handle charge events, never a
+   * transfer payload that happens to share field names.
    */
-  async handleFlutterwaveWebhook(signature: string | undefined, body: {
-    data?: { tx_ref?: string; status?: string };
-  }) {
+  async handleFlutterwaveWebhook(
+    signature: string | undefined,
+    body: { event?: string; data?: { tx_ref?: string; status?: string } },
+  ) {
     const secretHash = this.configService?.get<string>(
       'flutterwave.secretHash',
     );
@@ -423,7 +458,19 @@ export class PaymentsService {
       throw new BadRequestException('Invalid webhook signature');
     }
 
+    if (body.event && !body.event.startsWith('charge.')) {
+      return { received: true };
+    }
+
     const txRef = body.data?.tx_ref;
+
+    if (txRef) {
+      await db
+        .update(payments)
+        .set({ rawResponse: JSON.stringify(body), updatedAt: new Date() })
+        .where(eq(payments.reference, txRef));
+    }
+
     if (!txRef || body.data?.status !== 'successful') {
       return { received: true };
     }
@@ -432,7 +479,11 @@ export class PaymentsService {
     return { received: true };
   }
 
-  async failPayment(reference: string, reason?: string) {
+  async failPayment(
+    reference: string,
+    reason?: string,
+    options?: { skipEmail?: boolean },
+  ) {
     const payment = await db.query.payments.findFirst({
       where: eq(payments.reference, reference),
     });
@@ -463,8 +514,52 @@ export class PaymentsService {
           updatedAt: new Date(),
         })
         .where(eq(deposits.id, payment.depositId));
+
+      if (!options?.skipEmail) {
+        const depositUser = await db.query.users.findFirst({
+          where: eq(users.id, payment.userId),
+        });
+        if (depositUser) {
+          this.mailer
+            ?.sendDepositFailed(
+              depositUser.email,
+              depositUser.firstName,
+              payment.amount,
+              reason,
+            )
+            .catch((err) =>
+              this.logger.error(
+                `Failed to send deposit-failed email to ${depositUser.email}`,
+                err instanceof Error ? err.stack : err,
+              ),
+            );
+        }
+      }
     }
 
     return updatedPayment;
+  }
+
+  /**
+   * Called when a user cancels a Flutterwave checkout instead of
+   * completing it. Only the owning user may cancel their own payment,
+   * and only while it's still pending/processing.
+   */
+  async cancelPayment(userId: string, reference: string) {
+    const payment = await db.query.payments.findFirst({
+      where: eq(payments.reference, reference),
+    });
+
+    if (!payment || payment.userId !== userId) {
+      throw new NotFoundException('Payment not found');
+    }
+
+    if (payment.status !== 'pending' && payment.status !== 'processing') {
+      throw new BadRequestException('Only a pending payment can be cancelled');
+    }
+
+    return this.failPayment(reference, 'Cancelled by user', {
+      skipEmail: true,
+    });
   }
 }

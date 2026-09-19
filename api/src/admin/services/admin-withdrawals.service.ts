@@ -1,22 +1,44 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
+  Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 
 import { desc, eq, sql } from 'drizzle-orm';
 
-import { db, withdrawals } from '../../database';
+import { db, users, withdrawals, type Withdrawal } from '../../database';
 
 import { AuditService } from '../../audit/audit.service';
+import { MAILER, type Mailer } from '../../mail/mailer.service';
 
 @Injectable()
 export class AdminWithdrawalsService {
-  constructor(private readonly auditService: AuditService) {}
+  private readonly logger = new Logger(AdminWithdrawalsService.name);
+
+  constructor(
+    private readonly auditService: AuditService,
+    @Optional() @Inject(MAILER) private readonly mailer?: Mailer,
+  ) {}
 
   async getPendingWithdrawals() {
     return db.query.withdrawals.findMany({
       where: eq(withdrawals.status, 'pending'),
+      orderBy: [desc(withdrawals.createdAt)],
+    });
+  }
+
+  /**
+   * Admin: every withdrawal regardless of status — the manual review
+   * queue (getPendingWithdrawals) only ever shows `pending` requests, so
+   * this is the only place an admin can see `processing` (auto-payout in
+   * flight), `completed`, or `rejected` withdrawals.
+   */
+  async getAllWithdrawals(status?: Withdrawal['status']) {
+    return db.query.withdrawals.findMany({
+      where: status ? eq(withdrawals.status, status) : undefined,
       orderBy: [desc(withdrawals.createdAt)],
     });
   }
@@ -85,6 +107,25 @@ export class AdminWithdrawalsService {
         rejectionReason: note,
       },
     });
+
+    const withdrawingUser = await db.query.users.findFirst({
+      where: eq(users.id, withdrawal.userId),
+    });
+    if (withdrawingUser) {
+      this.mailer
+        ?.sendWithdrawalRejected(
+          withdrawingUser.email,
+          withdrawingUser.firstName,
+          withdrawal.amount,
+          note,
+        )
+        .catch((err) =>
+          this.logger.error(
+            `Failed to send withdrawal-rejected email to ${withdrawingUser.email}`,
+            err instanceof Error ? err.stack : err,
+          ),
+        );
+    }
 
     return updatedWithdrawal;
   }

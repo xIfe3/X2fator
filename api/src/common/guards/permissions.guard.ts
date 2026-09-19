@@ -6,13 +6,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
-import {
-  db,
-  permissions,
-  rolePermissions,
-  userRoles,
-} from '../../database';
-import { eq } from 'drizzle-orm';
+import { UserPermissionsService } from '../services/user-permissions.service';
 
 import { REQUIRED_PERMISSION_KEY } from '../decorators/required-permission.decorator';
 
@@ -20,7 +14,10 @@ import type { AuthenticatedUser } from '../types/authenticated-request';
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
-  constructor(private readonly reflector: Reflector) {}
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly userPermissionsService: UserPermissionsService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const requiredPermission = this.reflector.getAllAndOverride<string>(
@@ -43,20 +40,11 @@ export class PermissionsGuard implements CanActivate {
       throw new ForbiddenException('User not authenticated');
     }
 
-    const result = await db
-      .select({
-        permissionName: permissions.name,
-      })
-      .from(userRoles)
-      .innerJoin(rolePermissions, eq(userRoles.roleId, rolePermissions.roleId))
-      .innerJoin(permissions, eq(rolePermissions.permissionId, permissions.id))
-      .where(eq(userRoles.userId, user.id));
-
-    const hasPermission = result.some(
-      (permission) => permission.permissionName === requiredPermission,
+    const permissionNames = await this.userPermissionsService.getPermissionNames(
+      user.id,
     );
 
-    if (!hasPermission) {
+    if (!permissionNames.includes(requiredPermission)) {
       throw new ForbiddenException(
         `Missing required permission: ${requiredPermission}`,
       );

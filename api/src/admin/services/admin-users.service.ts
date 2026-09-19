@@ -2,15 +2,24 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 
 import { desc, eq } from 'drizzle-orm';
 
-import { db, users, wallets, walletTransactions } from '../../database';
+import {
+  db,
+  roles,
+  userRoles,
+  users,
+  wallets,
+  walletTransactions,
+} from '../../database';
 
 import { AuditService } from '../../audit/audit.service';
 import { PasswordService } from '../../auth/password.service';
 import type { UpdateUserDto } from '../dto/update-user.dto';
+import type { CreateAdminDto } from '../dto/create-admin.dto';
 
 @Injectable()
 export class AdminUsersService {
@@ -18,6 +27,109 @@ export class AdminUsersService {
     private readonly auditService: AuditService,
     private readonly passwordService: PasswordService,
   ) {}
+
+  /**
+   * Creates a new admin account. Requires the CALLING admin's own current
+   * password as a re-authorization step — protects against someone who
+   * has hijacked a logged-in admin session (but not the password) from
+   * minting themselves a fresh admin account.
+   */
+  async createAdmin(actingAdminId: string, dto: CreateAdminDto) {
+    const actingAdmin = await this.getUserRecord(actingAdminId);
+
+    const passwordValid = await this.passwordService.compare(
+      dto.currentAdminPassword,
+      actingAdmin.passwordHash,
+    );
+
+    if (!passwordValid) {
+      throw new UnauthorizedException('Your password is incorrect');
+    }
+
+    const email = dto.email.trim().toLowerCase();
+
+    const existing = await db.query.users.findFirst({
+      where: eq(users.email, email),
+    });
+
+    if (existing) {
+      throw new BadRequestException('An account with this email already exists');
+    }
+
+    const adminRole = await db.query.roles.findFirst({
+      where: eq(roles.name, 'admin'),
+    });
+    const userRole = await db.query.roles.findFirst({
+      where: eq(roles.name, 'user'),
+    });
+
+    if (!adminRole || !userRole) {
+      throw new BadRequestException('Admin/user roles are not configured');
+    }
+
+    const passwordHash = await this.passwordService.hash(dto.password);
+    const referralCode = await this.generateReferralCode(email);
+
+    const newAdmin = await db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(users)
+        .values({
+          email,
+          passwordHash,
+          firstName: dto.firstName.trim(),
+          lastName: dto.lastName.trim(),
+          referralCode,
+          status: 'active',
+          emailVerified: true,
+        })
+        .returning();
+
+      await tx.insert(userRoles).values([
+        { userId: created.id, roleId: adminRole.id },
+        { userId: created.id, roleId: userRole.id },
+      ]);
+
+      await tx.insert(wallets).values([
+        { userId: created.id, type: 'account', balance: '0', status: 'active' },
+        { userId: created.id, type: 'task', balance: '0', status: 'active' },
+        { userId: created.id, type: 'referral', balance: '0', status: 'active' },
+      ]);
+
+      return created;
+    });
+
+    await this.auditService.log({
+      actorId: actingAdminId,
+      action: 'create',
+      entityType: 'user',
+      entityId: newAdmin.id,
+      description: `Created admin account ${newAdmin.email}`,
+    });
+
+    return this.sanitizeUser(newAdmin);
+  }
+
+  private async generateReferralCode(email: string) {
+    const emailSlug = email.split('@')[0].toLowerCase();
+    let code = emailSlug;
+
+    let existing = await db.query.users.findFirst({
+      where: eq(users.referralCode, code),
+    });
+
+    if (existing) {
+      let counter = 1;
+      do {
+        code = `${emailSlug}${counter}`;
+        existing = await db.query.users.findFirst({
+          where: eq(users.referralCode, code),
+        });
+        counter++;
+      } while (existing && counter < 1000);
+    }
+
+    return code;
+  }
 
   async getUsers() {
     const rows = await db.query.users.findMany({

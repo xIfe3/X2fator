@@ -1,8 +1,8 @@
 import { api } from "../api-client";
-import type { Deposit, DepositProvider } from "../types";
+import type { Deposit } from "../types";
 
 export const depositsApi = {
-  create: (amount: string, provider: DepositProvider) =>
+  create: (amount: string, provider: "flutterwave") =>
     api.post<{ deposit: Deposit; paymentReference: string }>("/deposits", {
       amount,
       provider,
@@ -17,5 +17,7 @@ export const depositsApi = {
     }>(`/payments/initialize/${depositId}`),
   verify: (reference: string) =>
     api.get(`/payments/verify/${encodeURIComponent(reference)}`),
+  cancel: (reference: string) =>
+    api.patch(`/payments/cancel/${encodeURIComponent(reference)}`),
   payments: () => api.get("/payments"),
 };

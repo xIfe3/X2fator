@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { useApiQuery } from "@/hooks/useApiQuery";
+import { useAuth } from "@/lib/auth-context";
 import { adminApi } from "@/lib/api/admin";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -9,20 +11,43 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { Money } from "@/components/ui/Money";
 import { formatDateTime } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useToast } from "@/components/ui/Toast";
+import { ApiRequestError } from "@/lib/api-client";
 
 export default function AdminDepositsPage() {
+  const { hasPermission } = useAuth();
+  const canReview = hasPermission("deposits.review");
+
   const {
     data: deposits,
     isLoading,
     refetch,
   } = useApiQuery(() => adminApi.deposits.all());
-  const { data: stats, isLoading: statsLoading } = useApiQuery(() =>
-    adminApi.deposits.stats(),
-  );
+  const {
+    data: stats,
+    isLoading: statsLoading,
+    refetch: refetchStats,
+  } = useApiQuery(() => adminApi.deposits.stats());
+  const { push } = useToast();
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   async function review(id: string, action: "approve" | "reject") {
-    await adminApi.deposits.review(id, { action });
-    refetch();
+    setBusyId(id + action);
+    try {
+      await adminApi.deposits.review(id, { action });
+      push("success", action === "approve" ? "Deposit approved." : "Deposit rejected.");
+      refetch();
+      refetchStats();
+    } catch (err) {
+      push(
+        "error",
+        err instanceof ApiRequestError
+          ? err.message
+          : `Could not ${action} this deposit.`,
+      );
+    } finally {
+      setBusyId(null);
+    }
   }
 
   return (
@@ -104,8 +129,11 @@ export default function AdminDepositsPage() {
                 {deposits?.map((deposit) => (
                   <Tr key={deposit.id}>
                     <Td className="font-mono text-xs">{deposit.reference}</Td>
-                    <Td className="font-mono text-xs text-ink-dim">
-                      {deposit.userId}
+                    <Td className="text-xs">
+                      <p className="font-medium text-ink">
+                        {deposit.userFirstName} {deposit.userLastName}
+                      </p>
+                      <p className="text-ink-faint">{deposit.userEmail}</p>
                     </Td>
                     <Td className="text-ink-dim">
                       {formatDateTime(deposit.createdAt)}
@@ -117,10 +145,11 @@ export default function AdminDepositsPage() {
                       <Money value={deposit.amount} size="sm" />
                     </Td>
                     <Td className="text-right">
-                      {deposit.status === "pending" && (
+                      {deposit.status === "pending" && canReview && (
                         <span className="flex justify-end gap-2">
                           <Button
                             size="sm"
+                            isLoading={busyId === deposit.id + "approve"}
                             onClick={() => review(deposit.id, "approve")}
                           >
                             Approve
@@ -128,6 +157,7 @@ export default function AdminDepositsPage() {
                           <Button
                             size="sm"
                             variant="secondary"
+                            isLoading={busyId === deposit.id + "reject"}
                             onClick={() => review(deposit.id, "reject")}
                           >
                             Reject

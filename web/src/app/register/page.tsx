@@ -2,7 +2,7 @@
 
 import { FormEvent, Suspense, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Check } from "lucide-react";
 import { AuthShell } from "@/components/layout/AuthShell";
 import { Input } from "@/components/ui/Input";
@@ -13,6 +13,7 @@ import { Money } from "@/components/ui/Money";
 import { useAuth } from "@/lib/auth-context";
 import { useApiQuery } from "@/hooks/useApiQuery";
 import { plansApi } from "@/lib/api/plans";
+import { siteContentApi } from "@/lib/api/site-content";
 import { ApiRequestError } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
 import { cn, isValidEmail, isValidNigerianPhone } from "@/lib/utils";
@@ -41,7 +42,12 @@ const initialForm = {
 function RegisterForm() {
   const { register } = useAuth();
   const { push } = useToast();
+  const router = useRouter();
   const searchParams = useSearchParams();
+
+  const { data: siteContent } = useApiQuery(() => siteContentApi.get());
+  const requirePlanPurchase =
+    siteContent?.feature_flags?.requirePlanPurchase !== false;
 
   const [step, setStep] = useState<"details" | "plan">("details");
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
@@ -88,7 +94,7 @@ function RegisterForm() {
   const progress = (validCount / Object.keys(errors).length) * 100;
   const canSubmit = Object.values(errors).every((e) => !e);
 
-  function onDetailsSubmit(e: FormEvent) {
+  async function onDetailsSubmit(e: FormEvent) {
     e.preventDefault();
     setTouched({
       firstName: true,
@@ -100,7 +106,47 @@ function RegisterForm() {
     });
     setError(null);
     if (!canSubmit) return;
-    setStep("plan");
+
+    if (requirePlanPurchase) {
+      setStep("plan");
+      return;
+    }
+
+    // No plan required — register and activate immediately, no
+    // Flutterwave checkout step.
+    setIsLoading(true);
+    try {
+      await submitRegistration();
+    } catch (err) {
+      const message =
+        err instanceof ApiRequestError
+          ? Array.isArray(err.errors) && err.errors.length > 0
+            ? err.errors.join(" ")
+            : err.message
+          : "Something went wrong. Try again.";
+      setError(message);
+      push("error", message);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function submitRegistration() {
+    const res = await register({
+      email: form.email,
+      password: form.password,
+      firstName: form.firstName,
+      lastName: form.lastName,
+      phone: form.phone || undefined,
+      referralCode: form.referralCode || undefined,
+      planId: selectedPlanId ?? undefined,
+    });
+
+    if ("authorizationUrl" in res) {
+      window.location.assign(res.authorizationUrl);
+    } else {
+      router.replace("/getting-started");
+    }
   }
 
   async function onPlanConfirm() {
@@ -111,16 +157,7 @@ function RegisterForm() {
     setError(null);
     setIsLoading(true);
     try {
-      const res = await register({
-        email: form.email,
-        password: form.password,
-        firstName: form.firstName,
-        lastName: form.lastName,
-        phone: form.phone || undefined,
-        referralCode: form.referralCode || undefined,
-        planId: selectedPlanId,
-      });
-      window.location.assign(res.authorizationUrl);
+      await submitRegistration();
     } catch (err) {
       const message =
         err instanceof ApiRequestError
@@ -220,8 +257,13 @@ function RegisterForm() {
               {error}
             </p>
           )}
-          <Button type="submit" variant="auth" className="w-full">
-            Continue
+          <Button
+            type="submit"
+            variant="auth"
+            className="w-full"
+            isLoading={isLoading}
+          >
+            {requirePlanPurchase ? "Continue" : "Create account"}
           </Button>
         </form>
       ) : (

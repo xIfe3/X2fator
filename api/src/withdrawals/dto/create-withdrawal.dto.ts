@@ -1,4 +1,4 @@
-import { IsIn, IsNumberString, IsOptional, IsString, Length } from 'class-validator';
+import { IsIn, IsNumberString, IsString, Length, Matches } from 'class-validator';
 
 export class CreateWithdrawalDto {
   @IsIn(['task', 'referral'])
@@ -11,10 +11,9 @@ export class CreateWithdrawalDto {
   @Length(2, 150)
   bankName!: string;
 
-  @IsOptional()
   @IsString()
   @Length(1, 10)
-  bankCode?: string;
+  bankCode!: string;
 
   @IsString()
   @Length(10, 20)
@@ -23,4 +22,7 @@ export class CreateWithdrawalDto {
   @IsString()
   @Length(2, 150)
   accountName!: string;
+
+  @Matches(/^[0-9]{4}$/, { message: 'PIN must be exactly 4 digits' })
+  pin!: string;
 }

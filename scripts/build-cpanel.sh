@@ -6,7 +6,7 @@
 # `npm install --omit=dev` runs on the SERVER, not in this bundle.
 #
 # Usage:
-#   ./scripts/build-cpanel.sh
+#   PROD_API_URL=https://api.x2factor.com/api ./scripts/build-cpanel.sh
 #
 # Output (written to C:\deploy-x2factor, NOT inside this repo — keeps
 # it out of git and off any long/space-containing local path):
@@ -26,6 +26,25 @@ DEPLOY_DIR="/c/deploy-x2factor"
 API_PKG="$ROOT/api"
 WEB_PKG="$ROOT/web"
 
+# NEXT_PUBLIC_* vars are baked into the built JS at build time, so this
+# script must NOT trust whatever happens to be active in web/.env right
+# now (it's routinely switched to a localhost value for local dev) — a
+# forgotten toggle there silently ships a production build that calls
+# http://localhost from every visitor's own browser. Require the
+# production API URL to be passed explicitly instead.
+if [ -z "${PROD_API_URL:-}" ]; then
+  echo "ERROR: PROD_API_URL is not set." >&2
+  echo "Run this script as: PROD_API_URL=https://api.x2factor.com/api ./scripts/build-cpanel.sh" >&2
+  exit 1
+fi
+
+case "$PROD_API_URL" in
+  http://localhost*|http://127.0.0.1*)
+    echo "ERROR: PROD_API_URL looks like a local dev URL ($PROD_API_URL) — refusing to build a production bundle with it." >&2
+    exit 1
+    ;;
+esac
+
 echo "== 1/4 Cleaning old deploy output =="
 rm -rf "$DEPLOY_DIR"
 mkdir -p "$DEPLOY_DIR/api" "$DEPLOY_DIR/web"
@@ -33,8 +52,8 @@ mkdir -p "$DEPLOY_DIR/api" "$DEPLOY_DIR/web"
 echo "== 2/4 Building api =="
 ( cd "$API_PKG" && npm run build )
 
-echo "== 3/4 Building web =="
-( cd "$WEB_PKG" && npm run build )
+echo "== 3/4 Building web (NEXT_PUBLIC_API_URL=$PROD_API_URL) =="
+( cd "$WEB_PKG" && NEXT_PUBLIC_API_URL="$PROD_API_URL" npm run build )
 
 # ---------------------------------------------------------------------
 # api bundle

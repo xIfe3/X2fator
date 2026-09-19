@@ -12,8 +12,11 @@ export class RegisterDto {
   @IsEmail()
   email!: string;
 
+  // Optional when the platform's requirePlanPurchase feature flag is
+  // off — registration then activates immediately with no payment.
+  @IsOptional()
   @IsUUID()
-  planId!: string;
+  planId?: string;
 
   @IsString()
   @MinLength(8)

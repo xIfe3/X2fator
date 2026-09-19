@@ -1,0 +1,1 @@
+ALTER TABLE "withdrawal_settings" ADD COLUMN "auto_payout_enabled" boolean DEFAULT true NOT NULL;

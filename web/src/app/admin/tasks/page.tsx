@@ -2,14 +2,16 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
-import { ClipboardList, ImageIcon, Pencil, Plus } from "lucide-react";
+import { ClipboardList, ImageIcon, Pencil, Plus, Trash2 } from "lucide-react";
 import { useApiQuery } from "@/hooks/useApiQuery";
+import { useAuth } from "@/lib/auth-context";
 import { adminApi } from "@/lib/api/admin";
 import type { Task } from "@/lib/types";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Table, THead, Th, Tr, Td } from "@/components/ui/Table";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Input, Textarea, Select } from "@/components/ui/Input";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -45,6 +47,8 @@ function formatDuration(seconds?: number) {
 }
 
 export default function AdminTasksPage() {
+  const { hasPermission } = useAuth();
+  const canReview = hasPermission("tasks.review");
   const { data: tasks, isLoading, refetch } = useApiQuery(() => adminApi.tasks.all());
   const { push } = useToast();
 
@@ -53,6 +57,11 @@ export default function AdminTasksPage() {
   const [form, setForm] = useState<TaskFormState>(emptyForm);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   function openCreate() {
     setEditing(null);
@@ -123,6 +132,70 @@ export default function AdminTasksPage() {
     }
   }
 
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await adminApi.tasks.remove(deleteTarget.id);
+      push("success", "Task deleted.");
+      setDeleteTarget(null);
+      refetch();
+    } catch (err) {
+      push(
+        "error",
+        err instanceof ApiRequestError ? err.message : "Could not delete this task.",
+      );
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  function toggleSelected(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (!tasks) return;
+    setSelected((prev) =>
+      prev.size === tasks.length ? new Set() : new Set(tasks.map((t) => t.id)),
+    );
+  }
+
+  async function confirmBulkDelete() {
+    if (selected.size === 0) return;
+    setBulkDeleting(true);
+    try {
+      const { deleted, skipped } = await adminApi.tasks.bulkRemove([...selected]);
+      if (deleted.length > 0) {
+        push(
+          "success",
+          `Deleted ${deleted.length} task${deleted.length === 1 ? "" : "s"}.`,
+        );
+      }
+      if (skipped.length > 0) {
+        push(
+          "error",
+          `${skipped.length} task${skipped.length === 1 ? "" : "s"} couldn't be deleted (has completion history) — deactivate instead.`,
+        );
+      }
+      setSelected(new Set());
+      setBulkConfirmOpen(false);
+      refetch();
+    } catch (err) {
+      push(
+        "error",
+        err instanceof ApiRequestError ? err.message : "Could not delete these tasks.",
+      );
+    } finally {
+      setBulkDeleting(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -131,16 +204,38 @@ export default function AdminTasksPage() {
           <p className="mt-1 text-sm text-ink-dim">{tasks?.length ?? 0} tasks configured.</p>
         </div>
         <div className="flex gap-2">
-          <Link href="/admin/tasks/submissions">
-            <Button size="sm" variant="secondary">
-              <ImageIcon className="h-4 w-4" /> Review submissions
-            </Button>
-          </Link>
+          {canReview && (
+            <Link href="/admin/tasks/submissions">
+              <Button size="sm" variant="secondary">
+                <ImageIcon className="h-4 w-4" /> Review submissions
+              </Button>
+            </Link>
+          )}
           <Button size="sm" onClick={openCreate}>
             <Plus className="h-4 w-4" /> New task
           </Button>
         </div>
       </div>
+
+      {selected.size > 0 && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3">
+          <p className="text-sm font-medium text-danger">
+            {selected.size} task{selected.size === 1 ? "" : "s"} selected
+          </p>
+          <div className="flex gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
+              Clear
+            </Button>
+            <Button
+              size="sm"
+              variant="danger"
+              onClick={() => setBulkConfirmOpen(true)}
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Delete selected
+            </Button>
+          </div>
+        </div>
+      )}
 
       <Card>
         <CardHeader>
@@ -163,6 +258,15 @@ export default function AdminTasksPage() {
           ) : (
             <Table>
               <THead>
+                <Th className="w-8">
+                  <input
+                    type="checkbox"
+                    checked={selected.size === tasks.length}
+                    onChange={toggleSelectAll}
+                    aria-label="Select all tasks"
+                    className="h-4 w-4 rounded border-base-border text-primary focus:ring-primary"
+                  />
+                </Th>
                 <Th>Title</Th>
                 <Th className="text-right">Reward</Th>
                 <Th className="text-right">Duration</Th>
@@ -172,6 +276,15 @@ export default function AdminTasksPage() {
               <tbody>
                 {tasks.map((t) => (
                   <Tr key={t.id}>
+                    <Td>
+                      <input
+                        type="checkbox"
+                        checked={selected.has(t.id)}
+                        onChange={() => toggleSelected(t.id)}
+                        aria-label={`Select ${t.title}`}
+                        className="h-4 w-4 rounded border-base-border text-primary focus:ring-primary"
+                      />
+                    </Td>
                     <Td>
                       <p className="font-medium text-ink">{t.title}</p>
                       {t.description && <p className="mt-0.5 text-xs text-ink-faint">{t.description}</p>}
@@ -188,6 +301,13 @@ export default function AdminTasksPage() {
                         </Button>
                         <Button size="sm" variant="outline" onClick={() => toggleStatus(t)}>
                           {t.status === "active" ? "Deactivate" : "Activate"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={() => setDeleteTarget(t)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" /> Delete
                         </Button>
                       </div>
                     </Td>
@@ -267,6 +387,28 @@ export default function AdminTasksPage() {
           </Button>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={confirmDelete}
+        title="Delete task"
+        description={`Permanently delete "${deleteTarget?.title ?? ""}"? This can't be undone. Tasks with completion history can't be deleted — deactivate them instead.`}
+        confirmLabel="Delete task"
+        variant="danger"
+        isLoading={deleting}
+      />
+
+      <ConfirmDialog
+        open={bulkConfirmOpen}
+        onClose={() => setBulkConfirmOpen(false)}
+        onConfirm={confirmBulkDelete}
+        title="Delete selected tasks"
+        description={`Permanently delete ${selected.size} task${selected.size === 1 ? "" : "s"}? This can't be undone. Any with completion history will be skipped — deactivate those instead.`}
+        confirmLabel="Delete selected"
+        variant="danger"
+        isLoading={bulkDeleting}
+      />
     </div>
   );
 }

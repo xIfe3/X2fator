@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { and, desc, eq } from 'drizzle-orm';
@@ -11,15 +12,26 @@ import {
   walletTransactions,
   wallets,
 } from '../database';
+import { FlutterwaveBillsService } from './flutterwave-bills.service';
 
 @Injectable()
 export class UtilitiesService {
+  private readonly logger = new Logger(UtilitiesService.name);
+
+  constructor(
+    private readonly flutterwaveBillsService: FlutterwaveBillsService,
+  ) {}
+
+  async listDataBundles(provider: 'mtn' | 'airtel' | 'glo' | '9mobile') {
+    return this.flutterwaveBillsService.listDataBundles(provider);
+  }
+
   /**
    * Create and process a utility purchase.
    *
-   * The wallet debit and purchase record are created
-   * atomically. Actual provider integration should happen
-   * through processProviderPurchase().
+   * The wallet is debited first, then Flutterwave's Bills API is
+   * called to actually deliver the airtime/data. On success the
+   * purchase is marked successful; on failure the wallet is refunded.
    */
   async purchase(
     userId: string,
@@ -43,7 +55,7 @@ export class UtilitiesService {
       );
     }
 
-    return db.transaction(async (tx) => {
+    const purchase = await db.transaction(async (tx) => {
       const wallet = await tx.query.wallets.findFirst({
         where: and(eq(wallets.userId, userId), eq(wallets.type, 'account')),
       });
@@ -65,7 +77,7 @@ export class UtilitiesService {
       const balanceAfter = balanceBefore - amount;
       const reference = this.generateReference('UTIL');
 
-      const [purchase] = await tx
+      const [created] = await tx
         .insert(utilityPurchases)
         .values({
           userId,
@@ -101,7 +113,7 @@ export class UtilitiesService {
         description:
           params.type === 'airtime' ? 'Airtime purchase' : 'Data purchase',
         metadata: {
-          utilityPurchaseId: purchase.id,
+          utilityPurchaseId: created.id,
           provider: params.provider,
           phoneNumber: params.phoneNumber,
           productCode: params.productCode,
@@ -109,8 +121,42 @@ export class UtilitiesService {
         status: 'completed',
       });
 
-      return purchase;
+      return created;
     });
+
+    await this.markProcessing(purchase.id);
+
+    try {
+      const result =
+        params.type === 'airtime'
+          ? await this.flutterwaveBillsService.payAirtime({
+              provider: params.provider,
+              phoneNumber: params.phoneNumber,
+              amount: params.amount,
+              reference: purchase.reference,
+            })
+          : await this.flutterwaveBillsService.payDataBundle({
+              provider: params.provider,
+              phoneNumber: params.phoneNumber,
+              amount: params.amount,
+              itemCode: params.productCode!,
+              reference: purchase.reference,
+            });
+
+      return this.markSuccessful(purchase.id, result.providerReference, result.message);
+    } catch (err) {
+      this.logger.error(
+        `Utility purchase ${purchase.reference} failed`,
+        err instanceof Error ? err.stack : err,
+      );
+      return this.markFailed(
+        purchase.id,
+        err instanceof BadRequestException
+          ? (err.getResponse() as { message?: string })?.message ??
+              'Bill payment failed'
+          : 'Bill payment failed',
+      );
+    }
   }
 
   /**

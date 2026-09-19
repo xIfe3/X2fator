@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, count, desc, eq } from 'drizzle-orm';
 
 import {
   db,
@@ -240,18 +240,39 @@ export class WalletService {
   }
 
   /**
-   * Get wallet transactions.
+   * Get wallet transactions, paginated (30 per page by default).
    */
   async getTransactions(
     userId: string,
     walletType: 'account' | 'task' | 'referral',
+    page = 1,
+    pageSize = 30,
   ) {
     const wallet = await this.getWallet(userId, walletType);
 
-    return db.query.walletTransactions.findMany({
-      where: eq(walletTransactions.walletId, wallet.id),
-      orderBy: [desc(walletTransactions.createdAt)],
-    });
+    const safePage = Math.max(1, page);
+    const safePageSize = Math.min(100, Math.max(1, pageSize));
+
+    const [items, [{ total }]] = await Promise.all([
+      db.query.walletTransactions.findMany({
+        where: eq(walletTransactions.walletId, wallet.id),
+        orderBy: [desc(walletTransactions.createdAt)],
+        limit: safePageSize,
+        offset: (safePage - 1) * safePageSize,
+      }),
+      db
+        .select({ total: count() })
+        .from(walletTransactions)
+        .where(eq(walletTransactions.walletId, wallet.id)),
+    ]);
+
+    return {
+      items,
+      page: safePage,
+      pageSize: safePageSize,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / safePageSize)),
+    };
   }
 }
 

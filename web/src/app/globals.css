@@ -197,6 +197,21 @@ html:has(.app-shell-frame) {
   }
 }
 
+/* iOS Safari auto-zooms the whole page on focus of any input/select/
+   textarea styled below 16px, then leaves the page zoomed in until the
+   user manually pinches back out — the "site zooms in after tapping
+   anything" symptom. Most of the app's form controls use Tailwind's
+   text-sm (14px), so on phone widths only, bump them to the 16px
+   threshold; this is a couple of fractional pixels taller, not a
+   visible design change, and only applies below the sm breakpoint. */
+@media (max-width: 639px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
 /* Signature #1: the ledger rule — a faint repeating baseline grid
    behind large balance figures, evoking a paper ledger sheet. */
 .ledger-surface {

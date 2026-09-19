@@ -16,8 +16,8 @@ import { PlansService } from './plans.service';
 import { CreatePlanDto } from './dto/create-plan.dto';
 import { UpdatePlanDto } from './dto/update-plan.dto';
 
-import { Roles } from '../common/decorators/roles.decorator';
-import { RolesGuard } from '../common/guards/roles.guard';
+import { RequirePermission } from '../common/decorators/required-permission.decorator';
+import { PermissionsGuard } from '../common/guards/permissions.guard';
 
 @Controller('plans')
 export class PlansController {
@@ -37,8 +37,8 @@ export class PlansController {
    * Admin: get every plan.
    */
   @Get('admin/all')
-  @UseGuards(RolesGuard)
-  @Roles('admin')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('plans.manage')
   async getAllPlans() {
     return this.plansService.findAll();
   }
@@ -56,8 +56,8 @@ export class PlansController {
    * Admin: create plan.
    */
   @Post()
-  @UseGuards(RolesGuard)
-  @Roles('admin')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('plans.manage')
   async createPlan(@CurrentUser() admin: AuthenticatedUser, @Body() dto: CreatePlanDto) {
     return this.plansService.create(admin.id, dto);
   }
@@ -66,8 +66,8 @@ export class PlansController {
    * Admin: update plan.
    */
   @Patch(':id')
-  @UseGuards(RolesGuard)
-  @Roles('admin')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('plans.manage')
   async updatePlan(
     @CurrentUser() admin: AuthenticatedUser,
     @Param('id') id: string,
@@ -80,8 +80,8 @@ export class PlansController {
    * Admin: delete plan.
    */
   @Delete(':id')
-  @UseGuards(RolesGuard)
-  @Roles('admin')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('plans.manage')
   async deletePlan(@CurrentUser() admin: AuthenticatedUser, @Param('id') id: string) {
     return this.plansService.remove(admin.id, id);
   }

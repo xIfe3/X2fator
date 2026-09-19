@@ -25,7 +25,7 @@ export default function RegisterCallbackPage() {
 }
 
 function CallbackContent() {
-  const { completeRegistration } = useAuth();
+  const { completeRegistration, cancelRegistration } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<"pending" | "success" | "error">(
@@ -48,11 +48,32 @@ function CallbackContent() {
     }
 
     if (txStatus === "cancelled") {
-      setStatus("error");
-      setMessage("Payment was cancelled.");
+      // Actively discard the still-pending signup instead of leaving it
+      // dangling — cancelRegistrationPayment() no-ops (400) if this
+      // reference wasn't a registration payment at all (a cancelled
+      // wallet deposit instead), which we forward to /deposits as usual.
+      cancelRegistration(reference)
+        .then(() => {
+          setStatus("error");
+          setMessage("Payment was cancelled.");
+        })
+        .catch((err) => {
+          if (err instanceof ApiRequestError && err.statusCode === 400) {
+            router.replace(
+              `/deposits?tx_ref=${encodeURIComponent(reference)}&status=cancelled`,
+            );
+            return;
+          }
+          setStatus("error");
+          setMessage("Payment was cancelled.");
+        });
       return;
     }
 
+    // completeRegistration() itself tells us which flow this was via a
+    // 400 ("Not a registration payment") on a non-registration reference
+    // — that means it was a wallet deposit using the same global
+    // Flutterwave callback URL.
     completeRegistration(reference)
       .then(() => {
         setStatus("success");
@@ -61,9 +82,6 @@ function CallbackContent() {
       })
       .catch((err) => {
         if (err instanceof ApiRequestError && err.statusCode === 400) {
-          // Not a registration payment — this was a wallet deposit
-          // using the same global Flutterwave callback URL. Forward
-          // tx_ref/status so the deposits page can auto-verify it.
           const params = new URLSearchParams();
           params.set("tx_ref", reference);
           if (txStatus) params.set("status", txStatus);
@@ -77,7 +95,7 @@ function CallbackContent() {
             : "We couldn't confirm your payment. If you were charged, contact support.",
         );
       });
-  }, [searchParams, completeRegistration, router]);
+  }, [searchParams, completeRegistration, cancelRegistration, router]);
 
   return (
     <AuthShell title="Confirming payment" subtitle="" width="md">

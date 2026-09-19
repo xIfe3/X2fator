@@ -7,9 +7,16 @@ import { PasswordService } from './password.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { MailModule } from '../mail/mail.module';
 import { PaymentsModule } from '../payments/payments.module';
+import { SiteContentModule } from '../site-content/site-content.module';
 
 @Module({
-  imports: [PassportModule, JwtModule.register({}), MailModule, PaymentsModule],
+  imports: [
+    PassportModule,
+    JwtModule.register({}),
+    MailModule,
+    PaymentsModule,
+    SiteContentModule,
+  ],
   controllers: [AuthController],
   providers: [AuthService, PasswordService, JwtStrategy],
   exports: [AuthService],

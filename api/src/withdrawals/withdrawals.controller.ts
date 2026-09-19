@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 
 import { WithdrawalsService } from './withdrawals.service';
 import { WithdrawalSettingsService } from './withdrawal-settings.service';
@@ -6,9 +15,13 @@ import { FlutterwaveAccountsService } from './flutterwave-accounts.service';
 import { CreateWithdrawalDto } from './dto/create-withdrawal.dto';
 import { ReviewWithdrawalDto } from './dto/review-withdrawal.dto';
 import { VerifyAccountDto } from './dto/verify-account.dto';
+import { SetWithdrawalPinDto } from './dto/set-withdrawal-pin.dto';
+import { AddBankAccountDto } from './dto/add-bank-account.dto';
 
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
+import { RequirePermission } from '../common/decorators/required-permission.decorator';
+import { PermissionsGuard } from '../common/guards/permissions.guard';
 import type { AuthenticatedUser } from '../common/types/authenticated-request';
 
 @Controller('withdrawals')
@@ -38,6 +51,48 @@ export class WithdrawalsController {
     );
   }
 
+  @Get('pin/status')
+  async getPinStatus(@CurrentUser() user: AuthenticatedUser) {
+    return this.withdrawalsService.getPinStatus(user.id);
+  }
+
+  @Post('pin')
+  async setPin(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: SetWithdrawalPinDto,
+  ) {
+    return this.withdrawalsService.setPin(user.id, dto.pin);
+  }
+
+  @Get('accounts')
+  async listBankAccounts(@CurrentUser() user: AuthenticatedUser) {
+    return this.withdrawalsService.listBankAccounts(user.id);
+  }
+
+  @Post('accounts')
+  async addBankAccount(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: AddBankAccountDto,
+  ) {
+    return this.withdrawalsService.addBankAccount(user.id, dto);
+  }
+
+  @Delete('accounts/:id')
+  async deleteBankAccount(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    return this.withdrawalsService.deleteBankAccount(user.id, id);
+  }
+
+  @Patch('accounts/:id/default')
+  async setDefaultBankAccount(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    return this.withdrawalsService.setDefaultBankAccount(user.id, id);
+  }
+
   @Post()
   async createWithdrawal(
     @CurrentUser() user: AuthenticatedUser,
@@ -60,16 +115,27 @@ export class WithdrawalsController {
   }
 
   @Get('admin/all')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('withdrawals.read')
   async getAllWithdrawals() {
     return this.withdrawalsService.getAllWithdrawals();
   }
 
   @Patch('admin/:id/review')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('withdrawals.approve')
   async reviewWithdrawal(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: ReviewWithdrawalDto,
   ) {
     return this.withdrawalsService.reviewWithdrawal(id, user.id, dto);
+  }
+
+  @Patch('admin/:id/reconcile')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('withdrawals.approve')
+  async reconcileWithdrawal(@Param('id') id: string) {
+    return this.withdrawalsService.reconcileWithdrawal(id);
   }
 }

@@ -12,10 +12,14 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { UserPermissionsService } from '../common/services/user-permissions.service';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly userPermissionsService: UserPermissionsService,
+  ) {}
 
   @Public()
   @Throttle({ default: { limit: 5, ttl: 60000 } })
@@ -41,20 +45,33 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Post('register/cancel/:paymentReference')
+  cancelRegistrationPayment(
+    @Param('paymentReference') paymentReference: string,
+  ) {
+    return this.authService.cancelRegistrationPayment(paymentReference);
+  }
+
+  @Public()
   @Post('refresh')
   refresh(@Body() dto: RefreshTokenDto) {
     return this.authService.refresh(dto.refreshToken);
   }
 
   @Get('me')
-  me(
+  async me(
     @CurrentUser()
     user: {
       id: string;
       email: string;
+      roles: string[];
     },
   ) {
-    return user;
+    const permissions = await this.userPermissionsService.getPermissionNames(
+      user.id,
+    );
+    return { ...user, permissions };
   }
 
   @Public()
@@ -84,5 +101,20 @@ export class AuthController {
     @Body() dto: UpdateProfileDto,
   ) {
     return this.authService.updateProfile(user.id, dto);
+  }
+
+  @Get('telegram-prompt-status')
+  getTelegramPromptStatus(@CurrentUser() user: { id: string }) {
+    return this.authService.getTelegramPromptStatus(user.id);
+  }
+
+  @Post('telegram-prompt-seen')
+  markTelegramPromptSeen(@CurrentUser() user: { id: string }) {
+    return this.authService.markTelegramPromptSeen(user.id);
+  }
+
+  @Post('telegram-joined')
+  markTelegramJoined(@CurrentUser() user: { id: string }) {
+    return this.authService.markTelegramJoined(user.id);
   }
 }

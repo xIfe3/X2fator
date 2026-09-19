@@ -1,5 +1,6 @@
 import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
-import { pool } from './database';
+import { sql } from 'drizzle-orm';
+import { db } from './database';
 import { Public } from './common/decorators/auth.decorators';
 
 @Controller('health')
@@ -8,7 +9,7 @@ export class HealthController {
   @Get()
   async health() {
     try {
-      await pool.query('SELECT 1');
+      await db.execute(sql`SELECT 1`);
     } catch {
       throw new ServiceUnavailableException({
         status: 'error',

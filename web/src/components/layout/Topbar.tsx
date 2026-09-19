@@ -12,27 +12,36 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { walletApi } from "@/lib/api/wallet";
+import { adminApi } from "@/lib/api/admin";
 import { notificationsApi } from "@/lib/api/notifications";
 import { cn } from "@/lib/utils";
 import { BrandLogo } from "./BrandLogo";
 import { Avatar } from "../ui/Avatar";
 import { Money } from "../ui/Money";
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from "../ui/Menu";
+import { ThemeToggle } from "../ui/ThemeToggle";
 
 export function Topbar({
   homeHref = "/dashboard",
   wide = false,
+  platformTotals = false,
 }: {
   homeHref?: string;
   wide?: boolean;
+  /** Show the site-wide wallet total (admin console) instead of the
+   * logged-in user's own personal wallet balance. */
+  platformTotals?: boolean;
 }) {
   const { user, logout } = useAuth();
   const [balance, setBalance] = useState<string | null>(null);
   const [unread, setUnread] = useState(0);
 
   function refreshBalance() {
-    walletApi
-      .getBalance()
+    const request = platformTotals
+      ? adminApi.wallets.totals()
+      : walletApi.getBalance();
+
+    request
       .then((b) => setBalance(String(b.total)))
       .catch(() => setBalance(null));
   }
@@ -46,7 +55,8 @@ export function Topbar({
 
     window.addEventListener("wallet-updated", refreshBalance);
     return () => window.removeEventListener("wallet-updated", refreshBalance);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [platformTotals]);
 
   return (
     <header className="sticky top-0 z-30 h-[68px] shrink-0 border-b border-base-border bg-base-surface/95 shadow-[0_2px_14px_-12px_rgba(31,67,135,0.35)] backdrop-blur">
@@ -61,7 +71,8 @@ export function Topbar({
         </span>
         <div className="flex items-center gap-2 sm:gap-3">
           <Link
-            href="/wallet"
+            href={platformTotals ? "/admin" : "/wallet"}
+            title={platformTotals ? "Total balance across all users" : undefined}
             className="hidden items-center gap-2 rounded-full border border-base-border bg-base-surface px-3.5 py-1.5 sm:flex"
           >
             <Wallet className="h-3.5 w-3.5 text-primary" />
@@ -73,6 +84,8 @@ export function Topbar({
               </span>
             )}
           </Link>
+
+          <ThemeToggle />
 
           <Link
             href="/notifications"

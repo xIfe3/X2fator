@@ -9,6 +9,8 @@ import {
   Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/auth-context";
+import { ADMIN_ROUTE_PERMISSIONS } from "@/lib/admin-permissions";
 
 const tabs: Array<{
   href: string;
@@ -23,6 +25,12 @@ const tabs: Array<{
 
 export function AdminMobileTabBar({ onMore }: { onMore: () => void }) {
   const pathname = usePathname();
+  const { hasPermission } = useAuth();
+
+  const visibleTabs = tabs.filter((item) => {
+    const required = ADMIN_ROUTE_PERMISSIONS[item.href];
+    return !required || hasPermission(required);
+  });
 
   return (
     <nav
@@ -30,7 +38,7 @@ export function AdminMobileTabBar({ onMore }: { onMore: () => void }) {
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <div className="mx-auto flex w-full max-w-[756px] items-stretch">
-        {tabs.map((item) => {
+        {visibleTabs.map((item) => {
           const active = item.exact
             ? pathname === item.href
             : pathname.startsWith(item.href);

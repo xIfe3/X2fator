@@ -5,11 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowDownToLine, Plus, Wallet } from "lucide-react";
 import { useApiQuery } from "@/hooks/useApiQuery";
 import { depositsApi } from "@/lib/api/deposits";
-import type { DepositProvider } from "@/lib/types";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
-import { Input, Select } from "@/components/ui/Input";
+import { Input } from "@/components/ui/Input";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageSkeleton } from "@/components/ui/Skeleton";
@@ -27,7 +26,6 @@ export default function DepositsPage() {
   } = useApiQuery(() => depositsApi.list());
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("");
-  const [provider, setProvider] = useState<DepositProvider>("mock");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [verifying, setVerifying] = useState<string | null>(null);
@@ -50,7 +48,13 @@ export default function DepositsPage() {
     router.replace("/deposits");
 
     if (status === "cancelled") {
-      push("error", "Payment was cancelled.");
+      depositsApi
+        .cancel(reference)
+        .catch(() => undefined)
+        .finally(() => {
+          push("error", "Payment was cancelled.");
+          refetch();
+        });
       return;
     }
 
@@ -63,13 +67,11 @@ export default function DepositsPage() {
     setError(null);
     setSubmitting(true);
     try {
-      const result = await depositsApi.create(amount, provider);
-      if (provider === "flutterwave") {
-        const payment = await depositsApi.initializePayment(result.deposit.id);
-        if (payment.authorizationUrl) {
-          window.location.assign(payment.authorizationUrl);
-          return;
-        }
+      const result = await depositsApi.create(amount, "flutterwave");
+      const payment = await depositsApi.initializePayment(result.deposit.id);
+      if (payment.authorizationUrl) {
+        window.location.assign(payment.authorizationUrl);
+        return;
       }
       push("success", "Deposit created. Complete payment to fund your wallet.");
       setOpen(false);
@@ -168,19 +170,24 @@ export default function DepositsPage() {
                       {formatMoney(d.amount)}
                     </span>
                     <div className="flex items-center gap-2">
-                      <StatusPill status={d.status} />
-                      {(d.status === "pending" || d.status === "processing") &&
-                        d.provider !== "manual" &&
-                        d.provider !== "mock" && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            isLoading={verifying === d.reference}
-                            onClick={() => verify(d.reference)}
-                          >
-                            Check
-                          </Button>
-                        )}
+                      <StatusPill
+                        status={
+                          d.status === "failed" &&
+                          d.failureReason === "Cancelled by user"
+                            ? "cancelled"
+                            : d.status
+                        }
+                      />
+                      {(d.status === "pending" || d.status === "processing") && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          isLoading={verifying === d.reference}
+                          onClick={() => verify(d.reference)}
+                        >
+                          Check
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -219,15 +226,6 @@ export default function DepositsPage() {
               </button>
             ))}
           </div>
-          <Select
-            label="Provider"
-            value={provider}
-            onChange={(e) => setProvider(e.target.value as DepositProvider)}
-          >
-            <option value="mock">Mock (instant, sandbox)</option>
-            <option value="flutterwave">Flutterwave</option>
-            <option value="manual">Manual bank transfer</option>
-          </Select>
           {error && <p className="text-sm text-danger">{error}</p>}
           <Button type="submit" className="w-full" isLoading={submitting}>
             Continue
