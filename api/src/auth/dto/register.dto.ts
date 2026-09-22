@@ -12,6 +12,14 @@ export class RegisterDto {
   @IsEmail()
   email!: string;
 
+  @IsString()
+  @MinLength(3)
+  @MaxLength(30)
+  @Matches(/^[a-zA-Z0-9_]+$/, {
+    message: 'Username may only contain letters, numbers, and underscores',
+  })
+  username!: string;
+
   // Optional when the platform's requirePlanPurchase feature flag is
   // off — registration then activates immediately with no payment.
   @IsOptional()

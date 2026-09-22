@@ -23,10 +23,10 @@ export function MobileTabBar({ onMore }: { onMore: () => void }) {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-base-border bg-base-surface/95 shadow-[0_-8px_24px_-20px_rgba(31,67,135,0.6)] backdrop-blur"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-4"
+      style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 14px)" }}
     >
-      <div className="mx-auto flex w-full max-w-3xl items-stretch">
+      <div className="tabbar-glass flex w-full max-w-sm items-stretch gap-0.5 rounded-full px-2 py-2 shadow-[0_16px_40px_-16px_rgba(15,23,42,0.55)]">
         {tabs.map((tab) => {
           const active =
             pathname === tab.href || pathname.startsWith(tab.href + "/");
@@ -36,8 +36,10 @@ export function MobileTabBar({ onMore }: { onMore: () => void }) {
               key={tab.href}
               href={tab.href}
               className={cn(
-                "flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors",
-                active ? "text-primary" : "text-ink-faint",
+                "flex flex-1 flex-col items-center gap-0.5 rounded-full py-2 text-[10px] font-medium transition-colors",
+                active
+                  ? "bg-primary/15 text-primary"
+                  : "text-ink-faint hover:text-ink-dim",
               )}
             >
               <Icon
@@ -52,7 +54,7 @@ export function MobileTabBar({ onMore }: { onMore: () => void }) {
         })}
         <button
           onClick={onMore}
-          className="flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] font-medium text-ink-faint transition-colors"
+          className="flex flex-1 flex-col items-center gap-0.5 rounded-full py-2 text-[10px] font-medium text-ink-faint transition-colors hover:text-ink-dim"
         >
           <Menu className="h-5 w-5" />
           More

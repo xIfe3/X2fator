@@ -9,6 +9,12 @@ const NOTIFICATION_TYPES = [
   'referral',
   'security',
   'system',
+  'referral_commission',
+  'deposit_completed',
+  'withdrawal_completed',
+  'withdrawal_rejected',
+  'task_approved',
+  'task_rejected',
 ] as const;
 
 export class SendNotificationDto {

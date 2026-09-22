@@ -7,5 +7,6 @@ import { AuditService } from '../audit/audit.service';
 @Module({
   controllers: [NotificationsController, AdminNotificationsController],
   providers: [NotificationsService, AuditService],
+  exports: [NotificationsService],
 })
 export class NotificationsModule {}

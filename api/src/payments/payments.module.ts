@@ -4,9 +4,10 @@ import { PaymentsController } from './payments.controller';
 import { WalletService } from 'src/wallet/wallet.service';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { MailModule } from '../mail/mail.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [SubscriptionsModule, MailModule],
+  imports: [SubscriptionsModule, MailModule, NotificationsModule],
   controllers: [PaymentsController],
   providers: [PaymentsService, WalletService],
   exports: [PaymentsService],

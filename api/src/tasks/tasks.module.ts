@@ -4,9 +4,10 @@ import { TasksController } from './tasks.controller';
 import { WalletService } from 'src/wallet/wallet.service';
 import { AuditService } from '../audit/audit.service';
 import { MailModule } from '../mail/mail.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [MailModule],
+  imports: [MailModule, NotificationsModule],
   controllers: [TasksController],
   providers: [TasksService, WalletService, AuditService],
 })

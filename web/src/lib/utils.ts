@@ -83,6 +83,10 @@ export function isValidNigerianPhone(value: string) {
   return /^(\+234|0)[789][01]\d{8}$/.test(value.trim());
 }
 
+export function isValidUsername(value: string) {
+  return /^[a-zA-Z0-9_]{3,30}$/.test(value.trim());
+}
+
 /**
  * Resolves a possibly-relative file URL (e.g. "/uploads/xyz.png", as
  * returned by our own upload endpoint) against the API's origin, so

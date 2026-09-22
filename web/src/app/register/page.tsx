@@ -1,9 +1,9 @@
 "use client";
 
-import { FormEvent, Suspense, useState } from "react";
+import { FormEvent, Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Check } from "lucide-react";
+import { Check, Loader2, X } from "lucide-react";
 import { AuthShell } from "@/components/layout/AuthShell";
 import { Input } from "@/components/ui/Input";
 import { PasswordField } from "@/components/ui/PasswordField";
@@ -14,9 +14,10 @@ import { useAuth } from "@/lib/auth-context";
 import { useApiQuery } from "@/hooks/useApiQuery";
 import { plansApi } from "@/lib/api/plans";
 import { siteContentApi } from "@/lib/api/site-content";
+import { authApi } from "@/lib/api/auth";
 import { ApiRequestError } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
-import { cn, isValidEmail, isValidNigerianPhone } from "@/lib/utils";
+import { cn, isValidEmail, isValidNigerianPhone, isValidUsername } from "@/lib/utils";
 import { isPasswordValid } from "@/lib/password";
 
 export default function RegisterPage() {
@@ -33,6 +34,7 @@ const initialForm = {
   firstName: "",
   lastName: "",
   email: "",
+  username: "",
   phone: "",
   password: "",
   confirmPassword: "",
@@ -63,6 +65,37 @@ function RegisterForm() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  const [usernameStatus, setUsernameStatus] = useState<
+    "idle" | "checking" | "available" | "taken"
+  >("idle");
+  const usernameCheckId = useRef(0);
+
+  useEffect(() => {
+    if (!isValidUsername(form.username)) {
+      setUsernameStatus("idle");
+      return;
+    }
+
+    setUsernameStatus("checking");
+    const requestId = ++usernameCheckId.current;
+    const username = form.username.trim();
+
+    const timeout = setTimeout(() => {
+      authApi
+        .checkUsernameAvailability(username)
+        .then((res) => {
+          if (usernameCheckId.current !== requestId) return;
+          setUsernameStatus(res.available ? "available" : "taken");
+        })
+        .catch(() => {
+          if (usernameCheckId.current !== requestId) return;
+          setUsernameStatus("idle");
+        });
+    }, 500);
+
+    return () => clearTimeout(timeout);
+  }, [form.username]);
+
   function update<K extends keyof typeof form>(key: K, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
@@ -78,6 +111,11 @@ function RegisterForm() {
     email: !isValidEmail(form.email)
       ? "Enter a valid email address"
       : undefined,
+    username: !isValidUsername(form.username)
+      ? "3-30 characters, letters, numbers, and underscores only"
+      : usernameStatus === "taken"
+        ? "This username is already taken"
+        : undefined,
     phone: !isValidNigerianPhone(form.phone)
       ? "Enter a valid phone number, e.g. +2348012345678"
       : undefined,
@@ -92,7 +130,8 @@ function RegisterForm() {
 
   const validCount = Object.values(errors).filter((e) => !e).length;
   const progress = (validCount / Object.keys(errors).length) * 100;
-  const canSubmit = Object.values(errors).every((e) => !e);
+  const canSubmit =
+    Object.values(errors).every((e) => !e) && usernameStatus === "available";
 
   async function onDetailsSubmit(e: FormEvent) {
     e.preventDefault();
@@ -100,6 +139,7 @@ function RegisterForm() {
       firstName: true,
       lastName: true,
       email: true,
+      username: true,
       phone: true,
       password: true,
       confirmPassword: true,
@@ -134,6 +174,7 @@ function RegisterForm() {
   async function submitRegistration() {
     const res = await register({
       email: form.email,
+      username: form.username.trim(),
       password: form.password,
       firstName: form.firstName,
       lastName: form.lastName,
@@ -214,6 +255,38 @@ function RegisterForm() {
             error={touched.email ? errors.email : undefined}
             placeholder="you@example.com"
           />
+          <div>
+            <Input
+              label="Username"
+              autoComplete="username"
+              value={form.username}
+              onChange={(e) =>
+                update("username", e.target.value.replace(/\s/g, ""))
+              }
+              onBlur={() => blur("username")}
+              error={touched.username ? errors.username : undefined}
+              placeholder="Your unique username"
+              rightElement={
+                usernameStatus === "checking" ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-ink-faint" />
+                ) : usernameStatus === "available" ? (
+                  <Check className="h-4 w-4 text-secondary" />
+                ) : usernameStatus === "taken" ? (
+                  <X className="h-4 w-4 text-danger" />
+                ) : undefined
+              }
+            />
+            {!errors.username && usernameStatus === "checking" && (
+              <p className="mt-1.5 text-xs text-ink-faint">
+                Checking username availability...
+              </p>
+            )}
+            {!errors.username && usernameStatus === "available" && (
+              <p className="mt-1.5 flex items-center gap-1 text-xs font-medium text-secondary">
+                <Check className="h-3.5 w-3.5" /> Username available
+              </p>
+            )}
+          </div>
           <Input
             label="Phone (optional)"
             type="tel"

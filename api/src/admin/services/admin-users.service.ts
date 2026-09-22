@@ -68,17 +68,18 @@ export class AdminUsersService {
     }
 
     const passwordHash = await this.passwordService.hash(dto.password);
-    const referralCode = await this.generateReferralCode(email);
+    const username = await this.generateUsername(email);
 
     const newAdmin = await db.transaction(async (tx) => {
       const [created] = await tx
         .insert(users)
         .values({
           email,
+          username,
           passwordHash,
           firstName: dto.firstName.trim(),
           lastName: dto.lastName.trim(),
-          referralCode,
+          referralCode: username,
           status: 'active',
           emailVerified: true,
         })
@@ -109,12 +110,17 @@ export class AdminUsersService {
     return this.sanitizeUser(newAdmin);
   }
 
-  private async generateReferralCode(email: string) {
+  /**
+   * Derives a unique username/referral-code slug from an email for
+   * admin-created accounts, which don't collect a username from a form
+   * the way self-registration does.
+   */
+  private async generateUsername(email: string) {
     const emailSlug = email.split('@')[0].toLowerCase();
     let code = emailSlug;
 
     let existing = await db.query.users.findFirst({
-      where: eq(users.referralCode, code),
+      where: eq(users.username, code),
     });
 
     if (existing) {
@@ -122,7 +128,7 @@ export class AdminUsersService {
       do {
         code = `${emailSlug}${counter}`;
         existing = await db.query.users.findFirst({
-          where: eq(users.referralCode, code),
+          where: eq(users.username, code),
         });
         counter++;
       } while (existing && counter < 1000);

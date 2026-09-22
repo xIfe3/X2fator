@@ -78,6 +78,13 @@
       "when": 1789825263975,
       "tag": "0010_organic_the_twelve",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790071920197,
+      "tag": "0011_add_username_and_notification_types",
+      "breakpoints": true
     }
   ]
 }

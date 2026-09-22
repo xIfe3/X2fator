@@ -121,6 +121,20 @@ export class AuthService {
       }
     }
 
+    const username = dto.username.trim().toLowerCase();
+
+    const existingUsernameUser = await db.query.users.findFirst({
+      where: eq(users.username, username),
+    });
+
+    if (existingUsernameUser) {
+      if (existingUsernameUser.status !== 'pending') {
+        throw new ConflictException('This username is already taken');
+      }
+
+      await this.discardAbandonedPendingUser(existingUsernameUser.id);
+    }
+
     const sections = await this.siteContentService.getAll();
     const flags = (sections.feature_flags ?? {}) as Record<string, unknown>;
     const requirePlanPurchase = flags.requirePlanPurchase !== false;
@@ -143,7 +157,9 @@ export class AuthService {
 
     const passwordHash = await this.passwordService.hash(dto.password);
 
-    const referralCode = await this.generateReferralCode(email);
+    // The username doubles as the referral code — one human-readable
+    // handle instead of two separate codes.
+    const referralCode = username;
 
     // When no plan purchase is required, the account activates
     // immediately — no pending payment, no Flutterwave checkout.
@@ -168,6 +184,7 @@ export class AuthService {
         .insert(users)
         .values({
           email,
+          username,
           passwordHash,
           firstName: dto.firstName.trim(),
           lastName: dto.lastName.trim(),
@@ -533,29 +550,27 @@ export class AuthService {
     return safeUser;
   }
 
-  private async generateReferralCode(email: string) {
-    // Extract email slug (part before @)
-    const emailSlug = email.split('@')[0].toLowerCase();
-    let code = emailSlug;
+  /**
+   * Public username-availability check used by the registration form's
+   * live "checking..." indicator. A username is only "available" if it's
+   * both unused and passes the same format rule enforced by RegisterDto
+   * — invalid input is reported as unavailable rather than a validation
+   * error, since the UI just wants a yes/no to render.
+   */
+  async checkUsernameAvailability(username: string) {
+    const normalized = username.trim().toLowerCase();
 
-    // Check if the base slug exists
-    let existing = await db.query.users.findFirst({
-      where: eq(users.referralCode, code),
-    });
-
-    // If it exists, append numeric suffix until we find a unique one
-    if (existing) {
-      let counter = 1;
-      do {
-        code = `${emailSlug}${counter}`;
-        existing = await db.query.users.findFirst({
-          where: eq(users.referralCode, code),
-        });
-        counter++;
-      } while (existing && counter < 1000); // Safety limit
+    if (!/^[a-zA-Z0-9_]{3,30}$/.test(normalized)) {
+      return { available: false };
     }
 
-    return code;
+    const existing = await db.query.users.findFirst({
+      where: eq(users.username, normalized),
+    });
+
+    // A still-pending signup (abandoned checkout) doesn't permanently
+    // squat the username, same as email/phone elsewhere in register().
+    return { available: !existing || existing.status === 'pending' };
   }
 
   private hashToken(token: string): string {

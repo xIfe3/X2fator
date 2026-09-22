@@ -24,6 +24,7 @@ import {
 import { WithdrawalSettingsService } from './withdrawal-settings.service';
 import { FlutterwaveAccountsService } from './flutterwave-accounts.service';
 import { MAILER, type Mailer } from '../mail/mailer.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class WithdrawalsService {
@@ -35,6 +36,7 @@ export class WithdrawalsService {
     private readonly flutterwaveAccountsService: FlutterwaveAccountsService,
     @Optional() private readonly configService?: ConfigService,
     @Optional() @Inject(MAILER) private readonly mailer?: Mailer,
+    @Optional() private readonly notificationsService?: NotificationsService,
   ) {}
 
   /**
@@ -532,6 +534,25 @@ export class WithdrawalsService {
               err instanceof Error ? err.stack : err,
             ),
           );
+
+        this.notificationsService
+          ?.create({
+            userId: withdrawingUser.id,
+            title: 'Withdrawal rejected',
+            message: `Your withdrawal of ₦${withdrawal.amount} was rejected: ${reason}`,
+            type: 'withdrawal_rejected',
+            metadata: {
+              withdrawalId: withdrawal.id,
+              amount: withdrawal.amount,
+              reason,
+            },
+          })
+          .catch((err) =>
+            this.logger.error(
+              `Failed to create withdrawal-rejected notification for user ${withdrawingUser.id}`,
+              err instanceof Error ? err.stack : err,
+            ),
+          );
       }
 
       return updated;
@@ -578,6 +599,21 @@ export class WithdrawalsService {
         .catch((err) =>
           this.logger.error(
             `Failed to send withdrawal-approved email to ${withdrawingUser.email}`,
+            err instanceof Error ? err.stack : err,
+          ),
+        );
+
+      this.notificationsService
+        ?.create({
+          userId: withdrawingUser.id,
+          title: 'Withdrawal completed',
+          message: `Your withdrawal of ₦${withdrawal.amount} has been paid out successfully.`,
+          type: 'withdrawal_completed',
+          metadata: { withdrawalId: withdrawal.id, amount: withdrawal.amount },
+        })
+        .catch((err) =>
+          this.logger.error(
+            `Failed to create withdrawal-completed notification for user ${withdrawingUser.id}`,
             err instanceof Error ? err.stack : err,
           ),
         );
@@ -848,6 +884,35 @@ export class WithdrawalsService {
               err instanceof Error ? err.stack : err,
             ),
           );
+
+          this.notificationsService
+            ?.create(
+              params.status === 'completed'
+                ? {
+                    userId: withdrawingUser.id,
+                    title: 'Withdrawal completed',
+                    message: `Your withdrawal of ₦${withdrawal.amount} has been paid out successfully.`,
+                    type: 'withdrawal_completed',
+                    metadata: { withdrawalId: withdrawal.id, amount: withdrawal.amount },
+                  }
+                : {
+                    userId: withdrawingUser.id,
+                    title: 'Withdrawal rejected',
+                    message: `Your withdrawal of ₦${withdrawal.amount} was rejected: ${params.rejectionReason}`,
+                    type: 'withdrawal_rejected',
+                    metadata: {
+                      withdrawalId: withdrawal.id,
+                      amount: withdrawal.amount,
+                      reason: params.rejectionReason,
+                    },
+                  },
+            )
+            .catch((err) =>
+              this.logger.error(
+                `Failed to create withdrawal-${params.status} notification for user ${withdrawingUser.id}`,
+                err instanceof Error ? err.stack : err,
+              ),
+            );
         }
       }
 

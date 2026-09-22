@@ -23,7 +23,14 @@
       "Bash(tasklist //FI \"WINDOWTITLE eq node*\")",
       "Bash(taskkill //PID 32372 //F)",
       "Bash(taskkill //PID 26456 //F)",
-      "Bash(taskkill //PID 17616 //F)"
+      "Bash(taskkill //PID 17616 //F)",
+      "Bash(node -e \"const c='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#%^&*'; let p=''; for\\(let i=0;i<20;i++\\) p+=c[Math.floor\\(Math.random\\(\\)*c.length\\)]; console.log\\(p\\)\")",
+      "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_utLco8jqShf9@ep-twilight-union-b4ormtlu-pooler.c-6.us-east-2.aws.neon.tech/x2factor-db?sslmode=require&channel_binding=require\" SEED_ADMIN_EMAIL=\"admin@x2factor.com\" SEED_ADMIN_PASSWORD=\"htpzi#TXgq5Ku&6S%FMD\" npm run db:seed)",
+      "Bash(awk -F'=' '/^FLUTTERWAVE_SECRET_KEY=/{print substr\\($2,1,12\\)}' .env)",
+      "Bash(awk -F'=' '/^FLUTTERWAVE_SECRET_KEY=/{print \"SECRET_KEY prefix: \" substr\\($2,1,10\\)} /^FLUTTERWAVE_PUBLIC_KEY=/{print \"PUBLIC_KEY prefix: \" substr\\($2,1,10\\)} /^FLUTTERWAVE_SECRET_HASH=/{print \"SECRET_HASH set: \" \\(length\\($2\\)>0 ? \"yes\" : \"no\"\\)} /^FLUTTERWAVE_CALLBACK_URL=/{print \"CALLBACK_URL: \" $2} /^FLUTTERWAVE_BASE_URL=/{print \"BASE_URL: \" $2}' .env)",
+      "Bash(ngrok http *)",
+      "Bash(curl -s http://127.0.0.1:4040/api/tunnels)",
+      "Bash(PROD_API_URL=\"https://api.x2factor.com/api\" ./scripts/build-cpanel.sh)"
     ],
     "additionalDirectories": [
       "C:\\deploy-x2factor"

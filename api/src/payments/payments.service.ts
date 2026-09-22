@@ -15,6 +15,7 @@ import { deposits, payments, users } from '../database';
 import { WalletService } from '../wallet/wallet.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { MAILER, type Mailer } from '../mail/mailer.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class PaymentsService {
@@ -25,6 +26,7 @@ export class PaymentsService {
     @Optional() private readonly configService?: ConfigService,
     @Optional() private readonly subscriptionsService?: SubscriptionsService,
     @Optional() @Inject(MAILER) private readonly mailer?: Mailer,
+    @Optional() private readonly notificationsService?: NotificationsService,
   ) {}
 
   /**
@@ -81,6 +83,147 @@ export class PaymentsService {
       amount: payment.amount,
       currency: deposit.currency,
       status: payment.status,
+    };
+  }
+
+  /**
+   * Initializes a payment directly against Flutterwave's Charge API
+   * (bank transfer or USSD) instead of redirecting to their hosted
+   * checkout page. Used by the custom-styled funding screen so the user
+   * never leaves our site — we render the returned account number / USSD
+   * code ourselves and poll for completion. The same webhook
+   * (`charge.completed`) and `verifyPayment` path used by hosted checkout
+   * completes these too, since Flutterwave dispatches both the same way.
+   */
+  async initializeDirectCharge(
+    userId: string,
+    depositId: string,
+    method: 'bank_transfer' | 'ussd',
+  ) {
+    const deposit = await db.query.deposits.findFirst({
+      where: eq(deposits.id, depositId),
+    });
+
+    if (!deposit || deposit.userId !== userId) {
+      throw new NotFoundException('Deposit not found');
+    }
+
+    if (deposit.status !== 'pending') {
+      throw new BadRequestException('Deposit is no longer pending');
+    }
+
+    const payment = await db.query.payments.findFirst({
+      where: eq(payments.depositId, deposit.id),
+    });
+
+    if (!payment) {
+      throw new NotFoundException('Payment record not found');
+    }
+
+    const secretKey = this.configService?.get<string>('flutterwave.secretKey');
+    const baseUrl = this.configService?.get<string>('flutterwave.baseUrl');
+
+    if (!secretKey || !baseUrl) {
+      throw new BadRequestException('Flutterwave is not configured');
+    }
+
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, userId),
+    });
+    if (!user) throw new NotFoundException('User not found');
+
+    const response = await fetch(`${baseUrl}/charges?type=${method}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${secretKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        tx_ref: payment.reference,
+        amount: Number(payment.amount),
+        currency: deposit.currency,
+        email: user.email,
+        fullname: `${user.firstName} ${user.lastName}`,
+        // "1" auto-selects the first supported USSD bank (GTBank) — we
+        // hide the bank choice from the user, so pick one deterministically
+        // rather than asking Flutterwave to guess.
+        ...(method === 'ussd' ? { account_bank: '058' } : {}),
+      }),
+    });
+
+    const body = (await response.json()) as {
+      status?: string;
+      message?: string;
+      // The account/USSD details actually come back nested under
+      // `meta.authorization` at the top level of the response — there is
+      // no `data` object for this endpoint, despite every other
+      // Flutterwave v3 endpoint we call using `data`. Also handled below:
+      // `data.meta`/`data.meta_data`, in case that shape shows up for
+      // other charge variants (kept for resilience, not because we've
+      // seen it here).
+      meta?: { authorization?: Record<string, unknown> };
+      data?: {
+        status?: string;
+        meta?: Record<string, unknown>;
+        meta_data?: Record<string, unknown>;
+      };
+    };
+
+    // Flutterwave's bank-transfer/USSD charge endpoints respond with HTTP
+    // 400 and message "Charge initiated" for the expected "account/code
+    // created, now waiting on the customer to pay" case — it's a quirk of
+    // this specific endpoint, not an error. Only treat the call as failed
+    // when there's no usable charge data at all.
+    const chargeInitiated = body.message === 'Charge initiated';
+
+    if (!chargeInitiated && (!response.ok || body.status !== 'success')) {
+      throw new BadRequestException(
+        body.message ?? 'Could not initialize payment',
+      );
+    }
+
+    const meta =
+      body.meta?.authorization ?? body.data?.meta ?? body.data?.meta_data;
+
+    if (!meta) {
+      this.logger.error(
+        `Unrecognized Flutterwave charge response shape (${method}): ${JSON.stringify(body)}`,
+      );
+      throw new BadRequestException(
+        body.message ?? 'Could not initialize payment',
+      );
+    }
+
+    await db
+      .update(payments)
+      .set({ status: 'processing', updatedAt: new Date() })
+      .where(eq(payments.id, payment.id));
+    await db
+      .update(deposits)
+      .set({ status: 'processing', updatedAt: new Date() })
+      .where(eq(deposits.id, deposit.id));
+
+    if (method === 'bank_transfer') {
+      return {
+        method,
+        reference: payment.reference,
+        amount: payment.amount,
+        accountNumber: meta.transfer_account as string | undefined,
+        bankName: meta.transfer_bank as string | undefined,
+        accountName: meta.transfer_note as string | undefined,
+        expiresAt:
+          (meta.account_expiration as string | undefined) ??
+          (meta.transfer_expiry_date as string | undefined),
+      };
+    }
+
+    return {
+      method,
+      reference: payment.reference,
+      amount: payment.amount,
+      ussdCode:
+        (meta.ussd_code as string | undefined) ??
+        (meta.note as string | undefined),
     };
   }
 
@@ -151,12 +294,21 @@ export class PaymentsService {
         amount: Number(amount),
         currency,
         redirect_url: callbackUrl,
+        // Only bank transfer and USSD — card is left out so users aren't
+        // shown a "beneficiary" name mismatch or confused by an option
+        // we don't want them using for this flow.
+        payment_options: 'banktransfer,ussd',
         customer: {
           email: user.email,
           name: `${user.firstName} ${user.lastName}`,
         },
         customizations: {
-          title,
+          // Fixed brand name shown on the checkout page, independent of
+          // what this particular payment is for (that detail goes in
+          // `description` instead) — keeps "X2Factor" as the name the
+          // user sees rather than the raw settlement account name.
+          title: 'X2Factor',
+          description: title,
         },
       }),
     });
@@ -372,6 +524,21 @@ export class PaymentsService {
             err instanceof Error ? err.stack : err,
           ),
         );
+
+      this.notificationsService
+        ?.create({
+          userId: depositUser.id,
+          title: 'Deposit successful',
+          message: `Your deposit of ₦${payment.amount} was successful and has been added to your wallet.`,
+          type: 'deposit_completed',
+          metadata: { paymentReference: payment.reference, amount: payment.amount },
+        })
+        .catch((err) =>
+          this.logger.error(
+            `Failed to create deposit-completed notification for user ${depositUser.id}`,
+            err instanceof Error ? err.stack : err,
+          ),
+        );
     }
 
     return updatedPayment;
@@ -559,6 +726,52 @@ export class PaymentsService {
     }
 
     return this.failPayment(reference, 'Cancelled by user', {
+      skipEmail: true,
+    });
+  }
+
+  /**
+   * Called when the dedicated account / USSD code shown on the custom
+   * funding screen (see FundWalletModal) times out with no payment
+   * received. Same effect as cancelPayment but keeps a distinct failure
+   * reason so the deposit history can tell "user backed out" apart from
+   * "window expired" and Flutterwave's webhook doesn't race a late
+   * transfer against this — completePayment()/verifyFlutterwavePayment()
+   * are idempotent no-ops once status is already 'successful', but here
+   * the payment is still only 'processing'/'pending' at expiry time, so a
+   * webhook arriving moments later would otherwise credit a wallet whose
+   * deposit we'd just marked failed. We re-check with Flutterwave first
+   * to avoid that race instead of trusting the client's countdown alone.
+   */
+  async expirePayment(userId: string, reference: string) {
+    const payment = await db.query.payments.findFirst({
+      where: eq(payments.reference, reference),
+    });
+
+    if (!payment || payment.userId !== userId) {
+      throw new NotFoundException('Payment not found');
+    }
+
+    if (payment.status === 'successful') {
+      return payment;
+    }
+
+    if (payment.status !== 'pending' && payment.status !== 'processing') {
+      throw new BadRequestException('Only a pending payment can be expired');
+    }
+
+    if (payment.provider === 'flutterwave') {
+      try {
+        // If it actually went through in the last few seconds, this
+        // completes it as successful instead of failing it out from
+        // under the user.
+        return await this.verifyFlutterwavePayment(reference);
+      } catch {
+        // Not successful — fall through to marking it failed below.
+      }
+    }
+
+    return this.failPayment(reference, 'Payment window expired', {
       skipEmail: true,
     });
   }

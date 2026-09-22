@@ -9,6 +9,7 @@ import type {
 export const authApi = {
   register: (dto: {
     email: string;
+    username: string;
     password: string;
     firstName: string;
     lastName: string;
@@ -16,6 +17,12 @@ export const authApi = {
     referralCode?: string;
     planId?: string;
   }) => api.post<RegisterResponse>("/auth/register", dto, { auth: false }),
+
+  checkUsernameAvailability: (username: string) =>
+    api.get<{ available: boolean }>(
+      `/auth/username-available/${encodeURIComponent(username)}`,
+      { auth: false },
+    ),
 
   confirmRegistrationPayment: (paymentReference: string) =>
     api.get<AuthResponse>(

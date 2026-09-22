@@ -1,22 +1,19 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowDownToLine, Plus, Wallet } from "lucide-react";
 import { useApiQuery } from "@/hooks/useApiQuery";
 import { depositsApi } from "@/lib/api/deposits";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Modal } from "@/components/ui/Modal";
-import { Input } from "@/components/ui/Input";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageSkeleton } from "@/components/ui/Skeleton";
 import { ApiRequestError } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
-import { cn, formatDateTime, formatMoney } from "@/lib/utils";
-
-const PRESET_AMOUNTS = [1000, 2000, 5000, 10000, 20000, 50000];
+import { formatDateTime, formatMoney } from "@/lib/utils";
+import { FundWalletModal } from "@/components/deposits/FundWalletModal";
 
 export default function DepositsPage() {
   const {
@@ -25,9 +22,6 @@ export default function DepositsPage() {
     refetch,
   } = useApiQuery(() => depositsApi.list());
   const [open, setOpen] = useState(false);
-  const [amount, setAmount] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
   const [verifying, setVerifying] = useState<string | null>(null);
   const { push } = useToast();
   const router = useRouter();
@@ -61,32 +55,6 @@ export default function DepositsPage() {
     verify(reference);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
-
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setSubmitting(true);
-    try {
-      const result = await depositsApi.create(amount, "flutterwave");
-      const payment = await depositsApi.initializePayment(result.deposit.id);
-      if (payment.authorizationUrl) {
-        window.location.assign(payment.authorizationUrl);
-        return;
-      }
-      push("success", "Deposit created. Complete payment to fund your wallet.");
-      setOpen(false);
-      setAmount("");
-      refetch();
-    } catch (err) {
-      setError(
-        err instanceof ApiRequestError
-          ? err.message
-          : "Could not create deposit.",
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  }
 
   async function verify(reference?: string) {
     if (!reference) return;
@@ -197,41 +165,11 @@ export default function DepositsPage() {
         </CardBody>
       </Card>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="New deposit">
-        <form onSubmit={onSubmit} className="space-y-4">
-          <Input
-            label="Amount (NGN)"
-            type="number"
-            min={1}
-            step="0.01"
-            required
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="5000"
-          />
-          <div className="flex flex-wrap gap-2">
-            {PRESET_AMOUNTS.map((preset) => (
-              <button
-                key={preset}
-                type="button"
-                onClick={() => setAmount(String(preset))}
-                className={cn(
-                  "rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors",
-                  Number(amount) === preset
-                    ? "border-primary bg-primary-soft text-primary"
-                    : "border-base-border text-ink-dim hover:border-primary-dim/50 hover:text-ink",
-                )}
-              >
-                {formatMoney(preset)}
-              </button>
-            ))}
-          </div>
-          {error && <p className="text-sm text-danger">{error}</p>}
-          <Button type="submit" className="w-full" isLoading={submitting}>
-            Continue
-          </Button>
-        </form>
-      </Modal>
+      <FundWalletModal
+        open={open}
+        onClose={() => setOpen(false)}
+        onFunded={refetch}
+      />
     </div>
   );
 }

@@ -170,6 +170,12 @@ export const notificationTypeEnum = pgEnum("notification_type", [
   "referral",
   "security",
   "system",
+  "referral_commission",
+  "deposit_completed",
+  "withdrawal_completed",
+  "withdrawal_rejected",
+  "task_approved",
+  "task_rejected",
 ]);
 
 export const notificationChannelEnum = pgEnum("notification_channel", [

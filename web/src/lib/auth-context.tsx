@@ -21,6 +21,7 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<User>;
   register: (dto: {
     email: string;
+    username: string;
     password: string;
     firstName: string;
     lastName: string;
@@ -41,6 +42,20 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+// Log the user out after this long with no interaction. The platform holds
+// user funds (deposits/withdrawals), so an abandoned, still-logged-in tab
+// is a real risk — better to force a fresh login than leave a session open
+// indefinitely on a shared or unattended device.
+const IDLE_LOGOUT_MS = 10 * 60 * 1000;
+const ACTIVITY_EVENTS = [
+  "mousedown",
+  "mousemove",
+  "keydown",
+  "scroll",
+  "touchstart",
+  "visibilitychange",
+] as const;
 
 export function AuthProvider({ children }: { children: any }) {
   const [user, setUser] = useState<User | null>(null);
@@ -105,6 +120,7 @@ export function AuthProvider({ children }: { children: any }) {
   const register = useCallback(
     async (dto: {
       email: string;
+      username: string;
       password: string;
       firstName: string;
       lastName: string;
@@ -166,6 +182,36 @@ export function AuthProvider({ children }: { children: any }) {
     setUser(null);
     router.push("/login");
   }, [router]);
+
+  // Idle auto-logout: only runs while a session is actually active, and
+  // resets on any user interaction. visibilitychange is included so time
+  // spent away in another tab/app counts too, not just an untouched tab.
+  useEffect(() => {
+    if (!user) return;
+
+    let timer: ReturnType<typeof setTimeout>;
+
+    function reset() {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        tokenStore.clear();
+        setUser(null);
+        router.replace("/login?reason=idle");
+      }, IDLE_LOGOUT_MS);
+    }
+
+    reset();
+    ACTIVITY_EVENTS.forEach((event) =>
+      window.addEventListener(event, reset, { passive: true }),
+    );
+
+    return () => {
+      clearTimeout(timer);
+      ACTIVITY_EVENTS.forEach((event) =>
+        window.removeEventListener(event, reset),
+      );
+    };
+  }, [user, router]);
 
   // Any role beyond the default "user" role grants admin console access
   // — a custom staff role (e.g. "Finance Admin") is gated from there on

@@ -76,6 +76,36 @@ export class NotificationsService {
     return updated;
   }
 
+  /**
+   * Creates an in-app notification for a user. Used by other modules
+   * (referrals, deposits, withdrawals, tasks) to notify a user of an
+   * event on their account — always fire-and-forget from the caller's
+   * perspective (call after the triggering transaction commits, wrapped
+   * in a `.catch()`, the same way the mailer is used elsewhere) so a
+   * notification failure never rolls back money movement.
+   */
+  async create(params: {
+    userId: string;
+    title: string;
+    message: string;
+    type: (typeof notifications.type.enumValues)[number];
+    metadata?: Record<string, unknown>;
+  }) {
+    const [created] = await db
+      .insert(notifications)
+      .values({
+        userId: params.userId,
+        title: params.title,
+        message: params.message,
+        type: params.type,
+        channel: 'in_app',
+        metadata: params.metadata,
+      })
+      .returning();
+
+    return created;
+  }
+
   // ---- Admin ------------------------------------------------------
 
   /**

@@ -8,11 +8,19 @@ import {
 } from '@nestjs/common';
 import { and, desc, eq, gte } from 'drizzle-orm';
 
-import { ads, db, tasks, taskCompletions, users } from '../database';
+import {
+  ads,
+  db,
+  planSubscriptions,
+  tasks,
+  taskCompletions,
+  users,
+} from '../database';
 
 import { WalletService } from '../wallet/wallet.service';
 import { AuditService } from '../audit/audit.service';
 import { MAILER, type Mailer } from '../mail/mailer.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 
@@ -24,6 +32,7 @@ export class TasksService {
     private readonly walletService: WalletService,
     private readonly auditService: AuditService,
     @Optional() @Inject(MAILER) private readonly mailer?: Mailer,
+    @Optional() private readonly notificationsService?: NotificationsService,
   ) {}
 
   /**
@@ -232,6 +241,19 @@ export class TasksService {
     }
 
     return db.transaction(async (tx) => {
+      const subscription = await tx.query.planSubscriptions.findFirst({
+        where: and(
+          eq(planSubscriptions.userId, userId),
+          eq(planSubscriptions.status, 'active'),
+        ),
+      });
+
+      if (!subscription) {
+        throw new BadRequestException(
+          'You need an active plan to complete tasks',
+        );
+      }
+
       const task = await tx.query.tasks.findFirst({
         where: and(eq(tasks.id, taskId), eq(tasks.status, 'active')),
       });
@@ -286,8 +308,7 @@ export class TasksService {
         ),
       });
 
-      const dailyTaskLimit = 10;
-      if (todayCompletions.length >= dailyTaskLimit) {
+      if (todayCompletions.length >= subscription.dailyTaskLimit) {
         throw new BadRequestException('Daily task limit reached');
       }
 
@@ -467,6 +488,25 @@ export class TasksService {
               err instanceof Error ? err.stack : err,
             ),
           );
+
+        this.notificationsService
+          ?.create({
+            userId: completionUser.id,
+            title: 'Task approved',
+            message: `Your submission for "${completion.task?.title ?? 'a task'}" was approved. ₦${completion.reward} has been added to your task wallet.`,
+            type: 'task_approved',
+            metadata: {
+              taskId: completion.taskId,
+              completionId: completion.id,
+              reward: completion.reward,
+            },
+          })
+          .catch((err) =>
+            this.logger.error(
+              `Failed to create task-approved notification for user ${completionUser.id}`,
+              err instanceof Error ? err.stack : err,
+            ),
+          );
       }
 
       return updated;
@@ -529,6 +569,25 @@ export class TasksService {
         .catch((err) =>
           this.logger.error(
             `Failed to send task-rejected email to ${completionUser.email}`,
+            err instanceof Error ? err.stack : err,
+          ),
+        );
+
+      this.notificationsService
+        ?.create({
+          userId: completionUser.id,
+          title: 'Task rejected',
+          message: `Your submission for "${completion.task?.title ?? 'a task'}" was rejected.${note ? ` Reason: ${note}` : ''}`,
+          type: 'task_rejected',
+          metadata: {
+            taskId: completion.taskId,
+            completionId: completion.id,
+            reason: note,
+          },
+        })
+        .catch((err) =>
+          this.logger.error(
+            `Failed to create task-rejected notification for user ${completionUser.id}`,
             err instanceof Error ? err.stack : err,
           ),
         );

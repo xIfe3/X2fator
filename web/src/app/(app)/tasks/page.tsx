@@ -1,15 +1,19 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useRef, useState } from "react";
 import {
+  ArrowRight,
   ExternalLink,
   ImagePlus,
   ListChecks,
+  Lock,
   Play,
   Smartphone,
 } from "lucide-react";
 import { useApiQuery } from "@/hooks/useApiQuery";
 import { tasksApi } from "@/lib/api/tasks";
+import { subscriptionsApi } from "@/lib/api/plans";
 import { uploadsApi } from "@/lib/api/uploads";
 import type { Task } from "@/lib/types";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -33,6 +37,9 @@ const TASK_TYPE_META: Record<string, { label: string; icon: typeof Play }> = {
 
 export default function TasksPage() {
   const [tab, setTab] = useState<"browse" | "completions">("browse");
+  const { data: subscription, isLoading: subscriptionLoading } = useApiQuery(
+    () => subscriptionsApi.active(),
+  );
   const { data: tasks, isLoading: tasksLoading } = useApiQuery(() =>
     tasksApi.list(),
   );
@@ -90,6 +97,8 @@ export default function TasksPage() {
     }
   }
 
+  const hasPlan = !!subscription;
+
   return (
     <div className="space-y-6">
       <div>
@@ -101,16 +110,47 @@ export default function TasksPage() {
         </p>
       </div>
 
-      <Tabs
-        tabs={[
-          { key: "browse", label: "Browse" },
-          { key: "completions", label: "My submissions" },
-        ]}
-        active={tab}
-        onChange={(k) => setTab(k as "browse" | "completions")}
-      />
+      {subscriptionLoading ? (
+        <PageSkeleton />
+      ) : !hasPlan ? (
+        <Card>
+          <CardBody>
+            <EmptyState
+              icon={Lock}
+              title="No tasks for you until you purchase a plan"
+              description="Every plan comes with a daily task allowance — the higher the plan, the more tasks you can complete (and earn from) each day."
+              action={
+                <Link href="/plans">
+                  <Button size="sm">
+                    View plans <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </Link>
+              }
+            />
+          </CardBody>
+        </Card>
+      ) : (
+        <>
+          <div className="flex items-center gap-2.5 rounded-xl border border-primary-dim/30 bg-primary-soft px-3.5 py-2.5 text-xs text-primary">
+            <ListChecks className="h-4 w-4 shrink-0" />
+            <span>
+              Your <span className="font-semibold">{subscription.plan?.name ?? "plan"}</span>{" "}
+              lets you complete up to{" "}
+              <span className="font-semibold">{subscription.dailyTaskLimit}</span>{" "}
+              {subscription.dailyTaskLimit === 1 ? "task" : "tasks"} per day.
+            </span>
+          </div>
 
-      {tab === "browse" ? (
+          <Tabs
+            tabs={[
+              { key: "browse", label: "Browse" },
+              { key: "completions", label: "My submissions" },
+            ]}
+            active={tab}
+            onChange={(k) => setTab(k as "browse" | "completions")}
+          />
+
+          {tab === "browse" ? (
         <Card>
           <CardHeader>
             <CardTitle>Available tasks</CardTitle>
@@ -241,6 +281,8 @@ export default function TasksPage() {
             )}
           </CardBody>
         </Card>
+      )}
+        </>
       )}
 
       <Modal

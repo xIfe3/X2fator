@@ -7,7 +7,6 @@ import {
   ArrowUpFromLine,
   Award,
   Cable,
-  Clock,
   Coins,
   Eye,
   EyeOff,
@@ -18,19 +17,19 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { useRouteLoader } from "@/components/layout/RouteLoader";
 import { useApiQuery } from "@/hooks/useApiQuery";
 import { walletApi } from "@/lib/api/wallet";
-import { earningsApi } from "@/lib/api/earnings";
 import { referralsApi } from "@/lib/api/referrals";
-import { tasksApi } from "@/lib/api/tasks";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Money } from "@/components/ui/Money";
 import { Badge } from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { formatDateTime, formatMoney } from "@/lib/utils";
+import { cn, formatDateTime, formatMoney } from "@/lib/utils";
 import { bonusesApi } from "@/lib/api/bonuses";
 import { Leaderboard } from "../referrals/Leaderboard";
 
@@ -45,23 +44,29 @@ const quickActions = [
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const router = useRouter();
+  const { start: startRouteLoader } = useRouteLoader();
   const [hideBalance, setHideBalance] = useState(false);
+  const [clickedHref, setClickedHref] = useState<string | null>(null);
+
+  function handleQuickAction(href: string) {
+    setClickedHref(href);
+    setTimeout(() => {
+      startRouteLoader();
+      router.push(href);
+    }, 150);
+  }
   const { data: balance, isLoading: balanceLoading } = useApiQuery(() =>
     walletApi.getBalance(),
   );
   const { data: txns, isLoading: txnsLoading } = useApiQuery(() =>
     walletApi.getTransactions("account"),
   );
-  const { data: summary } = useApiQuery(() => earningsApi.summary());
   const { data: referral } = useApiQuery(() => referralsApi.me());
   const { data: leaderboard } = useApiQuery(() =>
     referralsApi.leaderboard("week"),
   );
   const { data: dailyBonus } = useApiQuery(() => bonusesApi.daily());
-  const { data: completions } = useApiQuery(() => tasksApi.myCompletions());
-
-  const pendingReviews =
-    completions?.filter((c) => c.status === "pending").length ?? 0;
 
   const milestoneDays = dailyBonus?.milestoneDays ?? 30;
   const streakDay = dailyBonus?.claimed
@@ -158,80 +163,58 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Quick actions — horizontal scroll, no boxed grid */}
-      <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-        <div className="flex gap-3">
-          {quickActions.map((a) => (
-            <Link
-              key={a.href}
-              href={a.href}
-              className="group flex shrink-0 flex-col items-center gap-2"
+      {/* Quick actions — 3x3 grid */}
+      <div className="grid grid-cols-3 gap-3">
+        {quickActions.map((a) => (
+          <button
+            key={a.href}
+            type="button"
+            onClick={() => handleQuickAction(a.href)}
+            className="group flex flex-col items-center gap-2"
+          >
+            <span
+              className={cn(
+                "flex h-14 w-14 items-center justify-center rounded-2xl text-ink transition-colors duration-150 group-active:scale-95",
+                clickedHref === a.href
+                  ? "bg-danger text-white"
+                  : "bg-base-surface group-hover:bg-base-surface2",
+              )}
             >
-              <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-base-surface text-ink transition-colors group-hover:bg-base-surface2 group-active:scale-95">
-                <a.icon className="h-5 w-5" />
-              </span>
-              <span className="text-[11px] font-medium text-ink-dim">
-                {a.label}
-              </span>
-            </Link>
-          ))}
+              <a.icon className="h-5 w-5" />
+            </span>
+            <span className="text-[11px] font-medium text-ink-dim">
+              {a.label}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* Streak — dark accent block, not a bordered card */}
+      <Link
+        href="/bonuses"
+        className="group relative block overflow-hidden rounded-2xl bg-secondary-soft p-5 transition-transform active:scale-[0.99]"
+      >
+        <div className="flex items-center justify-between">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary/20 text-secondary">
+            <Flame className="h-5 w-5" />
+          </span>
+          {!dailyBonus?.claimed && <Badge tone="secondary">Claim</Badge>}
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {/* Streak — dark accent block, not a bordered card */}
-        <Link
-          href="/bonuses"
-          className="group relative overflow-hidden rounded-2xl bg-secondary-soft p-5 transition-transform active:scale-[0.99]"
-        >
-          <div className="flex items-center justify-between">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary/20 text-secondary">
-              <Flame className="h-5 w-5" />
-            </span>
-            {!dailyBonus?.claimed && <Badge tone="secondary">Claim</Badge>}
-          </div>
-          <p className="mt-4 text-sm font-semibold text-ink">Daily streak</p>
-          <p className="text-2xl font-bold text-secondary">
-            Day {Math.max(streakDay, 0)}
-            <span className="text-sm font-medium text-ink-faint">
-              {" "}
-              / {milestoneDays}
-            </span>
-          </p>
-          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-base-surface2">
-            <div
-              className="h-full rounded-full bg-secondary transition-all"
-              style={{ width: `${streakPct}%` }}
-            />
-          </div>
-        </Link>
-
-        {/* Task reviews — dark accent block */}
-        <Link
-          href="/tasks"
-          className="group relative overflow-hidden rounded-2xl bg-primary-soft p-5 transition-transform active:scale-[0.99]"
-        >
-          <div className="flex items-center justify-between">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/20 text-primary">
-              <Clock className="h-5 w-5" />
-            </span>
-            <ArrowRight className="h-4 w-4 text-ink-faint transition-transform group-hover:translate-x-0.5" />
-          </div>
-          <p className="mt-4 text-sm font-semibold text-ink">
-            Task submissions
-          </p>
-          <p className="text-2xl font-bold text-primary">
-            {pendingReviews}
-            <span className="text-sm font-medium text-ink-faint">
-              {" "}
-              pending
-            </span>
-          </p>
-          <p className="mt-3 text-xs text-ink-dim">
-            Lifetime earnings: {formatMoney(summary?.total)}
-          </p>
-        </Link>
-      </div>
+        <p className="mt-4 text-sm font-semibold text-ink">Daily streak</p>
+        <p className="text-2xl font-bold text-secondary">
+          Day {Math.max(streakDay, 0)}
+          <span className="text-sm font-medium text-ink-faint">
+            {" "}
+            / {milestoneDays}
+          </span>
+        </p>
+        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-base-surface2">
+          <div
+            className="h-full rounded-full bg-secondary transition-all"
+            style={{ width: `${streakPct}%` }}
+          />
+        </div>
+      </Link>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-5">
         <Card className="sm:col-span-3">

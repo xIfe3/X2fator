@@ -20,6 +20,7 @@ export type ApiEnvelope<T> = ApiSuccess<T> | ApiError;
 export interface User {
   id: string;
   email: string;
+  username: string;
   firstName: string;
   lastName: string;
   phone?: string | null;
@@ -350,13 +351,30 @@ export interface Referral {
 }
 
 // ---- Notifications ----
+export type NotificationType =
+  | "general"
+  | "deposit"
+  | "withdrawal"
+  | "plan"
+  | "task"
+  | "referral"
+  | "security"
+  | "system"
+  | "referral_commission"
+  | "deposit_completed"
+  | "withdrawal_completed"
+  | "withdrawal_rejected"
+  | "task_approved"
+  | "task_rejected";
+
 export interface Notification {
   id: string;
   userId: string;
   title: string;
   message: string;
   isRead: boolean;
-  type?: string;
+  type?: NotificationType;
+  metadata?: Record<string, unknown> | null;
   createdAt: string;
 }
 

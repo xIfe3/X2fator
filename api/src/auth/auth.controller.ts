@@ -36,6 +36,13 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @Get('username-available/:username')
+  checkUsernameAvailability(@Param('username') username: string) {
+    return this.authService.checkUsernameAvailability(username);
+  }
+
+  @Public()
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Get('register/confirm/:paymentReference')
   confirmRegistrationPayment(

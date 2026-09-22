@@ -34,6 +34,14 @@ export const users = pgTable(
 
     gender: genderEnum("gender"),
 
+    // Chosen by the user at signup; doubles as their referral code so
+    // there is one human-readable handle instead of two separate codes.
+    username: varchar("username", {
+      length: 30,
+    })
+      .notNull()
+      .unique(),
+
     referralCode: varchar("referral_code", {
       length: 20,
     })
@@ -102,6 +110,7 @@ export const users = pgTable(
   (table) => ({
     emailIdx: index("users_email_idx").on(table.email),
     phoneIdx: index("users_phone_idx").on(table.phone),
+    usernameIdx: index("users_username_idx").on(table.username),
     referralCodeIdx: index("users_referral_code_idx").on(table.referralCode),
     referredByIdx: index("users_referred_by_idx").on(table.referredById),
     statusIdx: index("users_status_idx").on(table.status),

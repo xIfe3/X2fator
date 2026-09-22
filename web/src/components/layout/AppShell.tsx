@@ -7,6 +7,8 @@ import { LifeBuoy, Megaphone, X } from "lucide-react";
 import { Topbar } from "./Topbar";
 import { MobileTabBar } from "./MobileTabBar";
 import { TelegramJoinPrompt } from "./TelegramJoinPrompt";
+import { PlanBanner } from "./PlanBanner";
+import { RouteLoaderProvider } from "./RouteLoader";
 import { cn } from "@/lib/utils";
 import { BrandLogo } from "./BrandLogo";
 
@@ -32,6 +34,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   return (
+    <RouteLoaderProvider>
     <div className="app-page-background app-shell-frame h-dvh overflow-hidden">
       {open && (
         <div className="fixed inset-0 z-50">
@@ -75,6 +78,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <Topbar />
         <main className="flex-1 overflow-y-auto px-4 py-4 pb-28 sm:px-6 sm:py-6 sm:pb-28">
           <div className="mx-auto max-w-3xl animate-fade-up">
+            <PlanBanner />
             {children}
           </div>
         </main>
@@ -97,5 +101,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <MobileTabBar onMore={() => setOpen(true)} />
       <TelegramJoinPrompt />
     </div>
+    </RouteLoaderProvider>
   );
 }

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { and, desc, eq, gte, sql } from 'drizzle-orm';
 
 import { db } from '../database';
@@ -11,10 +11,16 @@ import {
 } from '../database';
 
 import { WalletService, type DbTransaction } from '../wallet/wallet.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class ReferralsService {
-  constructor(@Optional() private readonly walletService?: WalletService) {}
+  private readonly logger = new Logger(ReferralsService.name);
+
+  constructor(
+    @Optional() private readonly walletService?: WalletService,
+    @Optional() private readonly notificationsService?: NotificationsService,
+  ) {}
 
   async getMyReferralInfo(userId: string) {
     const user = await db.query.users.findFirst({
@@ -224,6 +230,31 @@ export class ReferralsService {
       },
       earningDate: new Date(),
     });
+
+    const referredName =
+      `${referredUser.firstName} ${referredUser.lastName}`.trim();
+
+    this.notificationsService
+      ?.create({
+        userId: referrerId,
+        title: 'Referral commission earned',
+        message: `${referredName || referredUser.username} activated a plan and you've earned ₦${commission.toFixed(2)} in referral commission.`,
+        type: 'referral_commission',
+        metadata: {
+          referralId: referral.id,
+          referredUserId,
+          referredName,
+          subscriptionId,
+          planId: plan.id,
+          commission: commission.toFixed(2),
+        },
+      })
+      .catch((err) =>
+        this.logger.error(
+          `Failed to create referral-commission notification for user ${referrerId}`,
+          err instanceof Error ? err.stack : err,
+        ),
+      );
 
     return {
       referralId: referral.id,

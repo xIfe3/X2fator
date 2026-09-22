@@ -1,8 +1,8 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, Gift, Sparkles } from "lucide-react";
 import { AuthShell } from "@/components/layout/AuthShell";
 import { Input } from "@/components/ui/Input";
@@ -15,6 +15,25 @@ import { Modal } from "@/components/ui/Modal";
 import { formatMoney, isValidEmail } from "@/lib/utils";
 import { useApiQuery } from "@/hooks/useApiQuery";
 import { siteContentApi } from "@/lib/api/site-content";
+
+// useSearchParams() opts the tree it's called in out of static rendering
+// unless wrapped in Suspense — isolated here so only this sliver bails,
+// not the whole login page.
+function IdleLogoutNotice() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const { push } = useToast();
+
+  useEffect(() => {
+    if (searchParams.get("reason") === "idle") {
+      push("error", "You were logged out after a period of inactivity.");
+      router.replace("/login");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  return null;
+}
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -73,6 +92,9 @@ export default function LoginPage() {
 
   return (
     <>
+      <Suspense fallback={null}>
+        <IdleLogoutNotice />
+      </Suspense>
       <AuthShell
         title="Log in"
         subtitle="Access your wallet, plans, and earnings."
