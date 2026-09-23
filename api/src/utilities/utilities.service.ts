@@ -4,10 +4,11 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 
 import {
   db,
+  utilityBeneficiaries,
   utilityPurchases,
   walletTransactions,
   wallets,
@@ -325,6 +326,100 @@ export class UtilitiesService {
     }
 
     return purchase;
+  }
+
+  /**
+   * All of the user's saved airtime/data numbers, most-recently-added
+   * first.
+   */
+  async listBeneficiaries(userId: string) {
+    return db.query.utilityBeneficiaries.findMany({
+      where: eq(utilityBeneficiaries.userId, userId),
+      orderBy: [desc(utilityBeneficiaries.createdAt)],
+    });
+  }
+
+  /**
+   * Saves a phone number as a beneficiary for a network so it can be
+   * picked again without retyping. The first one a user adds becomes
+   * their default automatically, same as saved bank accounts.
+   */
+  async addBeneficiary(
+    userId: string,
+    params: {
+      provider: 'mtn' | 'airtel' | 'glo' | '9mobile';
+      phoneNumber: string;
+      label?: string;
+    },
+  ) {
+    const existing = await db.query.utilityBeneficiaries.findFirst({
+      where: and(
+        eq(utilityBeneficiaries.userId, userId),
+        eq(utilityBeneficiaries.phoneNumber, params.phoneNumber),
+        eq(utilityBeneficiaries.provider, params.provider),
+      ),
+    });
+
+    if (existing) {
+      throw new BadRequestException(
+        'This number has already been saved for this network',
+      );
+    }
+
+    const beneficiaryCount = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(utilityBeneficiaries)
+      .where(eq(utilityBeneficiaries.userId, userId));
+
+    const [beneficiary] = await db
+      .insert(utilityBeneficiaries)
+      .values({
+        userId,
+        provider: params.provider,
+        phoneNumber: params.phoneNumber,
+        label: params.label,
+        isDefault: (beneficiaryCount[0]?.count ?? 0) === 0,
+      })
+      .returning();
+
+    return beneficiary;
+  }
+
+  /**
+   * Removes a saved beneficiary. If it was the default and others
+   * remain, the most recently added one becomes the new default.
+   */
+  async deleteBeneficiary(userId: string, beneficiaryId: string) {
+    const beneficiary = await db.query.utilityBeneficiaries.findFirst({
+      where: and(
+        eq(utilityBeneficiaries.id, beneficiaryId),
+        eq(utilityBeneficiaries.userId, userId),
+      ),
+    });
+
+    if (!beneficiary) {
+      throw new NotFoundException('Beneficiary not found');
+    }
+
+    await db
+      .delete(utilityBeneficiaries)
+      .where(eq(utilityBeneficiaries.id, beneficiaryId));
+
+    if (beneficiary.isDefault) {
+      const next = await db.query.utilityBeneficiaries.findFirst({
+        where: eq(utilityBeneficiaries.userId, userId),
+        orderBy: [desc(utilityBeneficiaries.createdAt)],
+      });
+
+      if (next) {
+        await db
+          .update(utilityBeneficiaries)
+          .set({ isDefault: true, updatedAt: new Date() })
+          .where(eq(utilityBeneficiaries.id, next.id));
+      }
+    }
+
+    return { message: 'Beneficiary removed.' };
   }
 
   private generateReference(prefix: string) {

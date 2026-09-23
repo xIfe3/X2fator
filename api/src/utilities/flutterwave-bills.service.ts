@@ -5,6 +5,7 @@ export interface FlutterwaveBillCategory {
   biller_code: string;
   item_code: string;
   name: string;
+  short_name: string;
   biller_name: string;
   amount: number | null;
   is_airtime: boolean;
@@ -74,15 +75,28 @@ export class FlutterwaveBillsService {
       );
     }
 
-    const billerName = NETWORK_BILLER_NAMES[provider];
-    const forNetwork = body.data.filter((category) =>
-      category.biller_name.toLowerCase().includes(billerName.toLowerCase()),
+    const billerName = NETWORK_BILLER_NAMES[provider].toLowerCase();
+
+    // Data bundles are identified by `biller_name` (it's the product
+    // name for these, e.g. "MTN 100GB", which happens to contain the
+    // network name). Airtime categories are different: Flutterwave
+    // gives them all the same generic `biller_name` ("AIRTIME"), so the
+    // actual network only shows up in `name`/`short_name` (e.g. "MTN
+    // VTU" / "MTN") — matching airtime on `biller_name` never finds
+    // anything and every airtime purchase fails.
+    const dataBundles = body.data.filter(
+      (category) =>
+        !category.is_airtime &&
+        category.biller_name.toLowerCase().includes(billerName),
+    );
+    const airtime = body.data.filter(
+      (category) =>
+        category.is_airtime &&
+        (category.short_name?.toLowerCase().includes(billerName) ||
+          category.name?.toLowerCase().includes(billerName)),
     );
 
-    return {
-      dataBundles: forNetwork.filter((category) => !category.is_airtime),
-      airtime: forNetwork.filter((category) => category.is_airtime),
-    };
+    return { dataBundles, airtime };
   }
 
   /**

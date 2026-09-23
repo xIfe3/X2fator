@@ -6,16 +6,16 @@ import {
   ArrowRight,
   ArrowUpFromLine,
   Award,
-  Cable,
   Coins,
   Eye,
   EyeOff,
   Flame,
   ListChecks,
-  Megaphone,
+  Smartphone,
   Trophy,
   Users,
   Wallet,
+  Wifi,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -42,8 +42,8 @@ const quickActions = [
   { href: "/deposits", label: "Deposit", icon: ArrowDownToLine },
   { href: "/withdrawals", label: "Withdraw", icon: ArrowUpFromLine },
   { href: "/plans", label: "Plans", icon: Award },
-  { href: "/utilities", label: "Bills", icon: Cable },
-  { href: "/ads", label: "Promote", icon: Megaphone },
+  { href: "/utilities?type=data", label: "Data", icon: Wifi },
+  { href: "/utilities?type=airtime", label: "Airtime", icon: Smartphone },
 ];
 
 export default function DashboardPage() {

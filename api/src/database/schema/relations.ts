@@ -18,6 +18,7 @@ import { auditLogs } from "./audit";
 import { deposits } from "./deposits";
 import { payments } from "./payments";
 import { utilityPurchases } from "./utilities";
+import { utilityBeneficiaries } from "./utility-beneficiaries";
 import { ads } from "./ads";
 
 // Every `with: { ... }` usage in the API relies on the relation names
@@ -58,6 +59,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   deposits: many(deposits),
   payments: many(payments),
   utilityPurchases: many(utilityPurchases),
+  utilityBeneficiaries: many(utilityBeneficiaries),
   ads: many(ads),
 }));
 
@@ -201,4 +203,8 @@ export const paymentsRelations = relations(payments, ({ one }) => ({
 
 export const utilityPurchasesRelations = relations(utilityPurchases, ({ one }) => ({
   user: one(users, { fields: [utilityPurchases.userId], references: [users.id] }),
+}));
+
+export const utilityBeneficiariesRelations = relations(utilityBeneficiaries, ({ one }) => ({
+  user: one(users, { fields: [utilityBeneficiaries.userId], references: [users.id] }),
 }));

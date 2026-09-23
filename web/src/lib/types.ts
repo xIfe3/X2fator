@@ -473,6 +473,14 @@ export interface DataBundle {
   is_airtime: boolean;
 }
 
+export interface UtilityBeneficiary {
+  id: string;
+  provider: "mtn" | "airtel" | "glo" | "9mobile";
+  phoneNumber: string;
+  label?: string | null;
+  isDefault: boolean;
+}
+
 // ---- Admin ----
 export interface AdminUser extends User {
   wallets?: UserWallets;

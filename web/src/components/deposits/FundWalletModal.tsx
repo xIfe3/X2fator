@@ -380,12 +380,8 @@ export function FundWalletModal({
                   <p className="text-[11px] font-medium uppercase tracking-wide text-ink-faint">
                     Account Name
                   </p>
-                  {/* Shown with the real registered name in brackets since
-                      that's what the bank's own transfer confirmation will
-                      display — matching it here avoids users second-guessing
-                      the account when the names don't line up mid-transfer. */}
                   <p className="mt-0.5 truncate text-sm font-semibold text-ink">
-                    X2FACTOR (Henry Chijioke)
+                    X2 Factor
                   </p>
                 </div>
               </div>

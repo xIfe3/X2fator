@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
 
 import { UtilitiesService } from './utilities.service';
 import { PurchaseUtilityDto } from './dto/purchase-utility.dto';
+import { AddBeneficiaryDto } from './dto/add-beneficiary.dto';
 
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../common/types/authenticated-request';
@@ -15,6 +16,27 @@ export class UtilitiesController {
     @Param('provider') provider: 'mtn' | 'airtel' | 'glo' | '9mobile',
   ) {
     return this.utilitiesService.listDataBundles(provider);
+  }
+
+  @Get('beneficiaries')
+  async listBeneficiaries(@CurrentUser() user: AuthenticatedUser) {
+    return this.utilitiesService.listBeneficiaries(user.id);
+  }
+
+  @Post('beneficiaries')
+  async addBeneficiary(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: AddBeneficiaryDto,
+  ) {
+    return this.utilitiesService.addBeneficiary(user.id, dto);
+  }
+
+  @Delete('beneficiaries/:id')
+  async deleteBeneficiary(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    return this.utilitiesService.deleteBeneficiary(user.id, id);
   }
 
   @Post('purchase')

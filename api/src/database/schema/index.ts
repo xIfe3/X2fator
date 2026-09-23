@@ -18,6 +18,7 @@ export * from "./withdrawals";
 export * from "./withdrawal-settings";
 
 export * from "./utilities";
+export * from "./utility-beneficiaries";
 export * from "./user-bank-accounts";
 
 export * from "./notifications";

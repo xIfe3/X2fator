@@ -1,34 +1,67 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { Zap } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { Bookmark, ChevronRight, Smartphone, Trash2, Wifi, Zap } from "lucide-react";
 import { useApiQuery } from "@/hooks/useApiQuery";
 import { utilitiesApi } from "@/lib/api/utilities";
-import type { UtilityPurchase } from "@/lib/types";
+import type { UtilityBeneficiary, UtilityPurchase } from "@/lib/types";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Input, Select } from "@/components/ui/Input";
+import { Input } from "@/components/ui/Input";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { Money } from "@/components/ui/Money";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageSkeleton, Skeleton } from "@/components/ui/Skeleton";
 import { BottomSheet } from "@/components/ui/BottomSheet";
+import { Modal } from "@/components/ui/Modal";
 import { DetailList } from "@/components/ui/DetailList";
 import { ApiRequestError } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
-import { formatDateTime, formatMoney } from "@/lib/utils";
+import { cn, formatDateTime, formatMoney } from "@/lib/utils";
 
-const NETWORKS = ["mtn", "airtel", "glo", "9mobile"] as const;
+type Provider = "mtn" | "airtel" | "glo" | "9mobile";
+type PurchaseType = "airtime" | "data";
+
+const TYPES: { value: PurchaseType; label: string; icon: typeof Smartphone }[] = [
+  { value: "airtime", label: "Airtime", icon: Smartphone },
+  { value: "data", label: "Data", icon: Wifi },
+];
+
+const NETWORKS: { value: Provider; label: string }[] = [
+  { value: "mtn", label: "MTN" },
+  { value: "airtel", label: "Airtel" },
+  { value: "glo", label: "Glo" },
+  { value: "9mobile", label: "9mobile" },
+];
+
+function maskPhone(phoneNumber: string) {
+  if (phoneNumber.length <= 4) return phoneNumber;
+  return `${phoneNumber.slice(0, 4)}····${phoneNumber.slice(-2)}`;
+}
 
 export default function UtilitiesPage() {
-  const { data: purchases, isLoading, refetch } = useApiQuery(() => utilitiesApi.myPurchases());
+  const searchParams = useSearchParams();
+  const initialType: PurchaseType =
+    searchParams.get("type") === "data" ? "data" : "airtime";
+
+  const { data: purchases, isLoading, refetch } = useApiQuery(() =>
+    utilitiesApi.myPurchases(),
+  );
+  const {
+    data: beneficiaries,
+    refetch: refetchBeneficiaries,
+  } = useApiQuery(() => utilitiesApi.listBeneficiaries());
+
   const [form, setForm] = useState({
-    type: "airtime" as "airtime" | "data",
-    provider: "mtn" as (typeof NETWORKS)[number],
+    type: initialType,
+    provider: "mtn" as Provider,
     phoneNumber: "",
     amount: "",
     productCode: "",
   });
+  const [saveAsBeneficiary, setSaveAsBeneficiary] = useState(false);
+  const [manageOpen, setManageOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState<UtilityPurchase | null>(
@@ -48,6 +81,13 @@ export default function UtilitiesPage() {
     setForm((f) => ({ ...f, productCode: "", amount: "" }));
   }, [form.type, form.provider]);
 
+  const beneficiariesForNetwork =
+    beneficiaries?.filter((b) => b.provider === form.provider) ?? [];
+
+  const numberAlreadySaved = beneficiariesForNetwork.some(
+    (b) => b.phoneNumber === form.phoneNumber,
+  );
+
   function selectBundle(itemCode: string) {
     const bundle = bundles?.find((b) => b.item_code === itemCode);
     setForm((f) => ({
@@ -55,6 +95,11 @@ export default function UtilitiesPage() {
       productCode: itemCode,
       amount: bundle?.amount ? String(bundle.amount) : f.amount,
     }));
+  }
+
+  function selectBeneficiary(beneficiary: UtilityBeneficiary) {
+    setForm((f) => ({ ...f, phoneNumber: beneficiary.phoneNumber }));
+    setSaveAsBeneficiary(false);
   }
 
   async function onSubmit(e: FormEvent) {
@@ -69,9 +114,24 @@ export default function UtilitiesPage() {
         amount: form.amount,
         productCode: form.type === "data" ? form.productCode : undefined,
       });
+
+      if (saveAsBeneficiary && !numberAlreadySaved) {
+        try {
+          await utilitiesApi.addBeneficiary({
+            provider: form.provider,
+            phoneNumber: form.phoneNumber,
+          });
+          refetchBeneficiaries();
+        } catch {
+          // The purchase already succeeded — a failed save shouldn't
+          // block that, so this is silent (e.g. a duplicate race).
+        }
+      }
+
       window.dispatchEvent(new Event("wallet-updated"));
       push("success", "Purchase submitted.");
       setForm((f) => ({ ...f, amount: "", phoneNumber: "", productCode: "" }));
+      setSaveAsBeneficiary(false);
       refetch();
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : "Could not complete purchase.");
@@ -92,59 +152,172 @@ export default function UtilitiesPage() {
           <CardTitle>New purchase</CardTitle>
         </CardHeader>
         <CardBody>
-          <form onSubmit={onSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Select
-              label="Type"
-              value={form.type}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, type: e.target.value as "airtime" | "data" }))
-              }
-            >
-              <option value="airtime">Airtime</option>
-              <option value="data">Data</option>
-            </Select>
-            <Select
-              label="Network"
-              value={form.provider}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  provider: e.target.value as (typeof NETWORKS)[number],
-                }))
-              }
-            >
-              {NETWORKS.map((n) => (
-                <option key={n} value={n}>
-                  {n === "9mobile" ? "9mobile" : n.toUpperCase()}
-                </option>
-              ))}
-            </Select>
-            <Input
-              label="Phone number"
-              required
-              minLength={10}
-              maxLength={20}
-              value={form.phoneNumber}
-              onChange={(e) => setForm((f) => ({ ...f, phoneNumber: e.target.value }))}
-            />
-            {form.type === "data" ? (
-              <Select
-                label="Bundle"
-                required
-                disabled={bundlesLoading}
-                value={form.productCode}
-                onChange={(e) => selectBundle(e.target.value)}
-              >
-                <option value="">
-                  {bundlesLoading ? "Loading bundles…" : "Select a bundle"}
-                </option>
-                {bundles?.map((b) => (
-                  <option key={b.item_code} value={b.item_code}>
-                    {b.name}
-                    {b.amount ? ` — ${formatMoney(b.amount)}` : ""}
-                  </option>
+          <form onSubmit={onSubmit} className="space-y-5">
+            <div>
+              <span className="mb-1.5 block text-xs font-medium text-ink-dim">
+                Type
+              </span>
+              <div className="grid grid-cols-2 gap-2.5">
+                {TYPES.map((t) => (
+                  <button
+                    key={t.value}
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, type: t.value }))}
+                    className={cn(
+                      "flex items-center gap-2.5 rounded-xl border p-3.5 text-left transition-colors",
+                      form.type === t.value
+                        ? "border-primary bg-primary-soft"
+                        : "border-base-border bg-base-raised hover:bg-base-surface2",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
+                        form.type === t.value
+                          ? "bg-primary/20 text-primary"
+                          : "bg-base-surface2 text-ink-faint",
+                      )}
+                    >
+                      <t.icon className="h-4.5 w-4.5" />
+                    </span>
+                    <span
+                      className={cn(
+                        "text-sm font-semibold",
+                        form.type === t.value ? "text-primary" : "text-ink",
+                      )}
+                    >
+                      {t.label}
+                    </span>
+                  </button>
                 ))}
-              </Select>
+              </div>
+            </div>
+
+            <div>
+              <span className="mb-1.5 block text-xs font-medium text-ink-dim">
+                Network
+              </span>
+              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                {NETWORKS.map((n) => (
+                  <button
+                    key={n.value}
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, provider: n.value }))}
+                    className={cn(
+                      "rounded-xl border p-3 text-center text-sm font-semibold transition-colors",
+                      form.provider === n.value
+                        ? "border-primary bg-primary-soft text-primary"
+                        : "border-base-border bg-base-raised text-ink hover:bg-base-surface2",
+                    )}
+                  >
+                    {n.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <Input
+                label="Phone number"
+                required
+                minLength={10}
+                maxLength={20}
+                value={form.phoneNumber}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, phoneNumber: e.target.value }))
+                }
+              />
+
+              {beneficiariesForNetwork.length > 0 && (
+                <div className="mt-2.5 flex flex-wrap gap-2">
+                  {beneficiariesForNetwork.map((b) => (
+                    <button
+                      key={b.id}
+                      type="button"
+                      onClick={() => selectBeneficiary(b)}
+                      className={cn(
+                        "rounded-full border px-3 py-1.5 font-mono text-xs font-medium transition-colors",
+                        form.phoneNumber === b.phoneNumber
+                          ? "border-primary bg-primary-soft text-primary"
+                          : "border-base-border text-ink-dim hover:border-primary-dim/50 hover:text-ink",
+                      )}
+                    >
+                      {b.label || maskPhone(b.phoneNumber)}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setManageOpen(true)}
+                    className="rounded-full border border-dashed border-base-border px-3 py-1.5 text-xs font-medium text-ink-faint hover:border-primary-dim/50 hover:text-ink"
+                  >
+                    Manage
+                  </button>
+                </div>
+              )}
+
+              {form.phoneNumber.length >= 10 && !numberAlreadySaved && (
+                <label className="mt-3 flex cursor-pointer items-center gap-2.5">
+                  <input
+                    type="checkbox"
+                    checked={saveAsBeneficiary}
+                    onChange={(e) => setSaveAsBeneficiary(e.target.checked)}
+                    className="h-4 w-4 rounded border-base-border text-primary focus:ring-primary/40"
+                  />
+                  <span className="text-xs text-ink-dim">
+                    Save this number as a beneficiary
+                  </span>
+                </label>
+              )}
+            </div>
+
+            {form.type === "data" ? (
+              <div>
+                <span className="mb-1.5 block text-xs font-medium text-ink-dim">
+                  Bundle
+                </span>
+                {bundlesLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-14" />
+                    <Skeleton className="h-14" />
+                  </div>
+                ) : !bundles || bundles.length === 0 ? (
+                  <p className="text-sm text-ink-faint">
+                    No bundles available for this network right now.
+                  </p>
+                ) : (
+                  <div className="grid max-h-72 grid-cols-1 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
+                    {bundles.map((b) => (
+                      <button
+                        key={b.item_code}
+                        type="button"
+                        onClick={() => selectBundle(b.item_code)}
+                        className={cn(
+                          "flex items-center justify-between gap-2 rounded-xl border p-3 text-left transition-colors",
+                          form.productCode === b.item_code
+                            ? "border-primary bg-primary-soft"
+                            : "border-base-border bg-base-raised hover:bg-base-surface2",
+                        )}
+                      >
+                        <span className="min-w-0 truncate text-sm font-medium text-ink">
+                          {b.name}
+                        </span>
+                        {b.amount != null && (
+                          <span
+                            className={cn(
+                              "shrink-0 text-sm font-semibold",
+                              form.productCode === b.item_code
+                                ? "text-primary"
+                                : "text-ink-dim",
+                            )}
+                          >
+                            {formatMoney(b.amount)}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             ) : (
               <Input
                 label="Amount (NGN)"
@@ -156,10 +329,11 @@ export default function UtilitiesPage() {
                 onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
               />
             )}
-            {error && <p className="sm:col-span-2 text-sm text-danger">{error}</p>}
+
+            {error && <p className="text-sm text-danger">{error}</p>}
             <Button
               type="submit"
-              className="sm:col-span-2"
+              className="w-full"
               isLoading={submitting}
               disabled={form.type === "data" && !form.productCode}
             >
@@ -209,6 +383,17 @@ export default function UtilitiesPage() {
         </CardBody>
       </Card>
 
+      <Modal
+        open={manageOpen}
+        onClose={() => setManageOpen(false)}
+        title="Manage beneficiaries"
+      >
+        <ManageBeneficiaries
+          beneficiaries={beneficiaries ?? []}
+          onChanged={refetchBeneficiaries}
+        />
+      </Modal>
+
       <BottomSheet
         open={!!selectedPurchase}
         onClose={() => setSelectedPurchase(null)}
@@ -237,6 +422,177 @@ export default function UtilitiesPage() {
           </div>
         )}
       </BottomSheet>
+    </div>
+  );
+}
+
+function ManageBeneficiaries({
+  beneficiaries,
+  onChanged,
+}: {
+  beneficiaries: UtilityBeneficiary[];
+  onChanged: () => void;
+}) {
+  const [adding, setAdding] = useState(beneficiaries.length === 0);
+  const [provider, setProvider] = useState<Provider>("mtn");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [label, setLabel] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const { push } = useToast();
+
+  async function onAdd(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await utilitiesApi.addBeneficiary({
+        provider,
+        phoneNumber,
+        label: label || undefined,
+      });
+      push("success", "Beneficiary added.");
+      setPhoneNumber("");
+      setLabel("");
+      setAdding(false);
+      onChanged();
+    } catch (err) {
+      setError(
+        err instanceof ApiRequestError
+          ? err.message
+          : "Could not add beneficiary.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function onDelete(id: string) {
+    setDeletingId(id);
+    try {
+      await utilitiesApi.deleteBeneficiary(id);
+      push("success", "Beneficiary removed.");
+      onChanged();
+    } catch (err) {
+      push(
+        "error",
+        err instanceof ApiRequestError
+          ? err.message
+          : "Could not remove beneficiary.",
+      );
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {beneficiaries.length > 0 && (
+        <div className="space-y-2">
+          {beneficiaries.map((b) => (
+            <div
+              key={b.id}
+              className="flex items-center gap-3 rounded-xl border border-base-border bg-base-raised p-3.5"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary">
+                <Bookmark className="h-4.5 w-4.5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="flex items-center gap-1.5 truncate text-sm font-medium text-ink">
+                  {b.label || maskPhone(b.phoneNumber)}
+                  <span className="rounded-full bg-base-surface2 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-ink-faint">
+                    {b.provider === "9mobile" ? "9mobile" : b.provider}
+                  </span>
+                </p>
+                <p className="truncate font-mono text-[11px] text-ink-faint">
+                  {b.phoneNumber}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onDelete(b.id)}
+                disabled={deletingId === b.id}
+                aria-label="Remove beneficiary"
+                className="shrink-0 rounded-lg p-2 text-ink-faint hover:bg-danger-soft hover:text-danger disabled:opacity-50"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {adding ? (
+        <form onSubmit={onAdd} className="space-y-4 border-t border-base-border pt-4">
+          <div>
+            <span className="mb-1.5 block text-xs font-medium text-ink-dim">
+              Network
+            </span>
+            <div className="grid grid-cols-4 gap-2">
+              {NETWORKS.map((n) => (
+                <button
+                  key={n.value}
+                  type="button"
+                  onClick={() => setProvider(n.value)}
+                  className={cn(
+                    "rounded-xl border p-2.5 text-center text-xs font-semibold transition-colors",
+                    provider === n.value
+                      ? "border-primary bg-primary-soft text-primary"
+                      : "border-base-border bg-base-raised text-ink hover:bg-base-surface2",
+                  )}
+                >
+                  {n.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <Input
+            label="Phone number"
+            required
+            minLength={10}
+            maxLength={20}
+            value={phoneNumber}
+            onChange={(e) => setPhoneNumber(e.target.value)}
+          />
+          <Input
+            label="Label (optional)"
+            placeholder="e.g. My phone"
+            maxLength={60}
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+          />
+          {error && <p className="text-sm text-danger">{error}</p>}
+          <div className="flex gap-2">
+            {beneficiaries.length > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => setAdding(false)}
+              >
+                Cancel
+              </Button>
+            )}
+            <Button
+              type="submit"
+              className="flex-1"
+              isLoading={submitting}
+              disabled={phoneNumber.length < 10}
+            >
+              Save beneficiary
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={() => setAdding(true)}
+        >
+          <ChevronRight className="h-4 w-4" /> Add another beneficiary
+        </Button>
+      )}
     </div>
   );
 }
