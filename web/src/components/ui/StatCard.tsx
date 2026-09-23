@@ -7,12 +7,14 @@ export function StatCard({
   icon: Icon,
   tone = "primary",
   sub,
+  iconClassName,
 }: {
   label: string;
   value: string;
   icon?: LucideIcon;
   tone?: "primary" | "secondary" | "neutral";
   sub?: string;
+  iconClassName?: string;
 }) {
   const toneClass =
     tone === "primary"
@@ -33,7 +35,7 @@ export function StatCard({
               toneClass,
             )}
           >
-            <Icon className="h-4 w-4" />
+            <Icon className={cn("h-4 w-4", iconClassName)} />
           </span>
         )}
       </div>

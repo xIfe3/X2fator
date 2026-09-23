@@ -16,9 +16,12 @@ import {
 import { useApiQuery } from "@/hooks/useApiQuery";
 import { withdrawalsApi, type SavedBankAccount } from "@/lib/api/withdrawals";
 import { walletApi } from "@/lib/api/wallet";
+import type { Withdrawal } from "@/lib/types";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
+import { BottomSheet } from "@/components/ui/BottomSheet";
+import { DetailList } from "@/components/ui/DetailList";
 import { Input } from "@/components/ui/Input";
 import { SearchSelect } from "@/components/ui/SearchSelect";
 import { StatusPill } from "@/components/ui/StatusPill";
@@ -61,6 +64,9 @@ export default function WithdrawalsPage() {
   const [manageOpen, setManageOpen] = useState(false);
   const [walletType, setWalletType] = useState<WalletType>("referral");
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(
+    null,
+  );
+  const [selectedWithdrawal, setSelectedWithdrawal] = useState<Withdrawal | null>(
     null,
   );
 
@@ -176,9 +182,11 @@ export default function WithdrawalsPage() {
           ) : (
             <div className="space-y-2.5">
               {withdrawals.map((w) => (
-                <div
+                <button
                   key={w.id}
-                  className="flex items-center gap-4 rounded-xl border border-base-border bg-base-raised p-4"
+                  type="button"
+                  onClick={() => setSelectedWithdrawal(w)}
+                  className="flex w-full items-center gap-4 rounded-xl border border-base-border bg-base-raised p-4 text-left transition-colors hover:border-base-borderStrong"
                 >
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary">
                     <ArrowUpFromLine className="h-4.5 w-4.5" />
@@ -201,7 +209,7 @@ export default function WithdrawalsPage() {
                     <Money value={w.amount} size="sm" />
                     <StatusPill status={w.status} />
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}
@@ -390,6 +398,58 @@ export default function WithdrawalsPage() {
           </Button>
         </form>
       </Modal>
+
+      {/* Withdrawal detail */}
+      <BottomSheet
+        open={!!selectedWithdrawal}
+        onClose={() => setSelectedWithdrawal(null)}
+        title="Withdrawal details"
+      >
+        {selectedWithdrawal && (
+          <WithdrawalDetail withdrawal={selectedWithdrawal} />
+        )}
+      </BottomSheet>
+    </div>
+  );
+}
+
+function WithdrawalDetail({ withdrawal: w }: { withdrawal: Withdrawal }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between rounded-xl bg-base-surface2 px-4 py-3.5">
+        <div>
+          <p className="text-xs text-ink-faint">Amount</p>
+          <Money value={w.amount} size="lg" className="mt-0.5" />
+        </div>
+        <StatusPill status={w.status} />
+      </div>
+
+      <DetailList
+        rows={[
+          { label: "Amount requested", value: formatMoney(w.amount) },
+          { label: "Fee", value: w.fee ? formatMoney(w.fee) : undefined },
+          {
+            label: "Amount paid out",
+            value: w.netAmount ? formatMoney(w.netAmount) : undefined,
+          },
+          { label: "Wallet", value: `${w.walletType} wallet` },
+          { label: "Bank", value: w.bankName },
+          { label: "Account number", value: maskAccount(w.accountNumber) },
+          { label: "Account name", value: w.accountName },
+          { label: "Reference", value: w.transactionReference },
+          { label: "Requested", value: formatDateTime(w.createdAt) },
+          {
+            label: "Processed",
+            value: w.processedAt ? formatDateTime(w.processedAt) : undefined,
+          },
+        ]}
+      />
+
+      {w.status === "rejected" && w.rejectionReason && (
+        <div className="rounded-xl border border-danger/30 bg-danger-soft px-3.5 py-2.5 text-sm text-danger">
+          {w.rejectionReason}
+        </div>
+      )}
     </div>
   );
 }

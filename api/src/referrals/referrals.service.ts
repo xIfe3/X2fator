@@ -44,9 +44,17 @@ export class ReferralsService {
       .innerJoin(users, eq(referrals.referredUserId, users.id))
       .where(eq(referrals.referrerId, userId));
 
+    const [{ totalEarned }] = await db
+      .select({
+        totalEarned: sql<string>`coalesce(sum(${earnings.amount}), 0)`,
+      })
+      .from(earnings)
+      .where(and(eq(earnings.userId, userId), eq(earnings.source, 'referral')));
+
     return {
       referralCode: user.referralCode,
       totalReferrals: referredUsers.length,
+      totalEarned,
       referrals: referredUsers,
     };
   }

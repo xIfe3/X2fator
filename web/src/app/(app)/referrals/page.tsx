@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Check, Copy, Trophy, Users } from "lucide-react";
 import { useApiQuery } from "@/hooks/useApiQuery";
 import { referralsApi } from "@/lib/api/referrals";
+import type { Referral } from "@/lib/types";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { StatCard } from "@/components/ui/StatCard";
 import { Button } from "@/components/ui/Button";
@@ -13,12 +14,17 @@ import { Avatar } from "@/components/ui/Avatar";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageSkeleton, Skeleton } from "@/components/ui/Skeleton";
 import { Tabs } from "@/components/ui/Tabs";
-import { formatDate, formatMoney } from "@/lib/utils";
+import { BottomSheet } from "@/components/ui/BottomSheet";
+import { DetailList } from "@/components/ui/DetailList";
+import { formatDate, formatDateTime, formatMoney, maskEmail } from "@/lib/utils";
 import { Leaderboard } from "./Leaderboard";
 
 export default function ReferralsPage() {
   const { data: info, isLoading: infoLoading } = useApiQuery(() => referralsApi.me());
   const { data: referrals, isLoading } = useApiQuery(() => referralsApi.list());
+  const [selectedReferral, setSelectedReferral] = useState<Referral | null>(
+    null,
+  );
   const [leaderboardPeriod, setLeaderboardPeriod] = useState<"week" | "all">(
     "week",
   );
@@ -118,9 +124,11 @@ export default function ReferralsPage() {
           ) : (
             <div className="space-y-2.5">
               {referrals.slice(0, 5).map((r) => (
-                <div
+                <button
                   key={r.id}
-                  className="flex items-center gap-3 rounded-xl border border-base-border bg-base-raised p-4"
+                  type="button"
+                  onClick={() => setSelectedReferral(r)}
+                  className="flex w-full items-center gap-3 rounded-xl border border-base-border bg-base-raised p-4 text-left transition-colors hover:border-base-borderStrong"
                 >
                   <Avatar firstName={r.firstName} lastName={r.lastName} />
                   <div className="min-w-0 flex-1">
@@ -128,19 +136,61 @@ export default function ReferralsPage() {
                       {r.firstName} {r.lastName}
                     </p>
                     <p className="truncate text-xs text-ink-faint">
-                      {r.email}
+                      {maskEmail(r.email)}
                     </p>
                     <p className="mt-0.5 text-[11px] text-ink-faint">
                       Joined {formatDate(r.createdAt)}
                     </p>
                   </div>
                   <StatusPill status={r.status} />
-                </div>
+                </button>
               ))}
             </div>
           )}
         </CardBody>
       </Card>
+
+      <BottomSheet
+        open={!!selectedReferral}
+        onClose={() => setSelectedReferral(null)}
+        title="Referral details"
+      >
+        {selectedReferral && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 rounded-xl bg-base-surface2 px-4 py-3.5">
+              <Avatar
+                firstName={selectedReferral.firstName}
+                lastName={selectedReferral.lastName}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-ink">
+                  {selectedReferral.firstName} {selectedReferral.lastName}
+                </p>
+                <p className="truncate text-xs text-ink-faint">
+                  {maskEmail(selectedReferral.email)}
+                </p>
+              </div>
+              <StatusPill status={selectedReferral.status} />
+            </div>
+
+            <DetailList
+              rows={[
+                {
+                  label: "Name",
+                  value: `${selectedReferral.firstName} ${selectedReferral.lastName}`,
+                  capitalize: false,
+                },
+                { label: "Email", value: maskEmail(selectedReferral.email) },
+                { label: "Status", value: selectedReferral.status },
+                {
+                  label: "Joined",
+                  value: formatDateTime(selectedReferral.createdAt),
+                },
+              ]}
+            />
+          </div>
+        )}
+      </BottomSheet>
     </div>
   );
 }

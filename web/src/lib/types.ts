@@ -211,10 +211,13 @@ export interface Deposit {
   id: string;
   userId: string;
   amount: string;
+  currency?: string;
   provider: DepositProvider;
+  providerReference?: string | null;
   status: "pending" | "processing" | "successful" | "failed" | "rejected";
   reference?: string;
   failureReason?: string | null;
+  paidAt?: string | null;
   createdAt: string;
 }
 
@@ -224,10 +227,13 @@ export interface Withdrawal {
   userId: string;
   walletType: "task" | "referral";
   amount: string;
+  fee?: string;
+  netAmount?: string;
   bankName: string;
   bankCode?: string | null;
   accountNumber: string;
   accountName: string;
+  transactionReference?: string;
   status: "pending" | "processing" | "completed" | "rejected" | "cancelled";
   rejectionReason?: string | null;
   adminNote?: string | null;

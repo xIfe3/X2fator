@@ -351,6 +351,96 @@ html:has(.app-shell-frame) {
   animation: stamp-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* Streak page: a live flame icon (subtle scale/glow flicker, not a
+   spin or bounce) for an active streak — reads as "burning" rather
+   than "loading". */
+@keyframes flame-flicker {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 0 rgba(31, 139, 147, 0));
+  }
+  50% {
+    transform: scale(1.08);
+    filter: drop-shadow(0 0 6px rgba(31, 139, 147, 0.5));
+  }
+}
+.animate-flame {
+  animation: flame-flicker 2.2s ease-in-out infinite;
+  transform-origin: center;
+}
+
+/* Streak grid: each filled day pops in with a slight overshoot,
+   staggered per-cell via the --delay custom property set inline. */
+@keyframes cell-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.55);
+  }
+  60% {
+    transform: scale(1.12);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.animate-cell-pop {
+  animation: cell-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: var(--delay, 0ms);
+}
+
+/* Today's claimable cell — a soft breathing ring instead of a static
+   border, so the eye finds it without it feeling like a spinner. */
+@keyframes today-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(31, 139, 147, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(31, 139, 147, 0);
+  }
+}
+.animate-today-pulse {
+  animation: today-pulse 1.8s ease-out infinite;
+}
+
+/* Milestone cell — a slow diagonal shimmer sweep to mark it as the
+   special "jackpot" day without resorting to confetti. */
+@keyframes milestone-shimmer {
+  from {
+    background-position: -150% 0;
+  }
+  to {
+    background-position: 250% 0;
+  }
+}
+.animate-milestone-shimmer {
+  background-image: linear-gradient(
+    110deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.35) 50%,
+    transparent 60%
+  );
+  background-size: 200% 100%;
+  animation: milestone-shimmer 2.6s ease-in-out infinite;
+}
+
+/* Claim success — a brief radiating ring burst behind the claim
+   button/icon, then fades. Triggered once via a re-mounted key, not
+   looped. */
+@keyframes claim-burst {
+  from {
+    opacity: 0.55;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.2);
+  }
+}
+.animate-claim-burst {
+  animation: claim-burst 0.6s ease-out both;
+}
+
 /* Perforated "tear line" — used between ledger-statement sections to
    reinforce the paper-ledger motif (dashboard hero, subscription
    passbook entries). */

@@ -27,7 +27,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PageSkeleton } from "@/components/ui/Skeleton";
 import { ApiRequestError } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
-import { formatDateTime } from "@/lib/utils";
+import { cn, formatDateTime } from "@/lib/utils";
 
 const TASK_TYPE_META: Record<string, { label: string; icon: typeof Play }> = {
   video: { label: "Watch video", icon: Play },
@@ -99,6 +99,31 @@ export default function TasksPage() {
 
   const hasPlan = !!subscription;
 
+  const todayCompletionsCount = (completions ?? []).filter((c) => {
+    const ts = c.completedAt ?? c.createdAt;
+    if (!ts) return false;
+    const date = new Date(ts);
+    const now = new Date();
+    return (
+      date.getFullYear() === now.getFullYear() &&
+      date.getMonth() === now.getMonth() &&
+      date.getDate() === now.getDate()
+    );
+  }).length;
+
+  const dailyLimitReached = hasPlan
+    ? todayCompletionsCount >= subscription.dailyTaskLimit
+    : false;
+
+  const visibleTasks = (tasks ?? []).filter((t) => {
+    if (!dailyLimitReached) return true;
+    // Once today's limit is hit, only tasks the user already has a
+    // completion record for stay visible (so their status still shows)
+    // — everything else disappears rather than sitting there
+    // unactionable, signaling there's nothing left to do today.
+    return completions?.some((c) => c.taskId === t.id);
+  });
+
   return (
     <div className="space-y-6">
       <div>
@@ -131,14 +156,37 @@ export default function TasksPage() {
         </Card>
       ) : (
         <>
-          <div className="flex items-center gap-2.5 rounded-xl border border-primary-dim/30 bg-primary-soft px-3.5 py-2.5 text-xs text-primary">
+          <div
+            className={cn(
+              "flex items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-xs",
+              dailyLimitReached
+                ? "border-secondary-dim/40 bg-secondary-soft text-secondary"
+                : "border-primary-dim/30 bg-primary-soft text-primary",
+            )}
+          >
             <ListChecks className="h-4 w-4 shrink-0" />
-            <span>
-              Your <span className="font-semibold">{subscription.plan?.name ?? "plan"}</span>{" "}
-              lets you complete up to{" "}
-              <span className="font-semibold">{subscription.dailyTaskLimit}</span>{" "}
-              {subscription.dailyTaskLimit === 1 ? "task" : "tasks"} per day.
-            </span>
+            {dailyLimitReached ? (
+              <span>
+                You've completed{" "}
+                <span className="font-semibold">
+                  {todayCompletionsCount}/{subscription.dailyTaskLimit}
+                </span>{" "}
+                tasks today — that's your limit on the{" "}
+                <span className="font-semibold">{subscription.plan?.name ?? "plan"}</span>{" "}
+                plan. Come back tomorrow for more.
+              </span>
+            ) : (
+              <span>
+                Your <span className="font-semibold">{subscription.plan?.name ?? "plan"}</span>{" "}
+                lets you complete up to{" "}
+                <span className="font-semibold">{subscription.dailyTaskLimit}</span>{" "}
+                {subscription.dailyTaskLimit === 1 ? "task" : "tasks"} per day —{" "}
+                <span className="font-semibold">
+                  {todayCompletionsCount}/{subscription.dailyTaskLimit}
+                </span>{" "}
+                done today.
+              </span>
+            )}
           </div>
 
           <Tabs
@@ -164,9 +212,15 @@ export default function TasksPage() {
                 title="No tasks available"
                 description="Check back later for new tasks."
               />
+            ) : visibleTasks.length === 0 ? (
+              <EmptyState
+                icon={ListChecks}
+                title="No more tasks for you today"
+                description="You've hit your daily task limit. Check back tomorrow."
+              />
             ) : (
               <div className="space-y-3">
-                {tasks.map((t) => {
+                {visibleTasks.map((t) => {
                   const meta = TASK_TYPE_META[t.taskType ?? "other"] ?? {
                     label: "Open link",
                     icon: ExternalLink,

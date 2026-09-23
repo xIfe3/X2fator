@@ -35,6 +35,7 @@ export default function PlansPage() {
 
   const [confirming, setConfirming] = useState<Plan | null>(null);
   const [purchasing, setPurchasing] = useState(false);
+  const [purchaseError, setPurchaseError] = useState<string | null>(null);
 
   const highestHeldRank = (history ?? []).reduce(
     (max, sub) => Math.max(max, sub.plan?.rank ?? 0),
@@ -44,6 +45,7 @@ export default function PlansPage() {
   async function confirmPurchase() {
     if (!confirming) return;
     setPurchasing(true);
+    setPurchaseError(null);
     try {
       await subscriptionsApi.purchase(confirming.id);
       push(
@@ -54,8 +56,7 @@ export default function PlansPage() {
       refetchActive();
       refetchHistory();
     } catch (error) {
-      push(
-        "error",
+      setPurchaseError(
         error instanceof ApiRequestError
           ? error.message
           : "Could not purchase this plan.",
@@ -192,7 +193,10 @@ export default function PlansPage() {
                 ) : (
                   <Button
                     className="w-full"
-                    onClick={() => setConfirming(plan)}
+                    onClick={() => {
+                      setPurchaseError(null);
+                      setConfirming(plan);
+                    }}
                   >
                     {activeSubscription ? "Upgrade to this plan" : "Subscribe"}
                   </Button>
@@ -244,7 +248,10 @@ export default function PlansPage() {
 
       <Modal
         open={confirming !== null}
-        onClose={() => setConfirming(null)}
+        onClose={() => {
+          setConfirming(null);
+          setPurchaseError(null);
+        }}
         title="Confirm subscription"
       >
         {confirming && (
@@ -259,11 +266,19 @@ export default function PlansPage() {
               ? This amount will be deducted from your account wallet
               balance right away.
             </p>
+            {purchaseError && (
+              <p className="rounded-lg border border-danger/30 bg-danger-soft px-3.5 py-2.5 text-sm text-danger">
+                {purchaseError}
+              </p>
+            )}
             <div className="flex gap-2">
               <Button
                 variant="outline"
                 className="flex-1"
-                onClick={() => setConfirming(null)}
+                onClick={() => {
+                  setConfirming(null);
+                  setPurchaseError(null);
+                }}
                 disabled={purchasing}
               >
                 Cancel

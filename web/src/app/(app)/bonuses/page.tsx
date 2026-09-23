@@ -19,6 +19,7 @@ export default function BonusesPage() {
     bonusesApi.daily(),
   );
   const [claiming, setClaiming] = useState(false);
+  const [justClaimed, setJustClaimed] = useState(false);
   const { push } = useToast();
 
   async function claim() {
@@ -27,6 +28,8 @@ export default function BonusesPage() {
       const result = await bonusesApi.claimDaily();
       refetch();
       window.dispatchEvent(new Event("wallet-updated"));
+      setJustClaimed(true);
+      setTimeout(() => setJustClaimed(false), 900);
       push(
         "success",
         result.isMilestone
@@ -75,6 +78,9 @@ export default function BonusesPage() {
               value={`${status?.currentStreak ?? 0} day${status?.currentStreak === 1 ? "" : "s"}`}
               icon={Flame}
               tone="primary"
+              iconClassName={
+                (status?.currentStreak ?? 0) > 0 ? "animate-flame" : undefined
+              }
             />
             <StatCard
               label="Longest streak"
@@ -89,8 +95,20 @@ export default function BonusesPage() {
       <Card className="border-primary-dim/40 bg-primary-soft/50">
         <CardBody className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-base shadow-stamp">
-              <Gift className="h-5 w-5" />
+            <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-base shadow-stamp">
+              {justClaimed && (
+                <span
+                  key="burst"
+                  className="animate-claim-burst absolute inset-0 rounded-full border-2 border-primary"
+                  aria-hidden="true"
+                />
+              )}
+              <Gift
+                className={cn(
+                  "h-5 w-5",
+                  !status?.claimed && status?.enabled && "animate-flame",
+                )}
+              />
             </span>
             <div>
               <p className="text-sm font-semibold text-ink">
@@ -127,16 +145,23 @@ export default function BonusesPage() {
               (day) => {
                 const filled = day <= filledDays;
                 const isMilestoneCell = day === milestoneDays;
+                const isToday = !status?.claimed && day === status?.nextStreak;
                 return (
                   <div
                     key={day}
-                    className={cn(
-                      "flex aspect-square items-center justify-center rounded-lg text-[11px] font-medium",
+                    style={
                       filled
-                        ? "bg-primary text-base"
+                        ? { "--delay": `${Math.min(day, 12) * 30}ms` } as React.CSSProperties
+                        : undefined
+                    }
+                    className={cn(
+                      "relative flex aspect-square items-center justify-center overflow-hidden rounded-lg text-[11px] font-medium transition-transform",
+                      filled
+                        ? "animate-cell-pop bg-primary text-base"
                         : "bg-base-surface2 text-ink-faint",
                       isMilestoneCell && !filled && "border border-secondary-dim/60 text-secondary",
-                      isMilestoneCell && filled && "bg-secondary text-base",
+                      isMilestoneCell && filled && "animate-milestone-shimmer bg-secondary text-base",
+                      isToday && "animate-today-pulse ring-2 ring-primary/70",
                     )}
                   >
                     {day}

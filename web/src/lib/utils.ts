@@ -88,6 +88,19 @@ export function isValidUsername(value: string) {
 }
 
 /**
+ * Masks an email for display in shared/social contexts (referrals list,
+ * leaderboards) — keeps the first 4 characters of the local part and
+ * the full domain, e.g. "odohnneka20@icloud.com" -> "odoh****@icloud.com".
+ * Local parts of 4 characters or fewer keep just the first character.
+ */
+export function maskEmail(email: string) {
+  const [local, domain] = email.split("@");
+  if (!local || !domain) return email;
+  const visible = local.length > 4 ? local.slice(0, 4) : local.slice(0, 1);
+  return `${visible}****@${domain}`;
+}
+
+/**
  * Resolves a possibly-relative file URL (e.g. "/uploads/xyz.png", as
  * returned by our own upload endpoint) against the API's origin, so
  * links/images work regardless of whether the frontend and backend are

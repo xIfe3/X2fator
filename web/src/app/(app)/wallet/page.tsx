@@ -228,7 +228,7 @@ export default function WalletPage() {
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex-col items-stretch gap-3 sm:flex-row sm:items-center">
           <CardTitle>Transaction history</CardTitle>
           <Tabs
             tabs={[

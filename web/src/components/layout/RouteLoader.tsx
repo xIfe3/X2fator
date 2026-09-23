@@ -16,29 +16,55 @@ export function useRouteLoader() {
   return useContext(RouteLoaderContext);
 }
 
+// Once shown, the loader stays up at least this long — a route that
+// resolves instantly (already-cached client navigation) would otherwise
+// make it flash for a single frame, which reads as a glitch rather than
+// a loading state.
+const MIN_VISIBLE_MS = 3000;
+const SAFETY_TIMEOUT_MS = 8000;
+
 export function RouteLoaderProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [active, setActive] = useState(false);
   const prevPathname = useRef(pathname);
+  const shownAt = useRef<number | null>(null);
   const safetyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function start() {
     setActive(true);
+    shownAt.current = Date.now();
     if (safetyTimer.current) clearTimeout(safetyTimer.current);
-    safetyTimer.current = setTimeout(() => setActive(false), 4000);
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    safetyTimer.current = setTimeout(() => setActive(false), SAFETY_TIMEOUT_MS);
+  }
+
+  function hide() {
+    if (safetyTimer.current) clearTimeout(safetyTimer.current);
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+
+    const elapsed = shownAt.current ? Date.now() - shownAt.current : MIN_VISIBLE_MS;
+    const remaining = Math.max(0, MIN_VISIBLE_MS - elapsed);
+
+    if (remaining === 0) {
+      setActive(false);
+    } else {
+      hideTimer.current = setTimeout(() => setActive(false), remaining);
+    }
   }
 
   useEffect(() => {
     if (prevPathname.current !== pathname) {
       prevPathname.current = pathname;
-      setActive(false);
-      if (safetyTimer.current) clearTimeout(safetyTimer.current);
+      hide();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
   useEffect(() => {
     return () => {
       if (safetyTimer.current) clearTimeout(safetyTimer.current);
+      if (hideTimer.current) clearTimeout(hideTimer.current);
     };
   }, []);
 

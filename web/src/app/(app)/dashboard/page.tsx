@@ -24,11 +24,15 @@ import { useRouteLoader } from "@/components/layout/RouteLoader";
 import { useApiQuery } from "@/hooks/useApiQuery";
 import { walletApi } from "@/lib/api/wallet";
 import { referralsApi } from "@/lib/api/referrals";
+import type { WalletTransaction } from "@/lib/types";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Money } from "@/components/ui/Money";
 import { Badge } from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { BottomSheet } from "@/components/ui/BottomSheet";
+import { DetailList } from "@/components/ui/DetailList";
+import { StatusPill } from "@/components/ui/StatusPill";
 import { cn, formatDateTime, formatMoney } from "@/lib/utils";
 import { bonusesApi } from "@/lib/api/bonuses";
 import { Leaderboard } from "../referrals/Leaderboard";
@@ -48,6 +52,9 @@ export default function DashboardPage() {
   const { start: startRouteLoader } = useRouteLoader();
   const [hideBalance, setHideBalance] = useState(false);
   const [clickedHref, setClickedHref] = useState<string | null>(null);
+  const [selectedTxn, setSelectedTxn] = useState<WalletTransaction | null>(
+    null,
+  );
 
   function handleQuickAction(href: string) {
     setClickedHref(href);
@@ -243,9 +250,11 @@ export default function DashboardPage() {
             ) : (
               <div className="space-y-1">
                 {txns.items.slice(0, 6).map((t) => (
-                  <div
+                  <button
                     key={t.id}
-                    className="flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-base-surface2"
+                    type="button"
+                    onClick={() => setSelectedTxn(t)}
+                    className="flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-base-surface2"
                   >
                     <span
                       className={
@@ -275,7 +284,7 @@ export default function DashboardPage() {
                       signed={t.direction}
                       tone={t.direction === "credit" ? "secondary" : "danger"}
                     />
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
@@ -331,6 +340,50 @@ export default function DashboardPage() {
           </CardBody>
         </Card>
       )}
+
+      <BottomSheet
+        open={!!selectedTxn}
+        onClose={() => setSelectedTxn(null)}
+        title="Transaction details"
+      >
+        {selectedTxn && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between rounded-xl bg-base-surface2 px-4 py-3.5">
+              <div>
+                <p className="text-xs text-ink-faint">Amount</p>
+                <Money
+                  value={selectedTxn.amount}
+                  size="lg"
+                  signed={selectedTxn.direction}
+                  tone={selectedTxn.direction === "credit" ? "secondary" : "danger"}
+                  className="mt-0.5"
+                />
+              </div>
+              <StatusPill
+                status={selectedTxn.direction === "credit" ? "completed" : "debited"}
+              />
+            </div>
+
+            <DetailList
+              rows={[
+                {
+                  label: "Type",
+                  value: selectedTxn.type.replace(/_/g, " "),
+                },
+                { label: "Direction", value: selectedTxn.direction },
+                { label: "Description", value: selectedTxn.description },
+                {
+                  label: "Balance after",
+                  value: selectedTxn.balanceAfter
+                    ? formatMoney(selectedTxn.balanceAfter)
+                    : undefined,
+                },
+                { label: "Date", value: formatDateTime(selectedTxn.createdAt) },
+              ]}
+            />
+          </div>
+        )}
+      </BottomSheet>
     </div>
   );
 }
