@@ -9,16 +9,18 @@ import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Table, THead, Th, Tr, Td } from "@/components/ui/Table";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
+import { BottomSheet } from "@/components/ui/BottomSheet";
+import { DetailList } from "@/components/ui/DetailList";
 import { Input, Textarea } from "@/components/ui/Input";
 import { Switch } from "@/components/ui/Switch";
 import { Tabs } from "@/components/ui/Tabs";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { PageSkeleton } from "@/components/ui/Skeleton";
+import { PageSkeleton, Skeleton } from "@/components/ui/Skeleton";
 import { ApiRequestError } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
 import { Money } from "@/components/ui/Money";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime, formatMoney } from "@/lib/utils";
 
 const STATUS_TABS = [
   { key: "all", label: "All" },
@@ -64,6 +66,11 @@ export default function AdminWithdrawalsPage() {
     [statusFilter],
   );
   const [reconcilingId, setReconcilingId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const { data: selectedWithdrawal, isLoading: selectedLoading } = useApiQuery(
+    () => (selectedId ? adminApi.withdrawals.get(selectedId) : Promise.resolve(null)),
+    [selectedId],
+  );
   const [settingsForm, setSettingsForm] = useState({
     referralMinimumWithdrawal: "",
     taskWithdrawalDay: "",
@@ -355,7 +362,11 @@ export default function AdminWithdrawalsPage() {
               </THead>
               <tbody>
                 {pending.map((w) => (
-                  <Tr key={w.id}>
+                  <Tr
+                    key={w.id}
+                    className="cursor-pointer"
+                    onClick={() => setSelectedId(w.id)}
+                  >
                     <Td>{w.bankName}</Td>
                     <Td className="font-mono text-xs text-ink-dim">
                       {w.accountNumber} · {w.accountName}
@@ -367,7 +378,10 @@ export default function AdminWithdrawalsPage() {
                       <Money value={w.amount} size="sm" />
                     </Td>
                     <Td className="text-right">
-                      <div className="flex justify-end gap-1.5">
+                      <div
+                        className="flex justify-end gap-1.5"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         {canApprove && (
                           <Button
                             size="sm"
@@ -431,7 +445,11 @@ export default function AdminWithdrawalsPage() {
               </THead>
               <tbody>
                 {allWithdrawals.map((w) => (
-                  <Tr key={w.id}>
+                  <Tr
+                    key={w.id}
+                    className="cursor-pointer"
+                    onClick={() => setSelectedId(w.id)}
+                  >
                     <Td>{w.bankName}</Td>
                     <Td className="font-mono text-xs text-ink-dim">
                       {w.accountNumber} · {w.accountName}
@@ -452,7 +470,10 @@ export default function AdminWithdrawalsPage() {
                           size="sm"
                           variant="outline"
                           isLoading={reconcilingId === w.id}
-                          onClick={() => reconcile(w.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            reconcile(w.id);
+                          }}
                         >
                           <RefreshCw className="h-3.5 w-3.5" /> Reconcile
                         </Button>
@@ -510,6 +531,46 @@ export default function AdminWithdrawalsPage() {
           </Button>
         </div>
       </Modal>
+
+      <BottomSheet
+        open={!!selectedId}
+        onClose={() => setSelectedId(null)}
+        title="Withdrawal details"
+      >
+        {selectedLoading ? (
+          <Skeleton className="h-48" />
+        ) : selectedWithdrawal ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between rounded-xl bg-base-surface2 px-4 py-3.5">
+              <div>
+                <p className="text-xs text-ink-faint">Amount</p>
+                <Money value={selectedWithdrawal.amount} size="lg" className="mt-0.5" />
+              </div>
+              <StatusPill status={selectedWithdrawal.status} />
+            </div>
+            <DetailList
+              rows={[
+                { label: "Wallet", value: `${selectedWithdrawal.walletType} wallet` },
+                { label: "Bank", value: selectedWithdrawal.bankName },
+                { label: "Account number", value: selectedWithdrawal.accountNumber },
+                { label: "Account name", value: selectedWithdrawal.accountName },
+                { label: "Fee", value: selectedWithdrawal.fee ? formatMoney(selectedWithdrawal.fee) : undefined },
+                { label: "Net amount", value: selectedWithdrawal.netAmount ? formatMoney(selectedWithdrawal.netAmount) : undefined },
+                { label: "Reference", value: selectedWithdrawal.transactionReference },
+                { label: "Requested", value: formatDateTime(selectedWithdrawal.createdAt) },
+                {
+                  label: "Processed",
+                  value: selectedWithdrawal.processedAt
+                    ? formatDateTime(selectedWithdrawal.processedAt)
+                    : undefined,
+                },
+                { label: "Admin note", value: selectedWithdrawal.adminNote },
+                { label: "Rejection reason", value: selectedWithdrawal.rejectionReason },
+              ]}
+            />
+          </div>
+        ) : null}
+      </BottomSheet>
     </div>
   );
 }

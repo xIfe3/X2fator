@@ -8,14 +8,16 @@ import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
+import { BottomSheet } from "@/components/ui/BottomSheet";
+import { DetailList } from "@/components/ui/DetailList";
 import { Money } from "@/components/ui/Money";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageSkeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { ApiRequestError } from "@/lib/api-client";
-import { formatDate } from "@/lib/utils";
-import type { Plan } from "@/lib/types";
+import { formatDate, formatDateTime, formatMoney } from "@/lib/utils";
+import type { Plan, Subscription } from "@/lib/types";
 
 export default function PlansPage() {
   const { data: plans, isLoading: plansLoading } = useApiQuery(() =>
@@ -36,6 +38,7 @@ export default function PlansPage() {
   const [confirming, setConfirming] = useState<Plan | null>(null);
   const [purchasing, setPurchasing] = useState(false);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
+  const [selectedSub, setSelectedSub] = useState<Subscription | null>(null);
 
   const highestHeldRank = (history ?? []).reduce(
     (max, sub) => Math.max(max, sub.plan?.rank ?? 0),
@@ -223,9 +226,11 @@ export default function PlansPage() {
           ) : (
             <div className="space-y-2.5">
               {history.map((sub) => (
-                <div
+                <button
                   key={sub.id}
-                  className="flex items-center gap-4 rounded-xl border border-base-border bg-base-raised p-4"
+                  type="button"
+                  onClick={() => setSelectedSub(sub)}
+                  className="flex w-full items-center gap-4 rounded-xl border border-base-border bg-base-raised p-4 text-left transition-colors hover:border-base-borderStrong"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-ink">
@@ -239,7 +244,7 @@ export default function PlansPage() {
                     <Money value={sub.amountPaid} size="sm" />
                     <StatusPill status={sub.status} />
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}
@@ -294,6 +299,49 @@ export default function PlansPage() {
           </div>
         )}
       </Modal>
+
+      <BottomSheet
+        open={!!selectedSub}
+        onClose={() => setSelectedSub(null)}
+        title="Subscription details"
+      >
+        {selectedSub && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between rounded-xl bg-base-surface2 px-4 py-3.5">
+              <div>
+                <p className="text-xs text-ink-faint">Amount paid</p>
+                <Money value={selectedSub.amountPaid} size="lg" className="mt-0.5" />
+              </div>
+              <StatusPill status={selectedSub.status} />
+            </div>
+
+            <DetailList
+              rows={[
+                { label: "Plan", value: selectedSub.plan?.name },
+                {
+                  label: "Daily task limit",
+                  value: selectedSub.dailyTaskLimit,
+                },
+                {
+                  label: "Daily reward",
+                  value: formatMoney(selectedSub.dailyReward),
+                },
+                {
+                  label: "Referral reward rate",
+                  value: `${selectedSub.referralRewardRate}%`,
+                },
+                { label: "Started", value: formatDateTime(selectedSub.startsAt) },
+                {
+                  label: "Purchased",
+                  value: selectedSub.createdAt
+                    ? formatDateTime(selectedSub.createdAt)
+                    : undefined,
+                },
+              ]}
+            />
+          </div>
+        )}
+      </BottomSheet>
     </div>
   );
 }

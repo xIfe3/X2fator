@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertTriangle, Users } from "lucide-react";
+import { useState } from "react";
 import { useApiQuery } from "@/hooks/useApiQuery";
 import { adminApi } from "@/lib/api/admin";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -9,6 +10,8 @@ import { Money } from "@/components/ui/Money";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageSkeleton, Skeleton } from "@/components/ui/Skeleton";
+import { BottomSheet } from "@/components/ui/BottomSheet";
+import { DetailList } from "@/components/ui/DetailList";
 import { formatDateTime } from "@/lib/utils";
 
 export default function AdminReferralsPage() {
@@ -20,6 +23,11 @@ export default function AdminReferralsPage() {
   );
   const { data: suspicious, isLoading: suspiciousLoading } = useApiQuery(() =>
     adminApi.referrals.suspicious(),
+  );
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const { data: selectedReferral, isLoading: selectedLoading } = useApiQuery(
+    () => (selectedId ? adminApi.referrals.get(selectedId) : Promise.resolve(null)),
+    [selectedId],
   );
 
   return (
@@ -128,7 +136,11 @@ export default function AdminReferralsPage() {
               </THead>
               <tbody>
                 {referrals.map((r) => (
-                  <Tr key={r.id}>
+                  <Tr
+                    key={r.id}
+                    className="cursor-pointer"
+                    onClick={() => setSelectedId(r.id)}
+                  >
                     <Td className="text-xs">
                       <p className="font-medium text-ink">
                         {r.referrerFirstName} {r.referrerLastName}
@@ -157,6 +169,86 @@ export default function AdminReferralsPage() {
           )}
         </CardBody>
       </Card>
+
+      <BottomSheet
+        open={!!selectedId}
+        onClose={() => setSelectedId(null)}
+        title="Referral details"
+      >
+        {selectedLoading ? (
+          <Skeleton className="h-48" />
+        ) : selectedReferral ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between rounded-xl bg-base-surface2 px-4 py-3.5">
+              <div>
+                <p className="text-xs text-ink-faint">Total commission</p>
+                <Money value={selectedReferral.totalCommission} size="lg" className="mt-0.5" />
+              </div>
+              <StatusPill status={selectedReferral.status} />
+            </div>
+
+            <p className="text-xs font-semibold uppercase tracking-wider text-ink-faint">
+              Referrer
+            </p>
+            <DetailList
+              rows={[
+                {
+                  label: "Name",
+                  value: `${selectedReferral.referrerFirstName} ${selectedReferral.referrerLastName}`,
+                  capitalize: false,
+                },
+                { label: "Username", value: selectedReferral.referrerUsername, capitalize: false },
+                { label: "Email", value: selectedReferral.referrerEmail, capitalize: false },
+              ]}
+            />
+
+            <p className="text-xs font-semibold uppercase tracking-wider text-ink-faint">
+              Referred user
+            </p>
+            <DetailList
+              rows={[
+                {
+                  label: "Name",
+                  value: `${selectedReferral.referredFirstName} ${selectedReferral.referredLastName}`,
+                  capitalize: false,
+                },
+                { label: "Username", value: selectedReferral.referredUsername, capitalize: false },
+                { label: "Email", value: selectedReferral.referredEmail, capitalize: false },
+                { label: "Phone", value: selectedReferral.referredPhone, capitalize: false },
+                { label: "Joined", value: formatDateTime(selectedReferral.referredJoinedAt) },
+              ]}
+            />
+
+            <DetailList
+              rows={[
+                { label: "Commission rate", value: `${selectedReferral.commissionRate}%` },
+                { label: "Since", value: formatDateTime(selectedReferral.createdAt) },
+              ]}
+            />
+
+            {selectedReferral.earnings.length > 0 && (
+              <>
+                <p className="text-xs font-semibold uppercase tracking-wider text-ink-faint">
+                  Commission earnings ({selectedReferral.earnings.length})
+                </p>
+                <div className="space-y-2">
+                  {selectedReferral.earnings.map((e) => (
+                    <div
+                      key={e.id}
+                      className="flex items-center justify-between rounded-lg border border-base-border bg-base-raised px-3 py-2 text-xs"
+                    >
+                      <span className="text-ink-faint">
+                        {formatDateTime(e.createdAt)}
+                      </span>
+                      <Money value={e.amount} size="sm" tone="primary" />
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        ) : null}
+      </BottomSheet>
     </div>
   );
 }

@@ -42,13 +42,18 @@ export class FlutterwaveBillsService {
   }
 
   /**
-   * Lists data bundle options for a network, sourced from Flutterwave's
-   * live bill-categories list so bundle sizes/prices always match what
-   * Flutterwave can actually fulfil.
+   * Fetches Flutterwave's live bill-categories list for a network,
+   * split into data-bundle and airtime categories. Both purchase flows
+   * source their `item_code` from here — Flutterwave's `/bills`
+   * endpoint rejects anything that isn't a real category code from this
+   * list, so neither flow can use a made-up literal.
    */
-  async listDataBundles(
+  private async listBillCategories(
     provider: 'mtn' | 'airtel' | 'glo' | '9mobile',
-  ): Promise<FlutterwaveBillCategory[]> {
+  ): Promise<{
+    dataBundles: FlutterwaveBillCategory[];
+    airtime: FlutterwaveBillCategory[];
+  }> {
     const { secretKey, baseUrl } = this.assertConfigured();
 
     const response = await fetch(`${baseUrl}/bill-categories?country=NG`, {
@@ -65,21 +70,38 @@ export class FlutterwaveBillsService {
 
     if (!response.ok || body.status !== 'success' || !body.data) {
       throw new BadRequestException(
-        body.message ?? 'Could not fetch data bundle options',
+        body.message ?? 'Could not fetch bill categories',
       );
     }
 
     const billerName = NETWORK_BILLER_NAMES[provider];
-
-    return body.data.filter(
-      (category) =>
-        !category.is_airtime &&
-        category.biller_name.toLowerCase().includes(billerName.toLowerCase()),
+    const forNetwork = body.data.filter((category) =>
+      category.biller_name.toLowerCase().includes(billerName.toLowerCase()),
     );
+
+    return {
+      dataBundles: forNetwork.filter((category) => !category.is_airtime),
+      airtime: forNetwork.filter((category) => category.is_airtime),
+    };
   }
 
   /**
-   * Pays an airtime top-up bill through Flutterwave.
+   * Lists data bundle options for a network, sourced from Flutterwave's
+   * live bill-categories list so bundle sizes/prices always match what
+   * Flutterwave can actually fulfil.
+   */
+  async listDataBundles(
+    provider: 'mtn' | 'airtel' | 'glo' | '9mobile',
+  ): Promise<FlutterwaveBillCategory[]> {
+    const { dataBundles } = await this.listBillCategories(provider);
+    return dataBundles;
+  }
+
+  /**
+   * Pays an airtime top-up bill through Flutterwave. The biller's real
+   * airtime item_code is looked up fresh from bill-categories rather
+   * than hardcoded — a literal like "AIRTIME" is not a category
+   * Flutterwave recognizes, so sending it fails every airtime purchase.
    */
   async payAirtime(params: {
     provider: 'mtn' | 'airtel' | 'glo' | '9mobile';
@@ -87,8 +109,17 @@ export class FlutterwaveBillsService {
     amount: string;
     reference: string;
   }): Promise<{ providerReference: string; message: string }> {
+    const { airtime } = await this.listBillCategories(params.provider);
+    const category = airtime[0];
+
+    if (!category) {
+      throw new BadRequestException(
+        `Airtime top-up is not available for ${NETWORK_BILLER_NAMES[params.provider]} right now`,
+      );
+    }
+
     return this.payBill({
-      itemCode: 'AIRTIME',
+      itemCode: category.item_code,
       billerName: NETWORK_BILLER_NAMES[params.provider],
       phoneNumber: params.phoneNumber,
       amount: params.amount,

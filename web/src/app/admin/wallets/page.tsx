@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ArrowDownToLine, ArrowUpFromLine, BookOpen } from "lucide-react";
 import { useApiQuery } from "@/hooks/useApiQuery";
-import { adminApi } from "@/lib/api/admin";
+import { adminApi, type LedgerEntry } from "@/lib/api/admin";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Select } from "@/components/ui/Input";
 import { Money } from "@/components/ui/Money";
@@ -11,7 +11,9 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PageSkeleton } from "@/components/ui/Skeleton";
 import { Pagination } from "@/components/ui/Pagination";
 import { StatusPill } from "@/components/ui/StatusPill";
-import { formatDateTime } from "@/lib/utils";
+import { BottomSheet } from "@/components/ui/BottomSheet";
+import { DetailList } from "@/components/ui/DetailList";
+import { formatDateTime, formatMoney } from "@/lib/utils";
 
 const TRANSACTION_TYPES = [
   "deposit",
@@ -34,6 +36,7 @@ export default function AdminWalletsLedgerPage() {
     status: "",
   });
   const [page, setPage] = useState(1);
+  const [selectedTxn, setSelectedTxn] = useState<LedgerEntry | null>(null);
 
   const { data, isLoading } = useApiQuery(
     () =>
@@ -145,9 +148,11 @@ export default function AdminWalletsLedgerPage() {
           ) : (
             <div className="space-y-2.5">
               {data.items.map((t) => (
-                <div
+                <button
                   key={t.id}
-                  className="flex flex-col gap-2 rounded-xl border border-base-border bg-base-raised p-4 sm:flex-row sm:items-center sm:gap-4"
+                  type="button"
+                  onClick={() => setSelectedTxn(t)}
+                  className="flex w-full flex-col gap-2 rounded-xl border border-base-border bg-base-raised p-4 text-left transition-colors hover:border-base-borderStrong sm:flex-row sm:items-center sm:gap-4"
                 >
                   <span
                     className={
@@ -193,7 +198,7 @@ export default function AdminWalletsLedgerPage() {
                       )}
                     {t.status && <StatusPill status={t.status} />}
                   </div>
-                </div>
+                </button>
               ))}
               <Pagination
                 page={data.page}
@@ -204,6 +209,54 @@ export default function AdminWalletsLedgerPage() {
           )}
         </CardBody>
       </Card>
+
+      <BottomSheet
+        open={!!selectedTxn}
+        onClose={() => setSelectedTxn(null)}
+        title="Transaction details"
+      >
+        {selectedTxn && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between rounded-xl bg-base-surface2 px-4 py-3.5">
+              <div>
+                <p className="text-xs text-ink-faint">Amount</p>
+                <Money
+                  value={selectedTxn.amount}
+                  size="lg"
+                  signed={selectedTxn.direction}
+                  tone={selectedTxn.direction === "credit" ? "secondary" : "danger"}
+                  className="mt-0.5"
+                />
+              </div>
+              {selectedTxn.status && <StatusPill status={selectedTxn.status} />}
+            </div>
+            <DetailList
+              rows={[
+                {
+                  label: "User",
+                  value: `${selectedTxn.userFirstName} ${selectedTxn.userLastName}`,
+                  capitalize: false,
+                },
+                { label: "Email", value: selectedTxn.userEmail, capitalize: false },
+                { label: "Wallet", value: `${selectedTxn.walletType} wallet` },
+                { label: "Type", value: selectedTxn.type.replace(/_/g, " ") },
+                { label: "Direction", value: selectedTxn.direction },
+                { label: "Reference", value: selectedTxn.reference },
+                { label: "Description", value: selectedTxn.description },
+                {
+                  label: "Balance change",
+                  value:
+                    selectedTxn.balanceBefore !== undefined &&
+                    selectedTxn.balanceAfter !== undefined
+                      ? `${formatMoney(selectedTxn.balanceBefore)} → ${formatMoney(selectedTxn.balanceAfter)}`
+                      : undefined,
+                },
+                { label: "Date", value: formatDateTime(selectedTxn.createdAt) },
+              ]}
+            />
+          </div>
+        )}
+      </BottomSheet>
     </div>
   );
 }

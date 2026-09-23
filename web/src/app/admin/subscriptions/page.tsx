@@ -13,13 +13,17 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageSkeleton } from "@/components/ui/Skeleton";
 import { Pagination } from "@/components/ui/Pagination";
-import { formatDateTime } from "@/lib/utils";
+import { BottomSheet } from "@/components/ui/BottomSheet";
+import { DetailList } from "@/components/ui/DetailList";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { formatDateTime, formatMoney } from "@/lib/utils";
 
 const STATUSES = ["pending", "active", "completed", "cancelled", "expired"];
 
 export default function AdminSubscriptionsPage() {
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const { data: stats } = useApiQuery(() => adminApi.subscriptions.stats());
   const { data, isLoading } = useApiQuery(
@@ -30,6 +34,10 @@ export default function AdminSubscriptionsPage() {
         pageSize: 30,
       }),
     [status, page],
+  );
+  const { data: selectedSub, isLoading: selectedLoading } = useApiQuery(
+    () => (selectedId ? adminApi.subscriptions.get(selectedId) : Promise.resolve(null)),
+    [selectedId],
   );
 
   return (
@@ -129,7 +137,11 @@ export default function AdminSubscriptionsPage() {
                 </THead>
                 <tbody>
                   {data.items.map((s) => (
-                    <Tr key={s.id}>
+                    <Tr
+                      key={s.id}
+                      className="cursor-pointer"
+                      onClick={() => setSelectedId(s.id)}
+                    >
                       <Td>
                         <p className="font-medium text-ink">
                           {s.userFirstName} {s.userLastName}
@@ -162,6 +174,46 @@ export default function AdminSubscriptionsPage() {
           )}
         </CardBody>
       </Card>
+
+      <BottomSheet
+        open={!!selectedId}
+        onClose={() => setSelectedId(null)}
+        title="Subscription details"
+      >
+        {selectedLoading ? (
+          <Skeleton className="h-48" />
+        ) : selectedSub ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between rounded-xl bg-base-surface2 px-4 py-3.5">
+              <div>
+                <p className="text-xs text-ink-faint">Amount paid</p>
+                <Money value={selectedSub.amountPaid} size="lg" className="mt-0.5" />
+              </div>
+              <StatusPill status={selectedSub.status} />
+            </div>
+            <DetailList
+              rows={[
+                {
+                  label: "User",
+                  value: `${selectedSub.userFirstName} ${selectedSub.userLastName}`,
+                  capitalize: false,
+                },
+                { label: "Email", value: selectedSub.userEmail, capitalize: false },
+                { label: "Plan", value: selectedSub.planName },
+                { label: "Daily task limit", value: selectedSub.dailyTaskLimit },
+                { label: "Daily reward", value: formatMoney(selectedSub.dailyReward) },
+                {
+                  label: "Referral reward rate",
+                  value: `${selectedSub.referralRewardRate}%`,
+                },
+                { label: "Started", value: formatDateTime(selectedSub.startsAt) },
+                { label: "Created", value: formatDateTime(selectedSub.createdAt) },
+                { label: "Updated", value: formatDateTime(selectedSub.updatedAt) },
+              ]}
+            />
+          </div>
+        ) : null}
+      </BottomSheet>
     </div>
   );
 }

@@ -14,12 +14,17 @@ import {
 } from "lucide-react";
 import { useApiQuery } from "@/hooks/useApiQuery";
 import { walletApi } from "@/lib/api/wallet";
+import type { WalletTransaction } from "@/lib/types";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Tabs } from "@/components/ui/Tabs";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageSkeleton, Skeleton } from "@/components/ui/Skeleton";
 import { Pagination } from "@/components/ui/Pagination";
+import { BottomSheet } from "@/components/ui/BottomSheet";
+import { DetailList } from "@/components/ui/DetailList";
+import { StatusPill } from "@/components/ui/StatusPill";
+import { Money } from "@/components/ui/Money";
 import { formatDateTime, formatMoney } from "@/lib/utils";
 
 const VALID_TYPES = ["account", "task", "referral"] as const;
@@ -35,6 +40,9 @@ export default function WalletPage() {
     initialType,
   );
   const [page, setPage] = useState(1);
+  const [selectedTxn, setSelectedTxn] = useState<WalletTransaction | null>(
+    null,
+  );
   const { data: wallets, isLoading: walletsLoading } = useApiQuery(() =>
     walletApi.getWallets(),
   );
@@ -256,9 +264,11 @@ export default function WalletPage() {
           ) : (
             <div className="space-y-2.5">
               {txns.items.map((t) => (
-                <div
+                <button
                   key={t.id}
-                  className="flex items-center gap-4 rounded-xl border border-base-border bg-base-raised p-4 transition-colors hover:border-base-borderStrong"
+                  type="button"
+                  onClick={() => setSelectedTxn(t)}
+                  className="flex w-full items-center gap-4 rounded-xl border border-base-border bg-base-raised p-4 text-left transition-colors hover:border-base-borderStrong"
                 >
                   <span
                     className={
@@ -293,7 +303,7 @@ export default function WalletPage() {
                     {t.direction === "credit" ? "+" : "−"}
                     {formatMoney(t.amount)}
                   </span>
-                </div>
+                </button>
               ))}
               <Pagination
                 page={txns.page}
@@ -304,6 +314,50 @@ export default function WalletPage() {
           )}
         </CardBody>
       </Card>
+
+      <BottomSheet
+        open={!!selectedTxn}
+        onClose={() => setSelectedTxn(null)}
+        title="Transaction details"
+      >
+        {selectedTxn && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between rounded-xl bg-base-surface2 px-4 py-3.5">
+              <div>
+                <p className="text-xs text-ink-faint">Amount</p>
+                <Money
+                  value={selectedTxn.amount}
+                  size="lg"
+                  signed={selectedTxn.direction}
+                  tone={selectedTxn.direction === "credit" ? "secondary" : "danger"}
+                  className="mt-0.5"
+                />
+              </div>
+              <StatusPill
+                status={selectedTxn.direction === "credit" ? "completed" : "debited"}
+              />
+            </div>
+
+            <DetailList
+              rows={[
+                {
+                  label: "Type",
+                  value: selectedTxn.type.replace(/_/g, " "),
+                },
+                { label: "Direction", value: selectedTxn.direction },
+                { label: "Description", value: selectedTxn.description },
+                {
+                  label: "Balance after",
+                  value: selectedTxn.balanceAfter
+                    ? formatMoney(selectedTxn.balanceAfter)
+                    : undefined,
+                },
+                { label: "Date", value: formatDateTime(selectedTxn.createdAt) },
+              ]}
+            />
+          </div>
+        )}
+      </BottomSheet>
     </div>
   );
 }

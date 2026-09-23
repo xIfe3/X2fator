@@ -10,6 +10,8 @@ import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Table, THead, Th, Tr, Td } from "@/components/ui/Table";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
+import { BottomSheet } from "@/components/ui/BottomSheet";
+import { DetailList } from "@/components/ui/DetailList";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Input, Select, Textarea } from "@/components/ui/Input";
 import { PasswordField } from "@/components/ui/PasswordField";
@@ -60,6 +62,11 @@ export default function AdminUsersPage() {
     null,
   );
   const [walletLoading, setWalletLoading] = useState(false);
+  const [profileId, setProfileId] = useState<string | null>(null);
+  const { data: profileUser, isLoading: profileLoading } = useApiQuery(
+    () => (profileId ? adminApi.users.get(profileId) : Promise.resolve(null)),
+    [profileId],
+  );
   const [editTarget, setEditTarget] = useState<AdminUser | null>(null);
   const [editForm, setEditForm] = useState({
     firstName: "",
@@ -270,7 +277,11 @@ export default function AdminUsersPage() {
               </THead>
               <tbody>
                 {users.map((u) => (
-                  <Tr key={u.id}>
+                  <Tr
+                    key={u.id}
+                    className="cursor-pointer"
+                    onClick={() => setProfileId(u.id)}
+                  >
                     <Td className="font-medium">
                       {u.firstName} {u.lastName}
                     </Td>
@@ -283,7 +294,10 @@ export default function AdminUsersPage() {
                       <StatusPill status={u.status} />
                     </Td>
                     <Td className="text-right">
-                      <div className="flex justify-end gap-1.5">
+                      <div
+                        className="flex justify-end gap-1.5"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         {canActivate && (
                           <Button
                             size="sm"
@@ -680,6 +694,50 @@ export default function AdminUsersPage() {
           </div>
         ) : null}
       </Modal>
+
+      <BottomSheet
+        open={!!profileId}
+        onClose={() => setProfileId(null)}
+        title="User profile"
+      >
+        {profileLoading ? (
+          <PageSkeleton />
+        ) : profileUser ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between rounded-xl bg-base-surface2 px-4 py-3.5">
+              <div>
+                <p className="text-sm font-semibold text-ink">
+                  {profileUser.firstName} {profileUser.lastName}
+                </p>
+                <p className="text-xs text-ink-faint">{profileUser.email}</p>
+              </div>
+              <StatusPill status={profileUser.status} />
+            </div>
+            <DetailList
+              rows={[
+                { label: "Username", value: profileUser.username, capitalize: false },
+                { label: "Referral code", value: profileUser.referralCode, capitalize: false },
+                { label: "Phone", value: profileUser.phone, capitalize: false },
+                { label: "Gender", value: profileUser.gender },
+                { label: "Roles", value: profileUser.roles?.join(", ") },
+                { label: "Login count", value: profileUser.loginCount },
+                {
+                  label: "Last login",
+                  value: profileUser.lastLoginAt
+                    ? formatDateTime(profileUser.lastLoginAt)
+                    : undefined,
+                },
+                {
+                  label: "Joined",
+                  value: profileUser.createdAt
+                    ? formatDateTime(profileUser.createdAt)
+                    : undefined,
+                },
+              ]}
+            />
+          </div>
+        ) : null}
+      </BottomSheet>
 
       <ConfirmDialog
         open={!!confirmAction}

@@ -5,6 +5,7 @@ import type {
   AdType,
   AdWithRequester,
   AdminDeposit,
+  AdminDepositDetail,
   AdminDepositStats,
   AdminSupportTicket,
   AdminSupportTicketDetail,
@@ -94,6 +95,37 @@ export interface AdminSubscriptionStats {
   totalRevenue: string;
 }
 
+export interface AdminReferral {
+  id: string;
+  status: string;
+  commissionRate: string;
+  totalCommission: string;
+  createdAt: string;
+  referrerId: string;
+  referrerFirstName: string;
+  referrerLastName: string;
+  referrerEmail: string;
+  referredId: string;
+  referredFirstName: string;
+  referredLastName: string;
+  referredEmail: string;
+  referredPhone?: string | null;
+}
+
+export interface AdminReferralDetail extends AdminReferral {
+  updatedAt: string;
+  referrerUsername: string;
+  referredUsername: string;
+  referredJoinedAt: string;
+  earnings: {
+    id: string;
+    amount: string;
+    status: string;
+    description?: string | null;
+    createdAt: string;
+  }[];
+}
+
 export interface GatewayStatus {
   provider: string;
   baseUrl?: string;
@@ -155,6 +187,7 @@ export const adminApi = {
   deposits: {
     all: () => api.get<AdminDeposit[]>("/admin/deposits"),
     stats: () => api.get<AdminDepositStats>("/admin/deposits/stats"),
+    get: (id: string) => api.get<AdminDepositDetail>(`/admin/deposits/${id}`),
     review: (
       id: string,
       body: {
@@ -277,24 +310,9 @@ export const adminApi = {
         activeReferrals: number;
         totalCommission: string;
       }>("/admin/referrals/stats"),
-    all: () =>
-      api.get<
-        {
-          id: string;
-          status: string;
-          commissionRate: string;
-          totalCommission: string;
-          createdAt: string;
-          referrerId: string;
-          referrerFirstName: string;
-          referrerLastName: string;
-          referrerEmail: string;
-          referredId: string;
-          referredFirstName: string;
-          referredLastName: string;
-          referredEmail: string;
-        }[]
-      >("/admin/referrals/all"),
+    all: () => api.get<AdminReferral[]>("/admin/referrals/all"),
+    get: (id: string) =>
+      api.get<AdminReferralDetail>(`/admin/referrals/${id}`),
     suspicious: (threshold?: number) =>
       api.get<
         {

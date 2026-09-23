@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { Zap } from "lucide-react";
 import { useApiQuery } from "@/hooks/useApiQuery";
 import { utilitiesApi } from "@/lib/api/utilities";
+import type { UtilityPurchase } from "@/lib/types";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input, Select } from "@/components/ui/Input";
@@ -11,6 +12,8 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { Money } from "@/components/ui/Money";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageSkeleton, Skeleton } from "@/components/ui/Skeleton";
+import { BottomSheet } from "@/components/ui/BottomSheet";
+import { DetailList } from "@/components/ui/DetailList";
 import { ApiRequestError } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
 import { formatDateTime, formatMoney } from "@/lib/utils";
@@ -28,6 +31,9 @@ export default function UtilitiesPage() {
   });
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [selectedPurchase, setSelectedPurchase] = useState<UtilityPurchase | null>(
+    null,
+  );
   const { push } = useToast();
 
   const { data: bundles, isLoading: bundlesLoading } = useApiQuery(
@@ -175,9 +181,11 @@ export default function UtilitiesPage() {
           ) : (
             <div className="space-y-2.5">
               {purchases.map((p) => (
-                <div
+                <button
                   key={p.id}
-                  className="flex items-center gap-4 rounded-xl border border-base-border bg-base-raised p-4"
+                  type="button"
+                  onClick={() => setSelectedPurchase(p)}
+                  className="flex w-full items-center gap-4 rounded-xl border border-base-border bg-base-raised p-4 text-left transition-colors hover:border-base-borderStrong"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium capitalize text-ink">
@@ -194,12 +202,41 @@ export default function UtilitiesPage() {
                     <Money value={p.amount} size="sm" />
                     <StatusPill status={p.status} />
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}
         </CardBody>
       </Card>
+
+      <BottomSheet
+        open={!!selectedPurchase}
+        onClose={() => setSelectedPurchase(null)}
+        title="Purchase details"
+      >
+        {selectedPurchase && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between rounded-xl bg-base-surface2 px-4 py-3.5">
+              <div>
+                <p className="text-xs text-ink-faint">Amount</p>
+                <Money value={selectedPurchase.amount} size="lg" className="mt-0.5" />
+              </div>
+              <StatusPill status={selectedPurchase.status} />
+            </div>
+
+            <DetailList
+              rows={[
+                { label: "Type", value: selectedPurchase.type },
+                { label: "Network", value: selectedPurchase.provider },
+                { label: "Phone number", value: selectedPurchase.phoneNumber },
+                { label: "Reference", value: selectedPurchase.reference },
+                { label: "Response", value: selectedPurchase.responseMessage },
+                { label: "Date", value: formatDateTime(selectedPurchase.createdAt) },
+              ]}
+            />
+          </div>
+        )}
+      </BottomSheet>
     </div>
   );
 }

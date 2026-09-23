@@ -275,6 +275,81 @@ export class ReferralsService {
   // ---- Admin ------------------------------------------------------
 
   /**
+   * Admin: a single referral relationship with both users' full
+   * profiles and the earnings history behind its commission total.
+   */
+  async getOneAdmin(referralId: string) {
+    const rows = await db.execute(sql`
+      select
+        r.id,
+        r.status,
+        r.commission_rate as "commissionRate",
+        r.total_commission as "totalCommission",
+        r.created_at as "createdAt",
+        r.updated_at as "updatedAt",
+        ru.id as "referrerId",
+        ru.first_name as "referrerFirstName",
+        ru.last_name as "referrerLastName",
+        ru.email as "referrerEmail",
+        ru.username as "referrerUsername",
+        du.id as "referredId",
+        du.first_name as "referredFirstName",
+        du.last_name as "referredLastName",
+        du.email as "referredEmail",
+        du.username as "referredUsername",
+        du.phone as "referredPhone",
+        du.created_at as "referredJoinedAt"
+      from referrals r
+      inner join users ru on ru.id = r.referrer_id
+      inner join users du on du.id = r.referred_user_id
+      where r.id = ${referralId}
+      limit 1
+    `);
+
+    const referral = rows.rows[0] as
+      | {
+          id: string;
+          status: string;
+          commissionRate: string;
+          totalCommission: string;
+          createdAt: string;
+          updatedAt: string;
+          referrerId: string;
+          referrerFirstName: string;
+          referrerLastName: string;
+          referrerEmail: string;
+          referrerUsername: string;
+          referredId: string;
+          referredFirstName: string;
+          referredLastName: string;
+          referredEmail: string;
+          referredUsername: string;
+          referredPhone: string | null;
+          referredJoinedAt: string;
+        }
+      | undefined;
+
+    if (!referral) {
+      throw new NotFoundException('Referral not found');
+    }
+
+    const earningsHistory = await db.query.earnings.findMany({
+      where: and(
+        eq(earnings.userId, referral.referrerId),
+        eq(earnings.source, 'referral'),
+      ),
+      orderBy: (earnings, { desc }) => [desc(earnings.createdAt)],
+    });
+
+    const commissionEarnings = earningsHistory.filter((e) => {
+      const metadata = e.metadata as { referredUserId?: string } | null;
+      return metadata?.referredUserId === referral.referredId;
+    });
+
+    return { ...referral, earnings: commissionEarnings };
+  }
+
+  /**
    * Admin: platform-wide referral stats — total referral relationships,
    * total commission ever paid out, and how many are currently active.
    */

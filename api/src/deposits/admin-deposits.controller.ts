@@ -24,6 +24,12 @@ export class AdminDepositsController {
     return this.depositsService.getAdminStats();
   }
 
+  @Get(':id')
+  @RequirePermission('deposits.read')
+  getOne(@Param('id') id: string) {
+    return this.depositsService.getOneAdmin(id);
+  }
+
   @Patch(':id/review')
   @RequirePermission('deposits.review')
   reviewDeposit(

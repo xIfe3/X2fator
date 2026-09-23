@@ -5,16 +5,18 @@ import { Lock, Megaphone } from "lucide-react";
 import { adsApi } from "@/lib/api/ads";
 import { siteContentApi } from "@/lib/api/site-content";
 import { useApiQuery } from "@/hooks/useApiQuery";
-import type { AdType } from "@/lib/types";
+import type { Ad, AdType } from "@/lib/types";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input, Select, Textarea } from "@/components/ui/Input";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { Money } from "@/components/ui/Money";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { BottomSheet } from "@/components/ui/BottomSheet";
+import { DetailList } from "@/components/ui/DetailList";
 import { useToast } from "@/components/ui/Toast";
 import { ApiRequestError } from "@/lib/api-client";
-import { formatMoney, formatDate } from "@/lib/utils";
+import { formatMoney, formatDate, formatDateTime } from "@/lib/utils";
 
 const AD_TYPE_LABELS: Record<AdType, string> = {
   app_download: "App downloads",
@@ -38,6 +40,7 @@ export default function AdsPage() {
     quantity: "50",
   });
   const [saving, setSaving] = useState(false);
+  const [selectedAd, setSelectedAd] = useState<Ad | null>(null);
 
   const quantity = Number(form.quantity) || 0;
   const pricePerUnit = pricing ? Number(pricing[form.adType]) : 0;
@@ -159,9 +162,11 @@ export default function AdsPage() {
         <CardBody className="space-y-3">
           {ads?.length ? (
             ads.map((ad) => (
-              <div
+              <button
                 key={ad.id}
-                className="flex flex-col gap-2 border-b border-base-border pb-3 last:border-0 sm:flex-row sm:items-center sm:justify-between"
+                type="button"
+                onClick={() => setSelectedAd(ad)}
+                className="flex w-full flex-col gap-2 border-b border-base-border pb-3 text-left transition-colors last:border-0 hover:bg-base-surface2/60 sm:flex-row sm:items-center sm:justify-between sm:rounded-lg sm:px-2"
               >
                 <div>
                   <p className="font-medium text-ink">{ad.title}</p>
@@ -178,7 +183,7 @@ export default function AdsPage() {
                     <StatusPill status={ad.status} />
                   </div>
                 </div>
-              </div>
+              </button>
             ))
           ) : (
             <p className="text-sm text-ink-dim">
@@ -187,6 +192,40 @@ export default function AdsPage() {
           )}
         </CardBody>
       </Card>
+
+      <BottomSheet
+        open={!!selectedAd}
+        onClose={() => setSelectedAd(null)}
+        title="Campaign details"
+      >
+        {selectedAd && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between rounded-xl bg-base-surface2 px-4 py-3.5">
+              <div>
+                <p className="text-xs text-ink-faint">Budget</p>
+                <Money value={selectedAd.budget} size="lg" tone="primary" className="mt-0.5" />
+              </div>
+              <StatusPill status={selectedAd.status} />
+            </div>
+
+            <DetailList
+              rows={[
+                { label: "Title", value: selectedAd.title, capitalize: false },
+                { label: "Type", value: AD_TYPE_LABELS[selectedAd.adType] },
+                { label: "Target URL", value: selectedAd.targetUrl, capitalize: false },
+                { label: "Description", value: selectedAd.description ?? undefined },
+                { label: "Quantity", value: selectedAd.quantity },
+                {
+                  label: "Completed",
+                  value: `${selectedAd.quantity - selectedAd.remainingSlots}/${selectedAd.quantity}`,
+                },
+                { label: "Price per unit", value: formatMoney(selectedAd.pricePerUnit) },
+                { label: "Created", value: formatDateTime(selectedAd.createdAt) },
+              ]}
+            />
+          </div>
+        )}
+      </BottomSheet>
     </div>
   );
 }

@@ -11,6 +11,8 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { Money } from "@/components/ui/Money";
 import { formatDateTime } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { BottomSheet } from "@/components/ui/BottomSheet";
+import { DetailList } from "@/components/ui/DetailList";
 import { useToast } from "@/components/ui/Toast";
 import { ApiRequestError } from "@/lib/api-client";
 
@@ -30,6 +32,11 @@ export default function AdminDepositsPage() {
   } = useApiQuery(() => adminApi.deposits.stats());
   const { push } = useToast();
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const { data: selectedDeposit, isLoading: selectedLoading } = useApiQuery(
+    () => (selectedId ? adminApi.deposits.get(selectedId) : Promise.resolve(null)),
+    [selectedId],
+  );
 
   async function review(id: string, action: "approve" | "reject") {
     setBusyId(id + action);
@@ -127,7 +134,11 @@ export default function AdminDepositsPage() {
               </THead>
               <tbody>
                 {deposits?.map((deposit) => (
-                  <Tr key={deposit.id}>
+                  <Tr
+                    key={deposit.id}
+                    className="cursor-pointer"
+                    onClick={() => setSelectedId(deposit.id)}
+                  >
                     <Td className="font-mono text-xs">{deposit.reference}</Td>
                     <Td className="text-xs">
                       <p className="font-medium text-ink">
@@ -146,7 +157,10 @@ export default function AdminDepositsPage() {
                     </Td>
                     <Td className="text-right">
                       {deposit.status === "pending" && canReview && (
-                        <span className="flex justify-end gap-2">
+                        <span
+                          className="flex justify-end gap-2"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <Button
                             size="sm"
                             isLoading={busyId === deposit.id + "approve"}
@@ -172,6 +186,65 @@ export default function AdminDepositsPage() {
           )}
         </CardBody>
       </Card>
+
+      <BottomSheet
+        open={!!selectedId}
+        onClose={() => setSelectedId(null)}
+        title="Deposit details"
+      >
+        {selectedLoading ? (
+          <Skeleton className="h-48" />
+        ) : selectedDeposit ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between rounded-xl bg-base-surface2 px-4 py-3.5">
+              <div>
+                <p className="text-xs text-ink-faint">Amount</p>
+                <Money value={selectedDeposit.amount} size="lg" className="mt-0.5" />
+              </div>
+              <StatusPill status={selectedDeposit.status} />
+            </div>
+            <DetailList
+              rows={[
+                {
+                  label: "User",
+                  value: `${selectedDeposit.userFirstName} ${selectedDeposit.userLastName}`,
+                  capitalize: false,
+                },
+                { label: "Email", value: selectedDeposit.userEmail, capitalize: false },
+                { label: "Provider", value: selectedDeposit.provider },
+                { label: "Currency", value: selectedDeposit.currency },
+                { label: "Reference", value: selectedDeposit.reference },
+                { label: "Provider reference", value: selectedDeposit.providerReference },
+                { label: "Failure reason", value: selectedDeposit.failureReason },
+                { label: "Created", value: formatDateTime(selectedDeposit.createdAt) },
+                {
+                  label: "Paid",
+                  value: selectedDeposit.paidAt
+                    ? formatDateTime(selectedDeposit.paidAt)
+                    : undefined,
+                },
+              ]}
+            />
+            {selectedDeposit.payment && (
+              <>
+                <p className="text-xs font-semibold uppercase tracking-wider text-ink-faint">
+                  Linked payment
+                </p>
+                <DetailList
+                  rows={[
+                    { label: "Payment reference", value: selectedDeposit.payment.reference },
+                    {
+                      label: "Provider reference",
+                      value: selectedDeposit.payment.providerReference,
+                    },
+                    { label: "Payment status", value: selectedDeposit.payment.status },
+                  ]}
+                />
+              </>
+            )}
+          </div>
+        ) : null}
+      </BottomSheet>
     </div>
   );
 }

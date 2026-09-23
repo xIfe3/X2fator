@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 
 import { ReferralsService } from './referrals.service';
 
@@ -28,5 +28,10 @@ export class AdminReferralsController {
     return this.referralsService.getSuspiciousReferrals(
       threshold ? Number(threshold) : undefined,
     );
+  }
+
+  @Get(':id')
+  async getOne(@Param('id') id: string) {
+    return this.referralsService.getOneAdmin(id);
   }
 }

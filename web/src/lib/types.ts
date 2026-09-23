@@ -197,6 +197,17 @@ export interface AdminDeposit {
   failureReason?: string | null;
   createdAt: string;
 }
+export interface AdminDepositDetail extends AdminDeposit {
+  paidAt?: string | null;
+  updatedAt?: string;
+  payment: {
+    id: string;
+    reference: string;
+    providerReference?: string | null;
+    status: string;
+    rawResponse?: string | null;
+  } | null;
+}
 export interface AdminDepositStats {
   totalCount: number;
   totalAmount: string;

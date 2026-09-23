@@ -177,6 +177,51 @@ export class DepositsService {
     }));
   }
 
+  /**
+   * Admin: a single deposit with its user and linked payment record
+   * (including the raw provider response) attached — the full detail
+   * view behind the admin deposits list.
+   */
+  async getOneAdmin(depositId: string) {
+    const row = await db
+      .select({
+        deposit: deposits,
+        userId: users.id,
+        userFirstName: users.firstName,
+        userLastName: users.lastName,
+        userEmail: users.email,
+      })
+      .from(deposits)
+      .innerJoin(users, eq(deposits.userId, users.id))
+      .where(eq(deposits.id, depositId))
+      .limit(1);
+
+    if (!row[0]) {
+      throw new NotFoundException('Deposit not found');
+    }
+
+    const payment = await db.query.payments.findFirst({
+      where: eq(payments.depositId, depositId),
+    });
+
+    return {
+      ...row[0].deposit,
+      userId: row[0].userId,
+      userFirstName: row[0].userFirstName,
+      userLastName: row[0].userLastName,
+      userEmail: row[0].userEmail,
+      payment: payment
+        ? {
+            id: payment.id,
+            reference: payment.reference,
+            providerReference: payment.providerReference,
+            status: payment.status,
+            rawResponse: payment.rawResponse,
+          }
+        : null,
+    };
+  }
+
   async getAdminStats() {
     const [stats] = await db
       .select({

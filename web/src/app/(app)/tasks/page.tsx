@@ -15,7 +15,7 @@ import { useApiQuery } from "@/hooks/useApiQuery";
 import { tasksApi } from "@/lib/api/tasks";
 import { subscriptionsApi } from "@/lib/api/plans";
 import { uploadsApi } from "@/lib/api/uploads";
-import type { Task } from "@/lib/types";
+import type { Task, TaskCompletion } from "@/lib/types";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
@@ -25,6 +25,8 @@ import { Badge } from "@/components/ui/Badge";
 import { Money } from "@/components/ui/Money";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageSkeleton } from "@/components/ui/Skeleton";
+import { BottomSheet } from "@/components/ui/BottomSheet";
+import { DetailList } from "@/components/ui/DetailList";
 import { ApiRequestError } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
 import { cn, formatDateTime } from "@/lib/utils";
@@ -54,6 +56,8 @@ export default function TasksPage() {
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [selectedCompletion, setSelectedCompletion] =
+    useState<TaskCompletion | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { push } = useToast();
 
@@ -311,9 +315,11 @@ export default function TasksPage() {
             ) : (
               <div className="space-y-2.5">
                 {completions.map((c) => (
-                  <div
+                  <button
                     key={c.id}
-                    className="flex items-center gap-4 rounded-xl border border-base-border bg-base-raised p-4"
+                    type="button"
+                    onClick={() => setSelectedCompletion(c)}
+                    className="flex w-full items-center gap-4 rounded-xl border border-base-border bg-base-raised p-4 text-left transition-colors hover:border-base-borderStrong"
                   >
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-ink">
@@ -329,7 +335,7 @@ export default function TasksPage() {
                       )}
                     </div>
                     <StatusPill status={c.status} />
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
@@ -338,6 +344,59 @@ export default function TasksPage() {
       )}
         </>
       )}
+
+      <BottomSheet
+        open={!!selectedCompletion}
+        onClose={() => setSelectedCompletion(null)}
+        title="Submission details"
+      >
+        {selectedCompletion && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between rounded-xl bg-base-surface2 px-4 py-3.5">
+              <div>
+                <p className="text-xs text-ink-faint">Reward</p>
+                <Money
+                  value={selectedCompletion.reward}
+                  size="lg"
+                  tone="primary"
+                  className="mt-0.5"
+                />
+              </div>
+              <StatusPill status={selectedCompletion.status} />
+            </div>
+
+            {selectedCompletion.screenshotUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={selectedCompletion.screenshotUrl}
+                alt="Submitted proof"
+                className="max-h-56 w-full rounded-xl border border-base-border object-cover"
+              />
+            )}
+
+            <DetailList
+              rows={[
+                { label: "Task", value: selectedCompletion.task?.title },
+                {
+                  label: "Submitted",
+                  value: formatDateTime(
+                    selectedCompletion.completedAt ??
+                      selectedCompletion.createdAt ??
+                      "",
+                  ),
+                },
+                {
+                  label: "Reviewed",
+                  value: selectedCompletion.reviewedAt
+                    ? formatDateTime(selectedCompletion.reviewedAt)
+                    : undefined,
+                },
+                { label: "Review note", value: selectedCompletion.reviewNote },
+              ]}
+            />
+          </div>
+        )}
+      </BottomSheet>
 
       <Modal
         open={!!selected}

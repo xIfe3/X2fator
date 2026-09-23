@@ -4,13 +4,15 @@ import { useState } from "react";
 import { Coins } from "lucide-react";
 import { useApiQuery } from "@/hooks/useApiQuery";
 import { earningsApi } from "@/lib/api/earnings";
-import type { EarningSource } from "@/lib/types";
+import type { Earning, EarningSource } from "@/lib/types";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { StatCard } from "@/components/ui/StatCard";
 import { Tabs } from "@/components/ui/Tabs";
 import { Money } from "@/components/ui/Money";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { BottomSheet } from "@/components/ui/BottomSheet";
+import { DetailList } from "@/components/ui/DetailList";
 import { formatDateTime, formatMoney } from "@/lib/utils";
 
 const sources: { key: EarningSource | "all"; label: string }[] = [
@@ -23,6 +25,7 @@ const sources: { key: EarningSource | "all"; label: string }[] = [
 
 export default function EarningsPage() {
   const [source, setSource] = useState<EarningSource | "all">("all");
+  const [selectedEarning, setSelectedEarning] = useState<Earning | null>(null);
   const { data: summary, isLoading: summaryLoading } = useApiQuery(() =>
     earningsApi.summary(),
   );
@@ -91,9 +94,11 @@ export default function EarningsPage() {
           ) : (
             <div className="space-y-2.5">
               {earnings.map((e) => (
-                <div
+                <button
                   key={e.id}
-                  className="flex items-center gap-4 rounded-xl border border-base-border bg-base-raised p-4"
+                  type="button"
+                  onClick={() => setSelectedEarning(e)}
+                  className="flex w-full items-center gap-4 rounded-xl border border-base-border bg-base-raised p-4 text-left transition-colors hover:border-base-borderStrong"
                 >
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary">
                     <Coins className="h-4.5 w-4.5" />
@@ -109,12 +114,42 @@ export default function EarningsPage() {
                     </div>
                   </div>
                   <Money value={e.amount} size="sm" tone="primary" signed="credit" />
-                </div>
+                </button>
               ))}
             </div>
           )}
         </CardBody>
       </Card>
+
+      <BottomSheet
+        open={!!selectedEarning}
+        onClose={() => setSelectedEarning(null)}
+        title="Earning details"
+      >
+        {selectedEarning && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between rounded-xl bg-base-surface2 px-4 py-3.5">
+              <div>
+                <p className="text-xs text-ink-faint">Amount</p>
+                <Money
+                  value={selectedEarning.amount}
+                  size="lg"
+                  tone="primary"
+                  signed="credit"
+                  className="mt-0.5"
+                />
+              </div>
+            </div>
+            <DetailList
+              rows={[
+                { label: "Source", value: selectedEarning.source },
+                { label: "Description", value: selectedEarning.description },
+                { label: "Date", value: formatDateTime(selectedEarning.createdAt) },
+              ]}
+            />
+          </div>
+        )}
+      </BottomSheet>
     </div>
   );
 }
