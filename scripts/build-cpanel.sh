@@ -98,6 +98,9 @@ EOF
 # ---------------------------------------------------------------------
 WEB_OUT="$DEPLOY_DIR/web"
 cp -r "$WEB_PKG/.next" "$WEB_OUT/.next"
+# Build cache only speeds up the next local build — the server never
+# reads it, and it's ~95% of the bundle's size.
+rm -rf "$WEB_OUT/.next/cache"
 if [ -d "$WEB_PKG/public" ]; then
   cp -r "$WEB_PKG/public" "$WEB_OUT/public"
 fi

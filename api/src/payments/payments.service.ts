@@ -120,6 +120,55 @@ export class PaymentsService {
       throw new NotFoundException('Payment record not found');
     }
 
+    const result = await this.chargeFlutterwave(
+      userId,
+      payment,
+      deposit.currency,
+      method,
+    );
+
+    await db
+      .update(deposits)
+      .set({ status: 'processing', updatedAt: new Date() })
+      .where(eq(deposits.id, deposit.id));
+
+    return result;
+  }
+
+  /**
+   * Same in-app bank transfer / USSD charge as initializeDirectCharge(),
+   * but for the signup-time plan payment, which has no deposit row and
+   * whose (still `pending`) user isn't authenticated yet. Safe without
+   * auth because the payment reference is an unguessable, single-use
+   * token only ever handed to the browser that started the signup.
+   */
+  async initializeRegistrationCharge(
+    paymentReference: string,
+    method: 'bank_transfer' | 'ussd',
+  ) {
+    const payment = await db.query.payments.findFirst({
+      where: eq(payments.reference, paymentReference),
+    });
+
+    const metadata = payment?.metadata as { purpose?: string } | null;
+
+    if (!payment || metadata?.purpose !== 'plan_purchase') {
+      throw new NotFoundException('Payment not found');
+    }
+
+    if (payment.status !== 'pending') {
+      throw new BadRequestException('Payment is no longer pending');
+    }
+
+    return this.chargeFlutterwave(payment.userId, payment, 'NGN', method);
+  }
+
+  private async chargeFlutterwave(
+    userId: string,
+    payment: typeof payments.$inferSelect,
+    currency: string,
+    method: 'bank_transfer' | 'ussd',
+  ) {
     const secretKey = this.configService?.get<string>('flutterwave.secretKey');
     const baseUrl = this.configService?.get<string>('flutterwave.baseUrl');
 
@@ -141,7 +190,7 @@ export class PaymentsService {
       body: JSON.stringify({
         tx_ref: payment.reference,
         amount: Number(payment.amount),
-        currency: deposit.currency,
+        currency,
         email: user.email,
         fullname: `${user.firstName} ${user.lastName}`,
         // "1" auto-selects the first supported USSD bank (GTBank) — we
@@ -198,10 +247,6 @@ export class PaymentsService {
       .update(payments)
       .set({ status: 'processing', updatedAt: new Date() })
       .where(eq(payments.id, payment.id));
-    await db
-      .update(deposits)
-      .set({ status: 'processing', updatedAt: new Date() })
-      .where(eq(deposits.id, deposit.id));
 
     if (method === 'bank_transfer') {
       return {
@@ -224,40 +269,6 @@ export class PaymentsService {
       ussdCode:
         (meta.ussd_code as string | undefined) ??
         (meta.note as string | undefined),
-    };
-  }
-
-  /**
-   * Initialize a Flutterwave checkout for a payment that isn't tied to a
-   * deposit — currently used for the signup-time plan purchase, where the
-   * money is paying for a plan directly rather than topping up a wallet.
-   */
-  async initializeRawPayment(userId: string, paymentReference: string) {
-    const payment = await db.query.payments.findFirst({
-      where: eq(payments.reference, paymentReference),
-    });
-
-    if (!payment || payment.userId !== userId) {
-      throw new NotFoundException('Payment not found');
-    }
-
-    if (payment.status !== 'pending') {
-      throw new BadRequestException('Payment is no longer pending');
-    }
-
-    const authorizationUrl = await this.initializeFlutterwaveCheckout(
-      userId,
-      payment.reference,
-      payment.amount,
-      'NGN',
-      'X2Factor plan purchase',
-    );
-
-    return {
-      paymentId: payment.id,
-      reference: payment.reference,
-      amount: payment.amount,
-      authorizationUrl,
     };
   }
 

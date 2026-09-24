@@ -58,10 +58,12 @@ export const userBankAccounts = pgTable(
       table.accountNumber,
     ),
 
-    userAccountUnique: uniqueIndex("user_bank_accounts_user_account_unique").on(
-      table.userId,
-      table.accountNumber,
-    ),
+    // Includes the bank: wallet banks like OPay and PalmPay both use the
+    // user's phone number as the account number, so the same number at
+    // two different banks is two different accounts.
+    userAccountUnique: uniqueIndex(
+      "user_bank_accounts_user_bank_account_unique",
+    ).on(table.userId, table.bankCode, table.accountNumber),
   }),
 );
 

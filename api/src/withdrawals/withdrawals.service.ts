@@ -112,12 +112,13 @@ export class WithdrawalsService {
     const existing = await db.query.userBankAccounts.findFirst({
       where: and(
         eq(userBankAccounts.userId, userId),
+        eq(userBankAccounts.bankCode, params.bankCode),
         eq(userBankAccounts.accountNumber, params.accountNumber),
       ),
     });
 
     if (existing) {
-      throw new BadRequestException('This account has already been saved');
+      throw new BadRequestException('This account has already been saved for this bank');
     }
 
     const accountCount = await db
@@ -431,6 +432,7 @@ export class WithdrawalsService {
     const existing = await db.query.userBankAccounts.findFirst({
       where: and(
         eq(userBankAccounts.userId, userId),
+        eq(userBankAccounts.bankCode, account.bankCode),
         eq(userBankAccounts.accountNumber, account.accountNumber),
       ),
     });

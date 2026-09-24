@@ -2,6 +2,7 @@ import { api, tokenStore } from "../api-client";
 import type {
   AuthMeResponse,
   AuthResponse,
+  ChargeDetails,
   RegisterResponse,
   User,
 } from "../types";
@@ -27,6 +28,16 @@ export const authApi = {
   confirmRegistrationPayment: (paymentReference: string) =>
     api.get<AuthResponse>(
       `/auth/register/confirm/${encodeURIComponent(paymentReference)}`,
+      { auth: false },
+    ),
+
+  chargeRegistration: (
+    paymentReference: string,
+    method: "bank_transfer" | "ussd",
+  ) =>
+    api.post<ChargeDetails>(
+      `/auth/register/charge/${encodeURIComponent(paymentReference)}`,
+      { method },
       { auth: false },
     ),
 

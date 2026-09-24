@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 
 import { AuthService } from './auth.service';
@@ -49,6 +57,24 @@ export class AuthController {
     @Param('paymentReference') paymentReference: string,
   ) {
     return this.authService.confirmRegistrationPayment(paymentReference);
+  }
+
+  // In-app bank transfer / USSD charge for the signup plan payment — same
+  // custom funding screen as wallet deposits (POST /payments/charge).
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Post('register/charge/:paymentReference')
+  initializeRegistrationCharge(
+    @Param('paymentReference') paymentReference: string,
+    @Body('method') method: string,
+  ) {
+    if (method !== 'bank_transfer' && method !== 'ussd') {
+      throw new BadRequestException('Invalid payment method');
+    }
+    return this.authService.initializeRegistrationCharge(
+      paymentReference,
+      method,
+    );
   }
 
   @Public()

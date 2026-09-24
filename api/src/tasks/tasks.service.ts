@@ -6,7 +6,7 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
-import { and, desc, eq, gte } from 'drizzle-orm';
+import { and, desc, eq, gte, lt } from 'drizzle-orm';
 
 import {
   ads,
@@ -68,17 +68,41 @@ export class TasksService {
    * Get all active tasks available to a user to complete. Excludes
    * ad-generated tasks the user themselves funded — you can't complete
    * (and get paid for) your own ad campaign.
+   *
+   * Also excludes any task the user already submitted on a previous day:
+   * a task can only ever be done once, so from the next day on it drops
+   * out of their list entirely. Tasks submitted *today* stay visible so
+   * the user can still see their pending/approved/rejected status. "Today"
+   * uses the same server-local day boundary as the daily limit check in
+   * completeTask().
    */
   async getTasks(userId: string) {
-    const rows = await db
-      .select({ task: tasks, ad: ads })
-      .from(tasks)
-      .leftJoin(ads, eq(tasks.adId, ads.id))
-      .where(eq(tasks.status, 'active'))
-      .orderBy(desc(tasks.createdAt));
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const [rows, pastCompletions] = await Promise.all([
+      db
+        .select({ task: tasks, ad: ads })
+        .from(tasks)
+        .leftJoin(ads, eq(tasks.adId, ads.id))
+        .where(eq(tasks.status, 'active'))
+        .orderBy(desc(tasks.createdAt)),
+      db
+        .select({ taskId: taskCompletions.taskId })
+        .from(taskCompletions)
+        .where(
+          and(
+            eq(taskCompletions.userId, userId),
+            lt(taskCompletions.completedAt, startOfDay),
+          ),
+        ),
+    ]);
+
+    const doneBeforeToday = new Set(pastCompletions.map((c) => c.taskId));
 
     return rows
       .filter((r) => !r.ad || r.ad.userId !== userId)
+      .filter((r) => !doneBeforeToday.has(r.task.id))
       .map((r) => ({
         ...r.task,
         source: r.task.adId ? ('ad' as const) : ('admin' as const),

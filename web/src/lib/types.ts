@@ -47,10 +47,24 @@ export interface AuthResponse extends AuthTokens {
 // Returned by POST /auth/register when a plan purchase is required —
 // the account is created as status='pending' and needs the linked
 // Flutterwave payment to succeed before login tokens are ever issued.
+// Payment happens in-app via authApi.chargeRegistration (bank transfer /
+// USSD), same as wallet deposits.
 export interface RegisterInitResponse {
   userId: string;
   paymentReference: string;
-  authorizationUrl: string;
+  amount: string;
+  planName: string;
+}
+
+export interface ChargeDetails {
+  method: "bank_transfer" | "ussd";
+  reference: string;
+  amount: string;
+  accountNumber?: string;
+  bankName?: string;
+  accountName?: string;
+  expiresAt?: string;
+  ussdCode?: string;
 }
 
 // Returned by POST /auth/register instead, when the platform's

@@ -284,16 +284,25 @@ export class AuthService {
       };
     }
 
-    const checkout = await this.paymentsService.initializeRawPayment(
-      user.id,
-      payment!.reference,
-    );
-
+    // Payment happens in-app (same custom bank transfer / USSD screen as
+    // wallet deposits) — the client follows up with
+    // initializeRegistrationCharge() once the user picks a method.
     return {
       userId: user.id,
       paymentReference: payment!.reference,
-      authorizationUrl: checkout.authorizationUrl,
+      amount: payment!.amount,
+      planName: plan!.name,
     };
+  }
+
+  initializeRegistrationCharge(
+    paymentReference: string,
+    method: 'bank_transfer' | 'ussd',
+  ) {
+    return this.paymentsService.initializeRegistrationCharge(
+      paymentReference,
+      method,
+    );
   }
 
   /**
@@ -328,6 +337,20 @@ export class AuthService {
 
     if (payment.status === 'successful') {
       return { message: 'Registration already completed.' };
+    }
+
+    // The in-app payment window can expire just as a transfer lands —
+    // re-check with Flutterwave before throwing the signup away, so a
+    // paid user is activated instead of deleted.
+    if (payment.status === 'processing') {
+      try {
+        await this.paymentsService.verifyFlutterwavePaymentPublic(
+          paymentReference,
+        );
+        return { message: 'Registration already completed.' };
+      } catch {
+        // Not paid — discard below.
+      }
     }
 
     const user = await db.query.users.findFirst({
