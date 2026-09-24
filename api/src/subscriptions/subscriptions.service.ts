@@ -102,7 +102,7 @@ export class SubscriptionsService {
 
           dailyTaskLimit: plan.dailyTaskLimit,
           dailyReward: plan.dailyReward,
-          referralRewardRate: plan.referralRewardRate,
+          referralRewardAmount: plan.referralRewardAmount,
 
           startsAt,
           status: 'active',

@@ -75,6 +75,8 @@ export default function AdminWithdrawalsPage() {
     referralMinimumWithdrawal: "",
     taskWithdrawalDay: "",
     autoPayoutEnabled: true,
+    withdrawalFeeFlat: "",
+    withdrawalFeePercent: "",
   });
   const [settingsSubmitting, setSettingsSubmitting] = useState(false);
   const [autoPayoutSaving, setAutoPayoutSaving] = useState(false);
@@ -85,6 +87,8 @@ export default function AdminWithdrawalsPage() {
       referralMinimumWithdrawal: settings.referralMinimumWithdrawal,
       taskWithdrawalDay: String(settings.taskWithdrawalDay),
       autoPayoutEnabled: settings.autoPayoutEnabled,
+      withdrawalFeeFlat: settings.withdrawalFeeFlat,
+      withdrawalFeePercent: settings.withdrawalFeePercent,
     });
   }, [settings]);
 
@@ -95,6 +99,8 @@ export default function AdminWithdrawalsPage() {
       await adminApi.withdrawals.updateSettings({
         referralMinimumWithdrawal: settingsForm.referralMinimumWithdrawal,
         taskWithdrawalDay: Number(settingsForm.taskWithdrawalDay),
+        withdrawalFeeFlat: settingsForm.withdrawalFeeFlat,
+        withdrawalFeePercent: settingsForm.withdrawalFeePercent,
       });
       push("success", "Withdrawal rules updated.");
       refetchSettings();
@@ -274,7 +280,41 @@ export default function AdminWithdrawalsPage() {
                   }))
                 }
               />
+              <Input
+                label="Withdrawal fee, flat (NGN)"
+                type="number"
+                min={0}
+                step="0.01"
+                required
+                value={settingsForm.withdrawalFeeFlat}
+                onChange={(e) =>
+                  setSettingsForm((f) => ({
+                    ...f,
+                    withdrawalFeeFlat: e.target.value,
+                  }))
+                }
+              />
+              <Input
+                label="Withdrawal fee, percent (%)"
+                type="number"
+                min={0}
+                max={99}
+                step="0.01"
+                required
+                value={settingsForm.withdrawalFeePercent}
+                onChange={(e) =>
+                  setSettingsForm((f) => ({
+                    ...f,
+                    withdrawalFeePercent: e.target.value,
+                  }))
+                }
+              />
               <div className="sm:col-span-2">
+                <p className="mb-3 text-xs text-ink-dim">
+                  The withdrawal fee is flat + percent of the amount, and is
+                  deducted from what the user receives. It covers the
+                  Flutterwave transfer fee charged on each payout.
+                </p>
                 <p className="mb-3 text-xs text-ink-dim">
                   Referral wallet withdrawals are allowed anytime, subject to
                   the minimum above. Task wallet withdrawals only open once a

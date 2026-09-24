@@ -58,7 +58,7 @@ export interface AdminSubscription {
   amountPaid: string;
   dailyTaskLimit: number;
   dailyReward: string;
-  referralRewardRate: string;
+  referralRewardAmount: string;
   startsAt: string;
   status: "pending" | "active" | "completed" | "cancelled" | "expired";
   createdAt: string;
@@ -183,7 +183,18 @@ export interface AdminPaymentStats {
   successfulVolume: string;
 }
 
+export interface FlutterwaveBalance {
+  currency: string;
+  availableBalance: number;
+  ledgerBalance: number;
+  fetchedAt: string;
+}
+
 export const adminApi = {
+  flutterwave: {
+    revealBalance: (password: string) =>
+      api.post<FlutterwaveBalance>("/admin/flutterwave/balance", { password }),
+  },
   deposits: {
     all: () => api.get<AdminDeposit[]>("/admin/deposits"),
     stats: () => api.get<AdminDepositStats>("/admin/deposits/stats"),
@@ -255,6 +266,8 @@ export const adminApi = {
       referralMinimumWithdrawal?: string;
       taskWithdrawalDay?: number;
       autoPayoutEnabled?: boolean;
+      withdrawalFeeFlat?: string;
+      withdrawalFeePercent?: string;
     }) =>
       api.patch<WithdrawalSettings>("/admin/withdrawals/settings", dto),
   },

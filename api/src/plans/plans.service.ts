@@ -74,7 +74,7 @@ export class PlansService {
     rank?: number;
     dailyTaskLimit?: number;
     dailyReward?: string;
-    referralRewardRate?: string;
+    referralRewardAmount?: string;
     minimumWithdrawal?: string;
     status?: 'draft' | 'active' | 'inactive';
     isFeatured?: boolean;
@@ -92,10 +92,10 @@ export class PlansService {
     }
 
     if (
-      data.referralRewardRate !== undefined &&
-      Number(data.referralRewardRate) < 0
+      data.referralRewardAmount !== undefined &&
+      Number(data.referralRewardAmount) < 0
     ) {
-      throw new BadRequestException('Referral reward rate cannot be negative');
+      throw new BadRequestException('Referral reward amount cannot be negative');
     }
 
     if (
@@ -122,7 +122,7 @@ export class PlansService {
         rank: data.rank ?? 0,
         dailyTaskLimit: data.dailyTaskLimit ?? 0,
         dailyReward: data.dailyReward ?? '0',
-        referralRewardRate: data.referralRewardRate ?? '0',
+        referralRewardAmount: data.referralRewardAmount ?? '0',
         minimumWithdrawal: data.minimumWithdrawal ?? '0',
         status: data.status ?? 'draft',
         isFeatured: data.isFeatured ?? false,
@@ -154,7 +154,7 @@ export class PlansService {
       rank?: number;
       dailyTaskLimit?: number;
       dailyReward?: string;
-      referralRewardRate?: string;
+      referralRewardAmount?: string;
       minimumWithdrawal?: string;
       status?: 'draft' | 'active' | 'inactive';
       isFeatured?: boolean;
@@ -175,10 +175,10 @@ export class PlansService {
     }
 
     if (
-      data.referralRewardRate !== undefined &&
-      Number(data.referralRewardRate) < 0
+      data.referralRewardAmount !== undefined &&
+      Number(data.referralRewardAmount) < 0
     ) {
-      throw new BadRequestException('Referral reward rate cannot be negative');
+      throw new BadRequestException('Referral reward amount cannot be negative');
     }
 
     if (

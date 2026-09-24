@@ -30,7 +30,16 @@
       "Bash(awk -F'=' '/^FLUTTERWAVE_SECRET_KEY=/{print \"SECRET_KEY prefix: \" substr\\($2,1,10\\)} /^FLUTTERWAVE_PUBLIC_KEY=/{print \"PUBLIC_KEY prefix: \" substr\\($2,1,10\\)} /^FLUTTERWAVE_SECRET_HASH=/{print \"SECRET_HASH set: \" \\(length\\($2\\)>0 ? \"yes\" : \"no\"\\)} /^FLUTTERWAVE_CALLBACK_URL=/{print \"CALLBACK_URL: \" $2} /^FLUTTERWAVE_BASE_URL=/{print \"BASE_URL: \" $2}' .env)",
       "Bash(ngrok http *)",
       "Bash(curl -s http://127.0.0.1:4040/api/tunnels)",
-      "Bash(PROD_API_URL=\"https://api.x2factor.com/api\" ./scripts/build-cpanel.sh)"
+      "Bash(PROD_API_URL=\"https://api.x2factor.com/api\" ./scripts/build-cpanel.sh)",
+      "Bash(npx jest *)",
+      "Bash(PROD_API_URL=https://api.x2factor.com/api bash ./scripts/build-cpanel.sh)",
+      "Bash(grep -c \"billers/\" /c/deploy-x2factor/api/dist/utilities/flutterwave-bills.service.js)",
+      "Read(//c/deploy-x2factor/api/dist/utilities/**)",
+      "Bash(grep -v \"^--$\")",
+      "Bash(sed -i 's|label=\"Referral rate \\(%\\)\"|label=\"Referral reward \\(₦\\)\"|' src/app/admin/plans/page.tsx)",
+      "Bash(sed -i 's|<p className=\"text-xs text-ink-faint\">Referral rate</p>|<p className=\"text-xs text-ink-faint\">Referral reward</p>|; s|{plan.referralRewardAmount ?? \"0\"}%|{formatMoney\\(plan.referralRewardAmount ?? \"0\"\\)}|; s|label: \"Referral reward rate\",|label: \"Referral reward\",|; s|value: `${selectedSub.referralRewardAmount}%`,|value: formatMoney\\(selectedSub.referralRewardAmount\\),|' \"src/app/\\(app\\)/plans/page.tsx\" src/app/admin/subscriptions/page.tsx)",
+      "Bash(python -)",
+      "Read(//c/deploy-x2factor/api/drizzle/**)"
     ],
     "additionalDirectories": [
       "C:\\deploy-x2factor"

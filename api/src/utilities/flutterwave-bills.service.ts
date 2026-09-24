@@ -133,8 +133,8 @@ export class FlutterwaveBillsService {
     }
 
     return this.payBill({
+      billerCode: category.biller_code,
       itemCode: category.item_code,
-      billerName: NETWORK_BILLER_NAMES[params.provider],
       phoneNumber: params.phoneNumber,
       amount: params.amount,
       reference: params.reference,
@@ -144,7 +144,8 @@ export class FlutterwaveBillsService {
   /**
    * Pays a data bundle bill through Flutterwave. `itemCode` must be one
    * of the `item_code` values returned by listDataBundles() for this
-   * network.
+   * network — it's looked up again here to get its `biller_code` and to
+   * make sure the amount charged matches the bundle's real price.
    */
   async payDataBundle(params: {
     provider: 'mtn' | 'airtel' | 'glo' | '9mobile';
@@ -153,40 +154,63 @@ export class FlutterwaveBillsService {
     itemCode: string;
     reference: string;
   }): Promise<{ providerReference: string; message: string }> {
+    const { dataBundles } = await this.listBillCategories(params.provider);
+    const bundle = dataBundles.find(
+      (category) => category.item_code === params.itemCode,
+    );
+
+    if (!bundle) {
+      throw new BadRequestException(
+        `Selected data bundle is not available for ${NETWORK_BILLER_NAMES[params.provider]}`,
+      );
+    }
+
+    if (bundle.amount && Number(params.amount) !== Number(bundle.amount)) {
+      throw new BadRequestException(
+        'Data bundle price has changed. Please refresh and try again.',
+      );
+    }
+
     return this.payBill({
-      itemCode: params.itemCode,
-      billerName: NETWORK_BILLER_NAMES[params.provider],
+      billerCode: bundle.biller_code,
+      itemCode: bundle.item_code,
       phoneNumber: params.phoneNumber,
       amount: params.amount,
       reference: params.reference,
     });
   }
 
+  /**
+   * Uses Flutterwave's biller/item payment endpoint, which identifies the
+   * bill by its exact `biller_code` + `item_code` pair. The legacy
+   * `POST /bills` endpoint matched on free-text `type`/`biller_name`
+   * and rejected our values with "Invalid Biller selected".
+   */
   private async payBill(params: {
+    billerCode: string;
     itemCode: string;
-    billerName: string;
     phoneNumber: string;
     amount: string;
     reference: string;
   }): Promise<{ providerReference: string; message: string }> {
     const { secretKey, baseUrl } = this.assertConfigured();
 
-    const response = await fetch(`${baseUrl}/bills`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${secretKey}`,
-        'Content-Type': 'application/json',
+    const response = await fetch(
+      `${baseUrl}/billers/${encodeURIComponent(params.billerCode)}/items/${encodeURIComponent(params.itemCode)}/payment`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${secretKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          country: 'NG',
+          customer_id: params.phoneNumber,
+          amount: Number(params.amount),
+          reference: params.reference,
+        }),
       },
-      body: JSON.stringify({
-        country: 'NG',
-        customer: params.phoneNumber,
-        amount: Number(params.amount),
-        recurrence: 'ONCE',
-        type: params.itemCode,
-        biller_name: params.billerName,
-        reference: params.reference,
-      }),
-    });
+    );
 
     const body = (await response.json()) as {
       status?: string;

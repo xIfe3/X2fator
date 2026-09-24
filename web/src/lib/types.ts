@@ -271,6 +271,8 @@ export interface WithdrawalSettings {
   referralMinimumWithdrawal: string;
   taskWithdrawalDay: number;
   autoPayoutEnabled: boolean;
+  withdrawalFeeFlat: string;
+  withdrawalFeePercent: string;
   updatedAt: string;
 }
 export interface WithdrawalStats {
@@ -293,7 +295,7 @@ export interface Plan {
   rank: number;
   dailyTaskLimit?: number;
   dailyReward?: string;
-  referralRewardRate?: string;
+  referralRewardAmount?: string;
   minimumWithdrawal?: string;
   status: "draft" | "active" | "inactive";
   isFeatured?: boolean;
@@ -307,7 +309,7 @@ export interface Subscription {
   amountPaid: string;
   dailyTaskLimit: number;
   dailyReward: string;
-  referralRewardRate: string;
+  referralRewardAmount: string;
   status: "pending" | "active" | "completed" | "cancelled" | "expired";
   startsAt: string;
   createdAt?: string;

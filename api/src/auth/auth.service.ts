@@ -9,7 +9,8 @@ import {
 
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { eq, and, gt, isNull } from 'drizzle-orm';
+import { eq, and, gt, inArray, isNull } from 'drizzle-orm';
+import { nigerianPhoneVariants } from '../common/decorators/nigerian-phone.decorator';
 import { createHash, randomBytes } from 'crypto';
 import { Inject } from '@nestjs/common';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
@@ -107,7 +108,7 @@ export class AuthService {
 
     if (dto.phone) {
       const existingPhoneUser = await db.query.users.findFirst({
-        where: eq(users.phone, dto.phone),
+        where: inArray(users.phone, nigerianPhoneVariants(dto.phone)),
       });
 
       if (existingPhoneUser) {

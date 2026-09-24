@@ -315,6 +315,31 @@ export default function WithdrawalsPage() {
             onChange={(e) => update("amount", e.target.value)}
           />
 
+          {settings && Number(form.amount) > 0 && (() => {
+            const amount = Number(form.amount);
+            const fee =
+              Math.round(
+                (Number(settings.withdrawalFeeFlat) +
+                  (amount * Number(settings.withdrawalFeePercent)) / 100) *
+                  100,
+              ) / 100;
+            const net = amount - fee;
+            return (
+              <div className="space-y-1 rounded-xl bg-base-surface2 px-4 py-3 text-xs">
+                <div className="flex justify-between text-ink-dim">
+                  <span>Withdrawal fee</span>
+                  <span>{formatMoney(fee)}</span>
+                </div>
+                <div className="flex justify-between font-semibold text-ink">
+                  <span>You will receive</span>
+                  <span className={net <= 0 ? "text-danger" : undefined}>
+                    {formatMoney(Math.max(net, 0))}
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
+
           <div>
             <span className="mb-1.5 block text-xs font-medium text-ink-dim">
               Payout account

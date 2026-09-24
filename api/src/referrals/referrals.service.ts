@@ -148,19 +148,17 @@ export class ReferralsService {
       throw new NotFoundException('Plan not found');
     }
 
-    // Use the rate stored on the subscription.
-    // This preserves the rate that applied when the subscription was purchased.
-    const commissionRate = Number(subscription.referralRewardRate);
+    // Use the fixed reward stored on the subscription. This preserves the
+    // amount that applied when the subscription was purchased.
+    const commission = Number(subscription.referralRewardAmount);
 
-    if (commissionRate <= 0) {
+    if (!Number.isFinite(commission) || commission <= 0) {
       return null;
     }
 
-    const commission = (Number(subscription.amountPaid) * commissionRate) / 100;
-
-    if (commission <= 0) {
-      return null;
-    }
+    // Referral rewards are a fixed amount now, not a percentage; the
+    // referrals table's rate column is kept for historical rows only.
+    const commissionRate = 0;
 
     const existingReferral = await tx.query.referrals.findFirst({
       where: and(
@@ -191,7 +189,6 @@ export class ReferralsService {
         .update(referrals)
         .set({
           totalCommission: newTotal.toFixed(2),
-          commissionRate: commissionRate.toFixed(4),
           status: 'active',
           updatedAt: new Date(),
         })

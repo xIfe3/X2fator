@@ -14,4 +14,12 @@ export class UpdateWithdrawalSettingsDto {
   @IsOptional()
   @IsBoolean()
   autoPayoutEnabled?: boolean;
+
+  @IsOptional()
+  @IsNumberString()
+  withdrawalFeeFlat?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  withdrawalFeePercent?: string;
 }

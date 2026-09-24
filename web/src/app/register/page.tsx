@@ -25,7 +25,14 @@ import { authApi } from "@/lib/api/auth";
 import { ApiRequestError } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
 import type { ChargeDetails, RegisterInitResponse } from "@/lib/types";
-import { cn, formatMoney, isValidEmail, isValidNigerianPhone, isValidUsername } from "@/lib/utils";
+import {
+  cn,
+  formatMoney,
+  isValidEmail,
+  isValidNigerianPhone,
+  isValidUsername,
+  normalizeNigerianPhone,
+} from "@/lib/utils";
 import { isPasswordValid } from "@/lib/password";
 
 export default function RegisterPage() {
@@ -142,9 +149,12 @@ function RegisterForm() {
       : usernameStatus === "taken"
         ? "This username is already taken"
         : undefined,
-    phone: !isValidNigerianPhone(form.phone)
-      ? "Enter a valid phone number, e.g. +2348012345678"
-      : undefined,
+    phone:
+      form.phone.trim().length === 0
+        ? "Phone number is required"
+        : !isValidNigerianPhone(form.phone)
+          ? "Enter a valid phone number, e.g. 08012345678 or 8012345678"
+          : undefined,
     password: !isPasswordValid(form.password)
       ? "Use at least 8 characters"
       : undefined,
@@ -193,7 +203,7 @@ function RegisterForm() {
         password: form.password,
         firstName: form.firstName,
         lastName: form.lastName,
-        phone: form.phone || undefined,
+        phone: normalizeNigerianPhone(form.phone),
         referralCode: form.referralCode || undefined,
         planId: requirePlanPurchase ? (selectedPlanId ?? undefined) : undefined,
       });
@@ -446,13 +456,13 @@ function RegisterForm() {
             )}
           </div>
           <Input
-            label="Phone (optional)"
+            label="Phone number"
             type="tel"
             value={form.phone}
             onChange={(e) => update("phone", e.target.value)}
             onBlur={() => blur("phone")}
             error={touched.phone ? errors.phone : undefined}
-            placeholder="+2348012345678"
+            placeholder="08012345678"
           />
           <div>
             <PasswordField

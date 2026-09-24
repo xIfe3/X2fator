@@ -21,6 +21,11 @@ export const PERMISSIONS: { name: string; description: string }[] = [
     description: "View and edit withdrawal rules (minimums, payout dates)",
   },
   {
+    name: "flutterwave.balance",
+    description:
+      "View the live Flutterwave balance (requires re-entering password)",
+  },
+  {
     name: "wallets.adjust",
     description: "Manually credit or debit a user's wallet",
   },

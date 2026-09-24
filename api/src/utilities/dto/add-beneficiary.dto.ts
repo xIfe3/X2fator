@@ -1,11 +1,12 @@
 import { IsIn, IsOptional, IsString, Length } from 'class-validator';
 
+import { IsNigerianPhone } from '../../common/decorators/nigerian-phone.decorator';
+
 export class AddBeneficiaryDto {
   @IsIn(['mtn', 'airtel', 'glo', '9mobile'])
   provider!: 'mtn' | 'airtel' | 'glo' | '9mobile';
 
-  @IsString()
-  @Length(10, 20)
+  @IsNigerianPhone()
   phoneNumber!: string;
 
   @IsOptional()

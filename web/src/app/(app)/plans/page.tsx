@@ -178,9 +178,9 @@ export default function PlansPage() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs text-ink-faint">Referral rate</p>
+                    <p className="text-xs text-ink-faint">Referral reward</p>
                     <p className="mt-0.5 font-medium text-ink">
-                      {plan.referralRewardRate ?? "0"}%
+                      {formatMoney(plan.referralRewardAmount ?? "0")}
                     </p>
                   </div>
                 </div>
@@ -327,8 +327,8 @@ export default function PlansPage() {
                   value: formatMoney(selectedSub.dailyReward),
                 },
                 {
-                  label: "Referral reward rate",
-                  value: `${selectedSub.referralRewardRate}%`,
+                  label: "Referral reward",
+                  value: formatMoney(selectedSub.referralRewardAmount),
                 },
                 { label: "Started", value: formatDateTime(selectedSub.startsAt) },
                 {

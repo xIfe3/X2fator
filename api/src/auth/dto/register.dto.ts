@@ -1,4 +1,5 @@
 import {
+  IsDefined,
   IsEmail,
   IsOptional,
   IsString,
@@ -7,6 +8,8 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
+
+import { IsNigerianPhone } from '../../common/decorators/nigerian-phone.decorator';
 
 export class RegisterDto {
   @IsEmail()
@@ -41,10 +44,9 @@ export class RegisterDto {
   @MaxLength(100)
   lastName!: string;
 
-  @IsOptional()
-  @IsString()
-  @Matches(/^\+?[0-9]{10,15}$/)
-  phone?: string;
+  @IsDefined({ message: 'Phone number is required' })
+  @IsNigerianPhone()
+  phone!: string;
 
   @IsOptional()
   @IsString()

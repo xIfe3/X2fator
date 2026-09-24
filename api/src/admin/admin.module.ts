@@ -7,6 +7,7 @@ import { AdminWithdrawalsController } from './controllers/admin-withdrawals.cont
 import { AdminRolesController } from './controllers/admin-roles.controller';
 import { AdminSubscriptionsController } from './controllers/admin-subscriptions.controller';
 import { AdminPaymentsController } from './controllers/admin-payments.controller';
+import { AdminFlutterwaveController } from './controllers/admin-flutterwave.controller';
 import { AdminUsersService } from './services/admin-users.service';
 import { AdminWalletsService } from './services/admin-wallets.service';
 import { AdminWithdrawalsService } from './services/admin-withdrawals.service';
@@ -28,6 +29,7 @@ import { MailModule } from '../mail/mail.module';
     AdminRolesController,
     AdminSubscriptionsController,
     AdminPaymentsController,
+    AdminFlutterwaveController,
   ],
   providers: [
     WalletService,

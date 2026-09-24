@@ -21,6 +21,23 @@ export const withdrawalSettings = pgTable("withdrawal_settings", {
   // original flow, kept as an admin-controlled fallback.
   autoPayoutEnabled: boolean("auto_payout_enabled").notNull().default(true),
 
+  // Fee charged to the user on each withdrawal, deducted from the amount
+  // they withdraw: fee = flat + amount * percent / 100. Covers the
+  // Flutterwave transfer fee the platform is charged per payout.
+  withdrawalFeeFlat: numeric("withdrawal_fee_flat", {
+    precision: 18,
+    scale: 2,
+  })
+    .notNull()
+    .default("50"),
+
+  withdrawalFeePercent: numeric("withdrawal_fee_percent", {
+    precision: 5,
+    scale: 2,
+  })
+    .notNull()
+    .default("0"),
+
   updatedAt: timestamp("updated_at", {
     withTimezone: true,
   })

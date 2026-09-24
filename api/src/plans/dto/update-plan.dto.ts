@@ -39,7 +39,7 @@ export class UpdatePlanDto {
 
   @IsOptional()
   @IsNumberString()
-  referralRewardRate?: string;
+  referralRewardAmount?: string;
 
   @IsOptional()
   @IsNumberString()

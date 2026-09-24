@@ -14,6 +14,10 @@ import { NotificationsModule } from '../notifications/notifications.module';
     WithdrawalSettingsService,
     FlutterwaveAccountsService,
   ],
-  exports: [WithdrawalSettingsService, WithdrawalsService],
+  exports: [
+    WithdrawalSettingsService,
+    WithdrawalsService,
+    FlutterwaveAccountsService,
+  ],
 })
 export class WithdrawalsModule {}

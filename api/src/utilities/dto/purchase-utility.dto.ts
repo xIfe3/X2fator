@@ -6,6 +6,8 @@ import {
   Length,
 } from 'class-validator';
 
+import { IsNigerianPhone } from '../../common/decorators/nigerian-phone.decorator';
+
 export class PurchaseUtilityDto {
   @IsIn(['airtime', 'data'])
   type!: 'airtime' | 'data';
@@ -13,8 +15,7 @@ export class PurchaseUtilityDto {
   @IsIn(['mtn', 'airtel', 'glo', '9mobile'])
   provider!: 'mtn' | 'airtel' | 'glo' | '9mobile';
 
-  @IsString()
-  @Length(10, 20)
+  @IsNigerianPhone()
   phoneNumber!: string;
 
   @IsNumberString()

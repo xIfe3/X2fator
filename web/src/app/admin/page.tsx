@@ -23,6 +23,8 @@ import { useToast } from "@/components/ui/Toast";
 import { siteContentApi } from "@/lib/api/site-content";
 import { ApiRequestError } from "@/lib/api-client";
 import { formatDateTime } from "@/lib/utils";
+import { useAuth } from "@/lib/auth-context";
+import { FlutterwaveBalanceCard } from "@/components/admin/FlutterwaveBalanceCard";
 
 const links = [
   {
@@ -84,6 +86,7 @@ export default function AdminOverviewPage() {
   const { data: siteContent, refetch: refetchSiteContent } = useApiQuery(() =>
     siteContentApi.get(),
   );
+  const { hasPermission } = useAuth();
   const [welcomeAmount, setWelcomeAmount] = useState("");
   const [savingWelcomeAmount, setSavingWelcomeAmount] = useState(false);
   const { push } = useToast();
@@ -134,6 +137,8 @@ export default function AdminOverviewPage() {
           <span className="font-mono">PermissionsGuard</span>).
         </p>
       </div>
+
+      {hasPermission("flutterwave.balance") && <FlutterwaveBalanceCard />}
 
       <div>
         <p className="mb-3 text-xs font-medium uppercase tracking-wider text-ink-faint">

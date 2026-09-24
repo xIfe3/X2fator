@@ -43,9 +43,11 @@ export const plans = pgTable(
       .notNull()
       .default("0"),
 
-    referralRewardRate: numeric("referral_reward_rate", {
-      precision: 8,
-      scale: 4,
+    // Fixed naira amount the referrer earns when someone they referred
+    // buys this plan.
+    referralRewardAmount: numeric("referral_reward_amount", {
+      precision: 18,
+      scale: 2,
     })
       .notNull()
       .default("0"),

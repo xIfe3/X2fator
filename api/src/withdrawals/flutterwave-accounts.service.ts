@@ -138,6 +138,43 @@ export class FlutterwaveAccountsService {
   }
 
   /**
+   * The merchant's live NGN balance on Flutterwave — the pool that
+   * withdrawals and airtime/data purchases are paid out of.
+   */
+  async getNgnBalance(): Promise<{
+    availableBalance: number;
+    ledgerBalance: number;
+  }> {
+    const secretKey = this.secretKey;
+    const baseUrl = this.baseUrl;
+
+    if (!secretKey || !baseUrl) {
+      throw new BadRequestException('Flutterwave is not configured');
+    }
+
+    const response = await fetch(`${baseUrl}/balances/NGN`, {
+      headers: { Authorization: `Bearer ${secretKey}` },
+    });
+
+    const body = (await response.json()) as {
+      status?: string;
+      message?: string;
+      data?: { available_balance?: number; ledger_balance?: number };
+    };
+
+    if (!response.ok || body.status !== 'success' || !body.data) {
+      throw new BadRequestException(
+        body.message ?? 'Could not fetch Flutterwave balance',
+      );
+    }
+
+    return {
+      availableBalance: Number(body.data.available_balance ?? 0),
+      ledgerBalance: Number(body.data.ledger_balance ?? 0),
+    };
+  }
+
+  /**
    * Fetches a transfer's current status directly from Flutterwave — used
    * to reconcile a withdrawal if its webhook is ever missed or delayed.
    */

@@ -78,9 +78,21 @@ export function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
+/**
+ * Normalizes a Nigerian mobile number to the local 11-digit form
+ * ("08012345678"). Accepts it with or without the leading 0, or with
+ * +234/234 — mirrors the API's normalization so what users see matches
+ * what gets saved.
+ */
+export function normalizeNigerianPhone(value: string) {
+  const digits = value.replace(/[\s\-().]/g, "");
+  if (/^\+?234\d{10}$/.test(digits)) return `0${digits.replace(/^\+?234/, "")}`;
+  if (/^[789]\d{9}$/.test(digits)) return `0${digits}`;
+  return digits;
+}
+
 export function isValidNigerianPhone(value: string) {
-  if (!value) return true; // optional field
-  return /^(\+234|0)[789][01]\d{8}$/.test(value.trim());
+  return /^0[789][01]\d{8}$/.test(normalizeNigerianPhone(value));
 }
 
 export function isValidUsername(value: string) {

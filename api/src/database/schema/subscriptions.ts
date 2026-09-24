@@ -41,10 +41,14 @@ export const planSubscriptions = pgTable(
       scale: 2,
     }).notNull(),
 
-    referralRewardRate: numeric("referral_reward_rate", {
-      precision: 8,
-      scale: 4,
-    }).notNull(),
+    // Snapshot of the plan's referral reward at purchase time, so later
+    // plan edits don't change what this purchase paid out.
+    referralRewardAmount: numeric("referral_reward_amount", {
+      precision: 18,
+      scale: 2,
+    })
+      .notNull()
+      .default("0"),
 
     startsAt: timestamp("starts_at", {
       withTimezone: true,

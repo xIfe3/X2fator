@@ -262,8 +262,14 @@ export class WithdrawalsService {
       }
     }
 
-    const fee = 0;
-    const netAmount = amount - fee;
+    const fee = WithdrawalSettingsService.calculateFee(amount, settings);
+    const netAmount = Math.round((amount - fee) * 100) / 100;
+
+    if (netAmount <= 0) {
+      throw new BadRequestException(
+        `Amount is too small to cover the withdrawal fee of ${fee.toFixed(2)}`,
+      );
+    }
 
     return db.transaction(async (tx) => {
       const wallet = await tx.query.wallets.findFirst({

@@ -221,7 +221,6 @@ export default function AdminReferralsPage() {
 
             <DetailList
               rows={[
-                { label: "Commission rate", value: `${selectedReferral.commissionRate}%` },
                 { label: "Since", value: formatDateTime(selectedReferral.createdAt) },
               ]}
             />

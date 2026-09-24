@@ -203,8 +203,8 @@ export default function AdminSubscriptionsPage() {
                 { label: "Daily task limit", value: selectedSub.dailyTaskLimit },
                 { label: "Daily reward", value: formatMoney(selectedSub.dailyReward) },
                 {
-                  label: "Referral reward rate",
-                  value: `${selectedSub.referralRewardRate}%`,
+                  label: "Referral reward",
+                  value: formatMoney(selectedSub.referralRewardAmount),
                 },
                 { label: "Started", value: formatDateTime(selectedSub.startsAt) },
                 { label: "Created", value: formatDateTime(selectedSub.createdAt) },

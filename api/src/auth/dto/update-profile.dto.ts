@@ -1,5 +1,7 @@
 import { IsIn, IsOptional, IsString, MinLength } from 'class-validator';
 
+import { IsNigerianPhone } from '../../common/decorators/nigerian-phone.decorator';
+
 export class UpdateProfileDto {
   @IsOptional()
   @IsString()
@@ -12,7 +14,7 @@ export class UpdateProfileDto {
   lastName?: string;
 
   @IsOptional()
-  @IsString()
+  @IsNigerianPhone()
   phone?: string | null;
 
   @IsOptional()

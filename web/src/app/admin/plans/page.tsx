@@ -24,7 +24,7 @@ interface PlanFormState {
   rank: string;
   dailyTaskLimit: string;
   dailyReward: string;
-  referralRewardRate: string;
+  referralRewardAmount: string;
   minimumWithdrawal: string;
   status: "draft" | "active" | "inactive";
   isFeatured: boolean;
@@ -37,7 +37,7 @@ const emptyForm: PlanFormState = {
   rank: "0",
   dailyTaskLimit: "0",
   dailyReward: "0",
-  referralRewardRate: "0",
+  referralRewardAmount: "0",
   minimumWithdrawal: "0",
   status: "draft",
   isFeatured: false,
@@ -71,7 +71,7 @@ export default function AdminPlansPage() {
       rank: String(plan.rank),
       dailyTaskLimit: String(plan.dailyTaskLimit ?? 0),
       dailyReward: plan.dailyReward ?? "0",
-      referralRewardRate: plan.referralRewardRate ?? "0",
+      referralRewardAmount: plan.referralRewardAmount ?? "0",
       minimumWithdrawal: plan.minimumWithdrawal ?? "0",
       status: plan.status,
       isFeatured: plan.isFeatured ?? false,
@@ -96,7 +96,7 @@ export default function AdminPlansPage() {
       rank: Number(form.rank),
       dailyTaskLimit: Number(form.dailyTaskLimit),
       dailyReward: form.dailyReward.trim(),
-      referralRewardRate: form.referralRewardRate.trim(),
+      referralRewardAmount: form.referralRewardAmount.trim(),
       minimumWithdrawal: form.minimumWithdrawal.trim(),
       status: form.status,
       isFeatured: form.isFeatured,
@@ -279,10 +279,10 @@ export default function AdminPlansPage() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Input
-              label="Referral rate (%)"
-              value={form.referralRewardRate}
+              label="Referral reward (₦)"
+              value={form.referralRewardAmount}
               onChange={(e) =>
-                setForm((f) => ({ ...f, referralRewardRate: e.target.value }))
+                setForm((f) => ({ ...f, referralRewardAmount: e.target.value }))
               }
               inputMode="decimal"
             />

@@ -37,8 +37,14 @@ export class UploadsService {
       return;
     }
 
+    // Cloudflare's dashboard shows the S3 API URL with the bucket on the
+    // end (".../x2factor"). The client adds the bucket itself, so a bucket
+    // path left on the endpoint makes every request hit the wrong path and
+    // R2 rejects it as "Unauthorized". Keep only the origin.
+    const endpointOrigin = new URL(endpoint).origin;
+
     this.s3 = new S3Client({
-      endpoint,
+      endpoint: endpointOrigin,
       region: 'auto',
       credentials: { accessKeyId, secretAccessKey },
     });
