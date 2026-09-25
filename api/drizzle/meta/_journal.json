@@ -120,6 +120,13 @@
       "when": 1790257829427,
       "tag": "0016_add_flutterwave_balance_permission",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1790273636817,
+      "tag": "0017_remove_unpaid_signup_referrals",
+      "breakpoints": true
     }
   ]
 }

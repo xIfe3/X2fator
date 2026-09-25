@@ -225,7 +225,11 @@ export class AuthService {
         },
       ]);
 
-      if (referredById) {
+      // With a plan purchase required, the referral row is created only
+      // once the signup payment succeeds (processReferralCommission) — an
+      // unpaid signup must never appear in the referrer's list.
+      // `referredById` on the user row keeps the link until then.
+      if (referredById && !requirePlanPurchase) {
         await tx.insert(referrals).values({
           referrerId: referredById,
           referredUserId: newUser.id,

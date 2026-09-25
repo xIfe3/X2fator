@@ -39,7 +39,9 @@
       "Bash(sed -i 's|label=\"Referral rate \\(%\\)\"|label=\"Referral reward \\(₦\\)\"|' src/app/admin/plans/page.tsx)",
       "Bash(sed -i 's|<p className=\"text-xs text-ink-faint\">Referral rate</p>|<p className=\"text-xs text-ink-faint\">Referral reward</p>|; s|{plan.referralRewardAmount ?? \"0\"}%|{formatMoney\\(plan.referralRewardAmount ?? \"0\"\\)}|; s|label: \"Referral reward rate\",|label: \"Referral reward\",|; s|value: `${selectedSub.referralRewardAmount}%`,|value: formatMoney\\(selectedSub.referralRewardAmount\\),|' \"src/app/\\(app\\)/plans/page.tsx\" src/app/admin/subscriptions/page.tsx)",
       "Bash(python -)",
-      "Read(//c/deploy-x2factor/api/drizzle/**)"
+      "Read(//c/deploy-x2factor/api/drizzle/**)",
+      "Bash(grep -v \"^\\\\s*//\")",
+      "Bash(cd \"C:/Users/ifeanyitheprogrammer/Hacker Space/X2Factor\" && PROD_API_URL=https://api.x2factor.com/api bash ./scripts/build-cpanel.sh 2>&1 | tail -6; ls /c/deploy-x2factor/api/drizzle/*.sql | tail -4)"
     ],
     "additionalDirectories": [
       "C:\\deploy-x2factor"

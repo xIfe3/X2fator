@@ -5,7 +5,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, ne } from 'drizzle-orm';
 
 import {
   db,
@@ -138,7 +138,10 @@ export class AdminUsersService {
   }
 
   async getUsers() {
+    // `pending` rows are signups that never paid — not real accounts yet,
+    // so they're kept out of the admin users list.
     const rows = await db.query.users.findMany({
+      where: ne(users.status, 'pending'),
       orderBy: [desc(users.createdAt)],
     });
     return rows.map((user) => this.sanitizeUser(user));

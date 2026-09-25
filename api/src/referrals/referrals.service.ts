@@ -150,15 +150,8 @@ export class ReferralsService {
 
     // Use the fixed reward stored on the subscription. This preserves the
     // amount that applied when the subscription was purchased.
-    const commission = Number(subscription.referralRewardAmount);
-
-    if (!Number.isFinite(commission) || commission <= 0) {
-      return null;
-    }
-
-    // Referral rewards are a fixed amount now, not a percentage; the
-    // referrals table's rate column is kept for historical rows only.
-    const commissionRate = 0;
+    const rawCommission = Number(subscription.referralRewardAmount);
+    const commission = Number.isFinite(rawCommission) ? rawCommission : 0;
 
     const existingReferral = await tx.query.referrals.findFirst({
       where: and(
@@ -169,20 +162,32 @@ export class ReferralsService {
 
     let referral = existingReferral;
 
+    // The referral row is only created here — once the referred user has
+    // actually paid — so unpaid signups never show up in the referrer's
+    // list. It's created even when the plan pays no reward, so the
+    // referrer still sees who joined through them.
     if (!referral) {
       const [createdReferral] = await tx
         .insert(referrals)
         .values({
           referrerId,
           referredUserId,
-          commissionRate: commissionRate.toFixed(4),
-          totalCommission: commission.toFixed(2),
+          // Rewards are a fixed amount now; the rate column is kept only
+          // for historical rows.
+          commissionRate: '0',
+          totalCommission: Math.max(commission, 0).toFixed(2),
           status: 'active',
         })
         .returning();
 
       referral = createdReferral;
-    } else {
+    }
+
+    if (commission <= 0) {
+      return null;
+    }
+
+    if (existingReferral) {
       const newTotal = Number(referral.totalCommission) + commission;
 
       const [updatedReferral] = await tx
@@ -213,7 +218,7 @@ export class ReferralsService {
           referredUserId,
           subscriptionId,
           planId: plan.id,
-          commissionRate,
+          rewardAmount: commission.toFixed(2),
         },
       },
       tx,
@@ -231,7 +236,7 @@ export class ReferralsService {
         referredUserId,
         subscriptionId,
         planId: plan.id,
-        commissionRate,
+        rewardAmount: commission.toFixed(2),
       },
       earningDate: new Date(),
     });
