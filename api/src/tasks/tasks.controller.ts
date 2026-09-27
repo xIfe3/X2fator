@@ -47,6 +47,11 @@ export class TasksController {
     return this.tasksService.getPendingCompletions();
   }
 
+  @Get('my/today')
+  async getMyDailyStatus(@CurrentUser() user: AuthenticatedUser) {
+    return this.tasksService.getDailyStatus(user.id);
+  }
+
   @Get('my/completions')
   async getMyCompletions(@CurrentUser() user: AuthenticatedUser) {
     return this.tasksService.getMyCompletions(user.id);

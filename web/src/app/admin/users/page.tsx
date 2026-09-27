@@ -1,17 +1,15 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
-import { ShieldPlus, Users } from "lucide-react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { ChevronRight, Search, ShieldPlus, Users, X } from "lucide-react";
 import { useApiQuery } from "@/hooks/useApiQuery";
 import { useAuth } from "@/lib/auth-context";
 import { adminApi } from "@/lib/api/admin";
 import type { AdminUser, AdminWalletDetails } from "@/lib/types";
-import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Card, CardBody } from "@/components/ui/Card";
 import { Table, THead, Th, Tr, Td } from "@/components/ui/Table";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
-import { BottomSheet } from "@/components/ui/BottomSheet";
-import { DetailList } from "@/components/ui/DetailList";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Input, Select, Textarea } from "@/components/ui/Input";
 import { PasswordField } from "@/components/ui/PasswordField";
@@ -19,13 +17,66 @@ import { PasswordStrength } from "@/components/ui/PasswordStrength";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageSkeleton } from "@/components/ui/Skeleton";
+import { Avatar } from "@/components/ui/Avatar";
+import { Badge } from "@/components/ui/Badge";
+import { Tabs } from "@/components/ui/Tabs";
+import { Pagination } from "@/components/ui/Pagination";
+import {
+  UserDetailPanel,
+  type UserAction,
+} from "@/components/admin/UserDetailPanel";
 import { ApiRequestError } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
 import { formatDate, formatDateTime, formatMoney } from "@/lib/utils";
 import { Money } from "@/components/ui/Money";
 
+const PAGE_SIZE = 20;
+
+type StatusFilter = "all" | AdminUser["status"];
+type RoleFilter = "all" | "staff" | "user";
+type PlanFilter = "all" | "with_plan" | "no_plan";
+type SortKey =
+  | "newest"
+  | "oldest"
+  | "name"
+  | "balance"
+  | "referrals"
+  | "last_login";
+
 function capitalize(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// Anyone holding a role beyond the base "user" role is staff.
+function isStaff(user: AdminUser) {
+  return (user.roles ?? []).some((r) => r !== "user");
+}
+
+function sortUsers(list: AdminUser[], key: SortKey) {
+  const time = (v?: string | null) => (v ? new Date(v).getTime() : 0);
+  const sorted = [...list];
+  switch (key) {
+    case "oldest":
+      return sorted.sort((a, b) => time(a.createdAt) - time(b.createdAt));
+    case "name":
+      return sorted.sort((a, b) =>
+        `${a.firstName} ${a.lastName}`.localeCompare(
+          `${b.firstName} ${b.lastName}`,
+        ),
+      );
+    case "balance":
+      return sorted.sort(
+        (a, b) => Number(b.totalBalance ?? 0) - Number(a.totalBalance ?? 0),
+      );
+    case "referrals":
+      return sorted.sort(
+        (a, b) => (b.referralCount ?? 0) - (a.referralCount ?? 0),
+      );
+    case "last_login":
+      return sorted.sort((a, b) => time(b.lastLoginAt) - time(a.lastLoginAt));
+    default:
+      return sorted.sort((a, b) => time(b.createdAt) - time(a.createdAt));
+  }
 }
 
 export default function AdminUsersPage() {
@@ -63,10 +114,80 @@ export default function AdminUsersPage() {
   );
   const [walletLoading, setWalletLoading] = useState(false);
   const [profileId, setProfileId] = useState<string | null>(null);
-  const { data: profileUser, isLoading: profileLoading } = useApiQuery(
+  const {
+    data: profileUser,
+    isLoading: profileLoading,
+    refetch: refetchProfile,
+  } = useApiQuery(
     () => (profileId ? adminApi.users.get(profileId) : Promise.resolve(null)),
     [profileId],
   );
+
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
+  const [planFilter, setPlanFilter] = useState<PlanFilter>("all");
+  const [sortKey, setSortKey] = useState<SortKey>("newest");
+  const [page, setPage] = useState(1);
+
+  const statusCounts = useMemo(() => {
+    const counts = { all: 0, active: 0, suspended: 0, blocked: 0 };
+    for (const u of users ?? []) {
+      counts.all++;
+      if (u.status in counts) counts[u.status as keyof typeof counts]++;
+    }
+    return counts;
+  }, [users]);
+
+  const filteredUsers = useMemo(() => {
+    const q = search.trim().toLowerCase().replace(/^@/, "");
+    const matches = (users ?? []).filter((u) => {
+      if (statusFilter !== "all" && u.status !== statusFilter) return false;
+      if (roleFilter === "staff" && !isStaff(u)) return false;
+      if (roleFilter === "user" && isStaff(u)) return false;
+      if (planFilter === "with_plan" && !u.activePlan) return false;
+      if (planFilter === "no_plan" && u.activePlan) return false;
+      if (!q) return true;
+      return [
+        `${u.firstName} ${u.lastName}`,
+        u.username,
+        u.email,
+        u.phone,
+        u.referralCode,
+      ].some((field) => field?.toLowerCase().includes(q));
+    });
+    return sortUsers(matches, sortKey);
+  }, [users, search, statusFilter, roleFilter, planFilter, sortKey]);
+
+  // Any change to what's being shown sends the admin back to page one.
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter, roleFilter, planFilter, sortKey]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
+  const pageUsers = filteredUsers.slice(
+    (page - 1) * PAGE_SIZE,
+    page * PAGE_SIZE,
+  );
+  const hasFilters =
+    !!search ||
+    statusFilter !== "all" ||
+    roleFilter !== "all" ||
+    planFilter !== "all" ||
+    sortKey !== "newest";
+
+  function clearFilters() {
+    setSearch("");
+    setStatusFilter("all");
+    setRoleFilter("all");
+    setPlanFilter("all");
+    setSortKey("newest");
+  }
+
+  function refreshAll() {
+    refetch();
+    if (profileId) refetchProfile();
+  }
   const [editTarget, setEditTarget] = useState<AdminUser | null>(null);
   const [editForm, setEditForm] = useState({
     firstName: "",
@@ -121,7 +242,7 @@ export default function AdminUsersPage() {
       await adminApi.users[action](user.id);
       push("success", `User ${action}d.`);
       setConfirmAction(null);
-      refetch();
+      refreshAll();
     } catch (err) {
       push(
         "error",
@@ -143,6 +264,7 @@ export default function AdminUsersPage() {
       await adminApi.wallets.adjust(adjustTarget.id, adjustForm);
       push("success", "Wallet adjusted.");
       setAdjustTarget(null);
+      refreshAll();
       setAdjustForm({
         walletType: "account",
         amount: "",
@@ -194,7 +316,7 @@ export default function AdminUsersPage() {
       push("success", "User details saved.");
       setConfirmEdit(false);
       setEditTarget(null);
-      refetch();
+      refreshAll();
     } catch (err) {
       push(
         "error",
@@ -246,7 +368,7 @@ export default function AdminUsersPage() {
         <div>
           <h1 className="font-display text-2xl font-semibold text-ink">Users</h1>
           <p className="mt-1 text-sm text-ink-dim">
-            {users?.length ?? 0} registered users.
+            {statusCounts.all} registered users · {statusCounts.active} active
           </p>
         </div>
         {canCreateAdmin && (
@@ -257,118 +379,222 @@ export default function AdminUsersPage() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>All users</CardTitle>
-        </CardHeader>
-        <CardBody>
+        <CardBody className="space-y-4">
+          <div className="overflow-x-auto">
+            <Tabs
+              active={statusFilter}
+              onChange={(key) => setStatusFilter(key as StatusFilter)}
+              tabs={[
+                { key: "all", label: `All (${statusCounts.all})` },
+                { key: "active", label: `Active (${statusCounts.active})` },
+                {
+                  key: "suspended",
+                  label: `Suspended (${statusCounts.suspended})`,
+                },
+                { key: "blocked", label: `Blocked (${statusCounts.blocked})` },
+              ]}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]">
+            <div className="relative sm:col-span-2 lg:col-span-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-ink-faint" />
+              <Input
+                placeholder="Search name, @username, email, phone…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+                aria-label="Search users"
+                rightElement={
+                  search ? (
+                    <button
+                      type="button"
+                      onClick={() => setSearch("")}
+                      className="text-ink-faint hover:text-ink"
+                      aria-label="Clear search"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  ) : undefined
+                }
+              />
+            </div>
+            <Select
+              aria-label="Filter by role"
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value as RoleFilter)}
+            >
+              <option value="all">All roles</option>
+              <option value="user">Regular users</option>
+              <option value="staff">Admins &amp; staff</option>
+            </Select>
+            <Select
+              aria-label="Filter by plan"
+              value={planFilter}
+              onChange={(e) => setPlanFilter(e.target.value as PlanFilter)}
+            >
+              <option value="all">Any plan</option>
+              <option value="with_plan">Has active plan</option>
+              <option value="no_plan">No active plan</option>
+            </Select>
+            <Select
+              aria-label="Sort users"
+              value={sortKey}
+              onChange={(e) => setSortKey(e.target.value as SortKey)}
+            >
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="name">Name A–Z</option>
+              <option value="balance">Highest balance</option>
+              <option value="referrals">Most referrals</option>
+              <option value="last_login">Recently active</option>
+            </Select>
+          </div>
+
+          {hasFilters && !isLoading && (
+            <div className="flex items-center justify-between text-xs text-ink-faint">
+              <span>
+                Showing {filteredUsers.length} of {statusCounts.all} users
+              </span>
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="font-medium text-primary hover:underline"
+              >
+                Clear filters
+              </button>
+            </div>
+          )}
+
           {isLoading ? (
             <PageSkeleton />
-          ) : !users || users.length === 0 ? (
-            <EmptyState icon={Users} title="No users found" />
+          ) : filteredUsers.length === 0 ? (
+            <EmptyState
+              icon={Users}
+              title={
+                hasFilters ? "No users match these filters" : "No users found"
+              }
+            />
           ) : (
-            <Table>
-              <THead>
-                <Th>Name</Th>
-                <Th>Email</Th>
-                <Th>Phone</Th>
-                <Th>Joined</Th>
-                <Th>Status</Th>
-                <Th className="text-right">Actions</Th>
-              </THead>
-              <tbody>
-                {users.map((u) => (
-                  <Tr
-                    key={u.id}
-                    className="cursor-pointer"
-                    onClick={() => setProfileId(u.id)}
-                  >
-                    <Td className="font-medium">
-                      {u.firstName} {u.lastName}
-                    </Td>
-                    <Td className="text-ink-dim">{u.email}</Td>
-                    <Td className="text-ink-dim">{u.phone ?? "—"}</Td>
-                    <Td className="text-ink-dim">
-                      {u.createdAt ? formatDate(u.createdAt) : "—"}
-                    </Td>
-                    <Td>
-                      <StatusPill status={u.status} />
-                    </Td>
-                    <Td className="text-right">
-                      <div
-                        className="flex justify-end gap-1.5"
-                        onClick={(e) => e.stopPropagation()}
+            <>
+              {/* Desktop table */}
+              <div className="hidden md:block">
+                <Table>
+                  <THead>
+                    <Th>User</Th>
+                    <Th>Contact</Th>
+                    <Th>Plan</Th>
+                    <Th className="text-right">Balance</Th>
+                    <Th className="text-right">Referrals</Th>
+                    <Th>Joined</Th>
+                    <Th>Status</Th>
+                    <Th className="w-8" />
+                  </THead>
+                  <tbody>
+                    {pageUsers.map((u) => (
+                      <Tr
+                        key={u.id}
+                        className="cursor-pointer"
+                        onClick={() => setProfileId(u.id)}
                       >
-                        {canActivate && (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            isLoading={actingId === u.id + "activate"}
-                            onClick={() =>
-                              setConfirmAction({ user: u, action: "activate" })
-                            }
-                          >
-                            Activate
-                          </Button>
-                        )}
-                        {canSuspend && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            isLoading={actingId === u.id + "suspend"}
-                            onClick={() =>
-                              setConfirmAction({ user: u, action: "suspend" })
-                            }
-                          >
-                            Suspend
-                          </Button>
-                        )}
-                        {canBlock && (
-                          <Button
-                            size="sm"
-                            variant="danger"
-                            isLoading={actingId === u.id + "block"}
-                            onClick={() =>
-                              setConfirmAction({ user: u, action: "block" })
-                            }
-                          >
-                            Block
-                          </Button>
-                        )}
-                        {canUpdate && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => openEdit(u)}
-                          >
-                            Edit user
-                          </Button>
-                        )}
-                        {canAdjustWallet && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setAdjustTarget(u)}
-                          >
-                            Adjust wallet
-                          </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setWalletTarget(u)}
-                        >
-                          Wallet details
-                        </Button>
+                        <Td>
+                          <div className="flex items-center gap-3">
+                            <Avatar
+                              firstName={u.firstName}
+                              lastName={u.lastName}
+                              size="sm"
+                            />
+                            <div className="min-w-0">
+                              <p className="flex items-center gap-1.5 truncate font-medium">
+                                {u.firstName} {u.lastName}
+                                {isStaff(u) && (
+                                  <Badge
+                                    tone="info"
+                                    className="px-1.5 py-0 text-[10px]"
+                                  >
+                                    Staff
+                                  </Badge>
+                                )}
+                              </p>
+                              <p className="truncate text-xs text-primary">
+                                @{u.username}
+                              </p>
+                            </div>
+                          </div>
+                        </Td>
+                        <Td>
+                          <p className="max-w-[220px] truncate text-ink-dim">
+                            {u.email}
+                          </p>
+                          <p className="text-xs text-ink-faint">
+                            {u.phone ?? "No phone"}
+                          </p>
+                        </Td>
+                        <Td className="text-ink-dim">
+                          {u.activePlan ?? (
+                            <span className="text-ink-faint">—</span>
+                          )}
+                        </Td>
+                        <Td className="text-right">
+                          <Money value={u.totalBalance ?? "0"} />
+                        </Td>
+                        <Td className="text-right text-ink-dim">
+                          {u.referralCount ?? 0}
+                        </Td>
+                        <Td className="whitespace-nowrap text-ink-dim">
+                          {u.createdAt ? formatDate(u.createdAt) : "—"}
+                        </Td>
+                        <Td>
+                          <StatusPill status={u.status} />
+                        </Td>
+                        <Td>
+                          <ChevronRight className="h-4 w-4 text-ink-faint" />
+                        </Td>
+                      </Tr>
+                    ))}
+                  </tbody>
+                </Table>
+              </div>
+
+              {/* Mobile cards */}
+              <div className="divide-y divide-base-border rounded-xl border border-base-border md:hidden">
+                {pageUsers.map((u) => (
+                  <button
+                    key={u.id}
+                    type="button"
+                    onClick={() => setProfileId(u.id)}
+                    className="flex w-full items-center gap-3 p-3.5 text-left transition-colors hover:bg-base-surface2/60"
+                  >
+                    <Avatar firstName={u.firstName} lastName={u.lastName} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="truncate text-sm font-medium text-ink">
+                          {u.firstName} {u.lastName}
+                        </p>
+                        <StatusPill status={u.status} />
                       </div>
-                    </Td>
-                  </Tr>
+                      <p className="truncate text-xs text-primary">
+                        @{u.username}
+                      </p>
+                      <p className="mt-0.5 truncate text-xs text-ink-faint">
+                        {formatMoney(u.totalBalance ?? "0")} ·{" "}
+                        {u.activePlan ?? "No plan"} · {u.referralCount ?? 0}{" "}
+                        referrals
+                      </p>
+                    </div>
+                  </button>
                 ))}
-              </tbody>
-            </Table>
+              </div>
+
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                onChange={setPage}
+              />
+            </>
           )}
         </CardBody>
       </Card>
-
       <Modal
         open={createAdminOpen}
         onClose={() => setCreateAdminOpen(false)}
@@ -695,49 +921,26 @@ export default function AdminUsersPage() {
         ) : null}
       </Modal>
 
-      <BottomSheet
+      <UserDetailPanel
         open={!!profileId}
         onClose={() => setProfileId(null)}
-        title="User profile"
-      >
-        {profileLoading ? (
-          <PageSkeleton />
-        ) : profileUser ? (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between rounded-xl bg-base-surface2 px-4 py-3.5">
-              <div>
-                <p className="text-sm font-semibold text-ink">
-                  {profileUser.firstName} {profileUser.lastName}
-                </p>
-                <p className="text-xs text-ink-faint">{profileUser.email}</p>
-              </div>
-              <StatusPill status={profileUser.status} />
-            </div>
-            <DetailList
-              rows={[
-                { label: "Username", value: profileUser.username, capitalize: false },
-                { label: "Referral code", value: profileUser.referralCode, capitalize: false },
-                { label: "Phone", value: profileUser.phone, capitalize: false },
-                { label: "Gender", value: profileUser.gender },
-                { label: "Roles", value: profileUser.roles?.join(", ") },
-                { label: "Login count", value: profileUser.loginCount },
-                {
-                  label: "Last login",
-                  value: profileUser.lastLoginAt
-                    ? formatDateTime(profileUser.lastLoginAt)
-                    : undefined,
-                },
-                {
-                  label: "Joined",
-                  value: profileUser.createdAt
-                    ? formatDateTime(profileUser.createdAt)
-                    : undefined,
-                },
-              ]}
-            />
-          </div>
-        ) : null}
-      </BottomSheet>
+        user={profileUser}
+        isLoading={profileLoading}
+        permissions={{
+          canUpdate,
+          canSuspend,
+          canActivate,
+          canBlock,
+          canAdjustWallet,
+        }}
+        onEdit={openEdit}
+        onAdjustWallet={setAdjustTarget}
+        onViewWallet={setWalletTarget}
+        onAction={(user, action: UserAction) =>
+          setConfirmAction({ user, action })
+        }
+        onOpenUser={setProfileId}
+      />
 
       <ConfirmDialog
         open={!!confirmAction}

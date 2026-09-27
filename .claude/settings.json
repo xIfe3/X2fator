@@ -41,7 +41,10 @@
       "Bash(python -)",
       "Read(//c/deploy-x2factor/api/drizzle/**)",
       "Bash(grep -v \"^\\\\s*//\")",
-      "Bash(cd \"C:/Users/ifeanyitheprogrammer/Hacker Space/X2Factor\" && PROD_API_URL=https://api.x2factor.com/api bash ./scripts/build-cpanel.sh 2>&1 | tail -6; ls /c/deploy-x2factor/api/drizzle/*.sql | tail -4)"
+      "Bash(cd \"C:/Users/ifeanyitheprogrammer/Hacker Space/X2Factor\" && PROD_API_URL=https://api.x2factor.com/api bash ./scripts/build-cpanel.sh 2>&1 | tail -6; ls /c/deploy-x2factor/api/drizzle/*.sql | tail -4)",
+      "Bash(curl -s -m 20 -o - -w \"\\\\nHTTP %{http_code}\\\\n\" -X POST https://api.x2factor.com/api/webhooks/flutterwave -H \"Content-Type: application/json\" -d \"{}\")",
+      "Bash(curl -s -m 20 -w \"\\\\nHTTP %{http_code}\\\\n\" -X POST https://api.x2factor.com/api/webhooks/flutterwave -H \"Content-Type: application/json\" -H \"verif-hash: Hennez11@\" -d '{\"event\":\"test.ping\"}')",
+      "Bash(curl -s -m 20 -w \"\\\\nHTTP %{http_code}\\\\n\" -X POST https://api.x2factor.com/api/webhooks/flutterwave -H \"Content-Type: application/json\" -H \"verif-hash: 06c71bd8ed12b45f4656d042\" -d '{\"event\":\"test.ping\"}')"
     ],
     "additionalDirectories": [
       "C:\\deploy-x2factor"

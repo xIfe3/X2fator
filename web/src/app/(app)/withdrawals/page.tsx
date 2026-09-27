@@ -5,6 +5,7 @@ import {
   ArrowUpFromLine,
   CheckCircle2,
   ChevronRight,
+  CircleHelp,
   Landmark,
   Lock,
   Plus,
@@ -39,6 +40,22 @@ const WALLET_LABEL: Record<WalletType, { title: string; subtitle: string }> = {
   task: { title: "Task", subtitle: "Activity / task earnings" },
 };
 
+function ordinal(n: number) {
+  const rem100 = n % 100;
+  if (rem100 >= 11 && rem100 <= 13) return `${n}th`;
+  return `${n}${({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[n % 10] ?? "th"}`;
+}
+
+/** Next date (today included) the task wallet opens for withdrawal. */
+function nextTaskWithdrawalDate(day: number) {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const thisMonth = new Date(now.getFullYear(), now.getMonth(), day);
+  return thisMonth >= today
+    ? thisMonth
+    : new Date(now.getFullYear(), now.getMonth() + 1, day);
+}
+
 function maskAccount(accountNumber: string) {
   return `····${accountNumber.slice(-4)}`;
 }
@@ -50,7 +67,16 @@ export default function WithdrawalsPage() {
     refetch,
   } = useApiQuery(() => withdrawalsApi.list());
   const { data: settings } = useApiQuery(() => withdrawalsApi.settings());
-  const { data: balance } = useApiQuery(() => walletApi.getBalance());
+  const { data: balance, refetch: refetchBalance } = useApiQuery(() =>
+    walletApi.getBalance(),
+  );
+  const [tipOpen, setTipOpen] = useState(false);
+
+  useEffect(() => {
+    window.addEventListener("wallet-updated", refetchBalance);
+    return () => window.removeEventListener("wallet-updated", refetchBalance);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const {
     data: accounts,
     refetch: refetchAccounts,
@@ -165,6 +191,104 @@ export default function WithdrawalsPage() {
           </Button>
         </div>
       </div>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <CardTitle>Your balances</CardTitle>
+            <button
+              type="button"
+              onClick={() => setTipOpen((v) => !v)}
+              aria-expanded={tipOpen}
+              aria-label="Withdrawal rules"
+              className={cn(
+                "rounded-full p-0.5 transition-colors",
+                tipOpen ? "text-primary" : "text-ink-faint hover:text-ink",
+              )}
+            >
+              <CircleHelp className="h-4.5 w-4.5" />
+            </button>
+          </div>
+        </CardHeader>
+        <CardBody className="space-y-3">
+          {tipOpen && (
+            <div className="rounded-xl border border-primary-dim/30 bg-primary-soft px-4 py-3 text-xs text-ink">
+              <p className="mb-1.5 font-semibold text-primary">
+                How withdrawals work
+              </p>
+              <ul className="list-disc space-y-1 pl-4 text-ink-dim">
+                <li>
+                  <span className="font-medium text-ink">Referral wallet:</span>{" "}
+                  withdraw anytime. The minimum withdrawal is{" "}
+                  <span className="font-medium text-ink">
+                    {settings
+                      ? formatMoney(settings.referralMinimumWithdrawal)
+                      : "…"}
+                  </span>
+                  .
+                </li>
+                <li>
+                  <span className="font-medium text-ink">Task wallet:</span>{" "}
+                  withdrawals open once a month, on the{" "}
+                  <span className="font-medium text-ink">
+                    {settings ? ordinal(settings.taskWithdrawalDay) : "…"}
+                  </span>{" "}
+                  of every month.
+                  {settings && (
+                    <>
+                      {" "}
+                      Next opening:{" "}
+                      <span className="font-medium text-ink">
+                        {nextTaskWithdrawalDate(
+                          settings.taskWithdrawalDay,
+                        ).toLocaleDateString(undefined, {
+                          day: "numeric",
+                          month: "long",
+                          year: "numeric",
+                        })}
+                      </span>
+                      .
+                    </>
+                  )}
+                </li>
+                {settings && (
+                  <li>
+                    <span className="font-medium text-ink">Fee:</span>{" "}
+                    {formatMoney(settings.withdrawalFeeFlat)}
+                    {Number(settings.withdrawalFeePercent) > 0 &&
+                      ` + ${Number(settings.withdrawalFeePercent)}%`}{" "}
+                    per withdrawal, deducted from the amount you withdraw.
+                  </li>
+                )}
+              </ul>
+            </div>
+          )}
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+            {(["referral", "task"] as WalletType[]).map((type) => (
+              <div
+                key={type}
+                className="rounded-xl border border-base-border bg-base-raised p-4"
+              >
+                <p className="text-xs font-medium text-ink-dim">
+                  {WALLET_LABEL[type].title} wallet
+                </p>
+                <Money
+                  value={balance?.[type] ?? "0"}
+                  size="lg"
+                  className="mt-1"
+                />
+                <p className="mt-1.5 text-[11px] text-ink-faint">
+                  {!settings
+                    ? "…"
+                    : type === "referral"
+                      ? `Withdraw anytime · min ${formatMoney(settings.referralMinimumWithdrawal)}`
+                      : `Opens on the ${ordinal(settings.taskWithdrawalDay)} of each month`}
+                </p>
+              </div>
+            ))}
+          </div>
+        </CardBody>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -300,8 +424,9 @@ export default function WithdrawalsPage() {
             </p>
           ) : (
             <p className="text-xs text-ink-faint">
-              Task wallet withdrawals only open on day{" "}
-              {settings?.taskWithdrawalDay ?? "…"} of each month.
+              Task wallet withdrawals only open on the{" "}
+              {settings ? ordinal(settings.taskWithdrawalDay) : "…"} of each
+              month.
             </p>
           )}
 

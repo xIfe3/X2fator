@@ -499,7 +499,42 @@ export interface UtilityBeneficiary {
 
 // ---- Admin ----
 export interface AdminUser extends User {
-  wallets?: UserWallets;
+  totalBalance?: string;
+  activePlan?: string | null;
+  referralCount?: number;
+  referredByUsername?: string | null;
+  emailVerified?: boolean;
+  phoneVerified?: boolean;
+  hasWithdrawalPin?: boolean;
+  currentStreak?: number;
+  longestStreak?: number;
+  telegramJoinedAt?: string | null;
+  updatedAt?: string;
+}
+
+// GET /admin/users/:id — the list row plus everything the detail panel shows.
+export interface AdminUserDetail extends AdminUser {
+  wallets: {
+    account: Wallet | null;
+    task: Wallet | null;
+    referral: Wallet | null;
+  };
+  subscriptions: Array<{
+    id: string;
+    planName: string;
+    amountPaid: string;
+    dailyReward: string;
+    dailyTaskLimit: number;
+    status: "pending" | "active" | "completed" | "cancelled" | "expired";
+    startsAt: string;
+    createdAt: string;
+  }>;
+  referredBy: Pick<User, "id" | "username" | "firstName" | "lastName"> | null;
+  recentReferrals: Array<
+    Pick<User, "id" | "username" | "firstName" | "lastName" | "status"> & {
+      createdAt: string;
+    }
+  >;
 }
 export interface AuditLog {
   id: string;

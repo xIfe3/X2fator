@@ -24,6 +24,36 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 
+// Nigeria (WAT) is UTC+1 all year — no daylight saving — so the task day
+// can be pinned to Lagos midnight regardless of the server's own timezone.
+const WAT_OFFSET_MS = 60 * 60 * 1000;
+
+// How many tasks a user is shown per day, drawn at random from every
+// active task. Never fewer than the user's plan limit, so a plan that
+// allows more than this can still fill its allowance.
+const TASKS_SHOWN_PER_DAY = 10;
+
+/** Start of the current task day (00:00 Lagos time) as a UTC instant. */
+function startOfTaskDay(now = new Date()) {
+  const shifted = new Date(now.getTime() + WAT_OFFSET_MS);
+  shifted.setUTCHours(0, 0, 0, 0);
+  return new Date(shifted.getTime() - WAT_OFFSET_MS);
+}
+
+/**
+ * Deterministic 32-bit hash (FNV-1a). Used to shuffle tasks per user per
+ * day, so the random selection stays stable across refreshes and only
+ * changes when the day rolls over.
+ */
+function hashString(value: string) {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
+}
+
 @Injectable()
 export class TasksService {
   private readonly logger = new Logger(TasksService.name);
@@ -65,48 +95,121 @@ export class TasksService {
   }
 
   /**
-   * Get all active tasks available to a user to complete. Excludes
-   * ad-generated tasks the user themselves funded — you can't complete
-   * (and get paid for) your own ad campaign.
+   * Get today's tasks for a user. Excludes ad-generated tasks the user
+   * themselves funded — you can't complete (and get paid for) your own
+   * ad campaign — and any task they already submitted on a previous day
+   * (a task can only ever be done once).
    *
-   * Also excludes any task the user already submitted on a previous day:
-   * a task can only ever be done once, so from the next day on it drops
-   * out of their list entirely. Tasks submitted *today* stay visible so
-   * the user can still see their pending/approved/rejected status. "Today"
-   * uses the same server-local day boundary as the daily limit check in
-   * completeTask().
+   * From what's left the user sees a random selection of
+   * TASKS_SHOWN_PER_DAY (or their plan limit, if higher). The shuffle is
+   * seeded by user + day, so the list is stable across refreshes and a
+   * new set appears after midnight. Tasks submitted *today* always stay
+   * in the list so the user can still see their pending/approved/rejected
+   * status.
    */
   async getTasks(userId: string) {
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
+    const startOfDay = startOfTaskDay();
 
-    const [rows, pastCompletions] = await Promise.all([
-      db
-        .select({ task: tasks, ad: ads })
-        .from(tasks)
-        .leftJoin(ads, eq(tasks.adId, ads.id))
-        .where(eq(tasks.status, 'active'))
-        .orderBy(desc(tasks.createdAt)),
-      db
-        .select({ taskId: taskCompletions.taskId })
-        .from(taskCompletions)
-        .where(
-          and(
-            eq(taskCompletions.userId, userId),
-            lt(taskCompletions.completedAt, startOfDay),
+    const [rows, pastCompletions, todayCompletions, subscription] =
+      await Promise.all([
+        db
+          .select({ task: tasks, ad: ads })
+          .from(tasks)
+          .leftJoin(ads, eq(tasks.adId, ads.id))
+          .where(eq(tasks.status, 'active'))
+          .orderBy(desc(tasks.createdAt)),
+        db
+          .select({ taskId: taskCompletions.taskId })
+          .from(taskCompletions)
+          .where(
+            and(
+              eq(taskCompletions.userId, userId),
+              lt(taskCompletions.completedAt, startOfDay),
+            ),
           ),
-        ),
-    ]);
+        db
+          .select({ taskId: taskCompletions.taskId })
+          .from(taskCompletions)
+          .where(
+            and(
+              eq(taskCompletions.userId, userId),
+              gte(taskCompletions.completedAt, startOfDay),
+            ),
+          ),
+        db.query.planSubscriptions.findFirst({
+          where: and(
+            eq(planSubscriptions.userId, userId),
+            eq(planSubscriptions.status, 'active'),
+          ),
+        }),
+      ]);
 
     const doneBeforeToday = new Set(pastCompletions.map((c) => c.taskId));
+    const doneToday = new Set(todayCompletions.map((c) => c.taskId));
+    const shownCount = Math.max(
+      TASKS_SHOWN_PER_DAY,
+      subscription?.dailyTaskLimit ?? 0,
+    );
+    const seed = `${userId}:${startOfDay.toISOString()}`;
 
-    return rows
+    const available = rows
       .filter((r) => !r.ad || r.ad.userId !== userId)
-      .filter((r) => !doneBeforeToday.has(r.task.id))
+      .filter((r) => !doneBeforeToday.has(r.task.id));
+
+    const submittedToday = available.filter((r) => doneToday.has(r.task.id));
+    const shuffled = available
+      .filter((r) => !doneToday.has(r.task.id))
+      .map((r) => ({ r, key: hashString(`${seed}:${r.task.id}`) }))
+      .sort((a, b) => a.key - b.key)
+      .map(({ r }) => r);
+
+    return [...submittedToday, ...shuffled]
+      .slice(0, Math.max(shownCount, submittedToday.length))
       .map((r) => ({
         ...r.task,
         source: r.task.adId ? ('ad' as const) : ('admin' as const),
       }));
+  }
+
+  /**
+   * Today's task allowance for the user: how many they've submitted
+   * today (pending, approved and rejected all count — a submission uses
+   * up a slot the moment it's made) against their plan's daily limit,
+   * plus when the allowance resets (next midnight, Lagos time). Uses the
+   * same day boundary as completeTask(), so the frontend countdown lands
+   * exactly when the server starts accepting submissions again.
+   */
+  async getDailyStatus(userId: string) {
+    const startOfDay = startOfTaskDay();
+
+    const resetsAt = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
+
+    const subscription = await db.query.planSubscriptions.findFirst({
+      where: and(
+        eq(planSubscriptions.userId, userId),
+        eq(planSubscriptions.status, 'active'),
+      ),
+    });
+
+    const todayCompletions = await db
+      .select({ id: taskCompletions.id })
+      .from(taskCompletions)
+      .where(
+        and(
+          eq(taskCompletions.userId, userId),
+          gte(taskCompletions.completedAt, startOfDay),
+        ),
+      );
+
+    const dailyTaskLimit = subscription?.dailyTaskLimit ?? 0;
+    const completedToday = todayCompletions.length;
+
+    return {
+      completedToday,
+      dailyTaskLimit,
+      limitReached: !!subscription && completedToday >= dailyTaskLimit,
+      resetsAt: resetsAt.toISOString(),
+    };
   }
 
   /**
@@ -236,7 +339,8 @@ export class TasksService {
         skipped.push({
           id: taskId,
           reason:
-            err instanceof BadRequestException || err instanceof NotFoundException
+            err instanceof BadRequestException ||
+            err instanceof NotFoundException
               ? err.message
               : 'Could not delete this task',
         });
@@ -314,16 +418,13 @@ export class TasksService {
         }
 
         if (adRow.remainingSlots <= 0) {
-          throw new BadRequestException(
-            'This campaign has no remaining slots',
-          );
+          throw new BadRequestException('This campaign has no remaining slots');
         }
 
         ad = adRow;
       }
 
-      const startOfDay = new Date();
-      startOfDay.setHours(0, 0, 0, 0);
+      const startOfDay = startOfTaskDay();
 
       const todayCompletions = await tx.query.taskCompletions.findMany({
         where: and(

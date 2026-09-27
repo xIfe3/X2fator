@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
+  CheckCircle2,
   ExternalLink,
   ImagePlus,
   ListChecks,
@@ -42,8 +43,13 @@ export default function TasksPage() {
   const { data: subscription, isLoading: subscriptionLoading } = useApiQuery(
     () => subscriptionsApi.active(),
   );
-  const { data: tasks, isLoading: tasksLoading } = useApiQuery(() =>
-    tasksApi.list(),
+  const {
+    data: tasks,
+    isLoading: tasksLoading,
+    refetch: refetchTasks,
+  } = useApiQuery(() => tasksApi.list());
+  const { data: today, refetch: refetchToday } = useApiQuery(() =>
+    tasksApi.today(),
   );
   const {
     data: completions,
@@ -92,6 +98,7 @@ export default function TasksPage() {
       setFile(null);
       setPreview(null);
       refetchCompletions();
+      refetchToday();
     } catch (err) {
       setError(
         err instanceof ApiRequestError ? err.message : "Could not submit task.",
@@ -103,30 +110,18 @@ export default function TasksPage() {
 
   const hasPlan = !!subscription;
 
-  const todayCompletionsCount = (completions ?? []).filter((c) => {
-    const ts = c.completedAt ?? c.createdAt;
-    if (!ts) return false;
-    const date = new Date(ts);
-    const now = new Date();
-    return (
-      date.getFullYear() === now.getFullYear() &&
-      date.getMonth() === now.getMonth() &&
-      date.getDate() === now.getDate()
-    );
-  }).length;
+  // Today's count comes from the server so it uses the same day boundary
+  // as the submit-time limit check. Every submission counts — pending,
+  // approved or rejected — so once the limit is hit there's nothing left
+  // to do today and the task list is replaced by a countdown.
+  const todayCompletionsCount = today?.completedToday ?? 0;
+  const dailyLimitReached = hasPlan && !!today?.limitReached;
 
-  const dailyLimitReached = hasPlan
-    ? todayCompletionsCount >= subscription.dailyTaskLimit
-    : false;
-
-  const visibleTasks = (tasks ?? []).filter((t) => {
-    if (!dailyLimitReached) return true;
-    // Once today's limit is hit, only tasks the user already has a
-    // completion record for stay visible (so their status still shows)
-    // — everything else disappears rather than sitting there
-    // unactionable, signaling there's nothing left to do today.
-    return completions?.some((c) => c.taskId === t.id);
-  });
+  function onDayReset() {
+    refetchToday();
+    refetchTasks();
+    refetchCompletions();
+  }
 
   return (
     <div className="space-y-6">
@@ -177,7 +172,7 @@ export default function TasksPage() {
                 </span>{" "}
                 tasks today — that's your limit on the{" "}
                 <span className="font-semibold">{subscription.plan?.name ?? "plan"}</span>{" "}
-                plan. Come back tomorrow for more.
+                plan.
               </span>
             ) : (
               <span>
@@ -210,21 +205,17 @@ export default function TasksPage() {
           <CardBody>
             {tasksLoading ? (
               <PageSkeleton />
+            ) : dailyLimitReached && today ? (
+              <DoneForToday resetsAt={today.resetsAt} onReset={onDayReset} />
             ) : !tasks || tasks.length === 0 ? (
               <EmptyState
                 icon={ListChecks}
                 title="No tasks available"
                 description="Check back later for new tasks."
               />
-            ) : visibleTasks.length === 0 ? (
-              <EmptyState
-                icon={ListChecks}
-                title="No more tasks for you today"
-                description="You've hit your daily task limit. Check back tomorrow."
-              />
             ) : (
               <div className="space-y-3">
-                {visibleTasks.map((t) => {
+                {tasks.map((t) => {
                   const meta = TASK_TYPE_META[t.taskType ?? "other"] ?? {
                     label: "Open link",
                     icon: ExternalLink,
@@ -469,6 +460,65 @@ export default function TasksPage() {
           </Button>
         </form>
       </Modal>
+    </div>
+  );
+}
+
+function DoneForToday({
+  resetsAt,
+  onReset,
+}: {
+  resetsAt: string;
+  onReset: () => void;
+}) {
+  const target = new Date(resetsAt).getTime();
+  const [secondsLeft, setSecondsLeft] = useState(() =>
+    Math.max(0, Math.floor((target - Date.now()) / 1000)),
+  );
+
+  useEffect(() => {
+    const tick = () => {
+      const left = Math.max(0, Math.floor((target - Date.now()) / 1000));
+      setSecondsLeft(left);
+      if (left === 0) {
+        clearInterval(id);
+        onReset();
+      }
+    };
+    const id = setInterval(tick, 1000);
+    tick();
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target]);
+
+  const h = Math.floor(secondsLeft / 3600)
+    .toString()
+    .padStart(2, "0");
+  const m = Math.floor((secondsLeft % 3600) / 60)
+    .toString()
+    .padStart(2, "0");
+  const s = Math.floor(secondsLeft % 60)
+    .toString()
+    .padStart(2, "0");
+
+  return (
+    <div className="flex flex-col items-center px-4 py-8 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-soft text-primary">
+        <CheckCircle2 className="h-6 w-6" />
+      </div>
+      <h3 className="mt-4 font-display text-lg font-semibold text-ink">
+        You've performed all your tasks for today
+      </h3>
+      <p className="mt-1 text-sm text-ink-dim">
+        Come back tomorrow for new tasks. You can track your submissions in
+        the My submissions tab.
+      </p>
+      <p className="mt-5 text-xs uppercase tracking-wide text-ink-faint">
+        New tasks in
+      </p>
+      <p className="mt-1 font-mono tabular text-3xl font-semibold text-ink">
+        {h}:{m}:{s}
+      </p>
     </div>
   );
 }

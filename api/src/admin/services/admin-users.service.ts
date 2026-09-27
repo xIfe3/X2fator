@@ -5,10 +5,12 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 
-import { desc, eq, ne } from 'drizzle-orm';
+import { and, count, desc, eq, isNotNull, ne, sql } from 'drizzle-orm';
 
 import {
   db,
+  planSubscriptions,
+  plans,
   roles,
   userRoles,
   users,
@@ -144,7 +146,61 @@ export class AdminUsersService {
       where: ne(users.status, 'pending'),
       orderBy: [desc(users.createdAt)],
     });
-    return rows.map((user) => this.sanitizeUser(user));
+
+    // One grouped query per related table rather than per user, so the
+    // list stays a fixed handful of queries however many users exist.
+    const [roleRows, balanceRows, planRows, referralRows] = await Promise.all([
+      db
+        .select({ userId: userRoles.userId, name: roles.name })
+        .from(userRoles)
+        .innerJoin(roles, eq(userRoles.roleId, roles.id)),
+      db
+        .select({
+          userId: wallets.userId,
+          total: sql<string>`coalesce(sum(${wallets.balance}), 0)`,
+        })
+        .from(wallets)
+        .groupBy(wallets.userId),
+      db
+        .select({ userId: planSubscriptions.userId, planName: plans.name })
+        .from(planSubscriptions)
+        .innerJoin(plans, eq(planSubscriptions.planId, plans.id))
+        .where(eq(planSubscriptions.status, 'active'))
+        .orderBy(desc(plans.rank)),
+      db
+        .select({ referrerId: users.referredById, total: count() })
+        .from(users)
+        .where(and(isNotNull(users.referredById), ne(users.status, 'pending')))
+        .groupBy(users.referredById),
+    ]);
+
+    const rolesByUser = new Map<string, string[]>();
+    for (const row of roleRows) {
+      const list = rolesByUser.get(row.userId) ?? [];
+      list.push(row.name);
+      rolesByUser.set(row.userId, list);
+    }
+    const balanceByUser = new Map(balanceRows.map((r) => [r.userId, r.total]));
+    // Rows are ordered by plan rank, so the first one seen is the best tier.
+    const planByUser = new Map<string, string>();
+    for (const row of planRows) {
+      if (!planByUser.has(row.userId)) planByUser.set(row.userId, row.planName);
+    }
+    const referralsByUser = new Map(
+      referralRows.map((r) => [r.referrerId as string, r.total]),
+    );
+    const usernameById = new Map(rows.map((u) => [u.id, u.username]));
+
+    return rows.map((user) => ({
+      ...this.sanitizeUser(user),
+      roles: rolesByUser.get(user.id) ?? [],
+      totalBalance: balanceByUser.get(user.id) ?? '0',
+      activePlan: planByUser.get(user.id) ?? null,
+      referralCount: referralsByUser.get(user.id) ?? 0,
+      referredByUsername: user.referredById
+        ? (usernameById.get(user.referredById) ?? null)
+        : null,
+    }));
   }
 
   async getUser(userId: string) {
@@ -156,7 +212,78 @@ export class AdminUsersService {
       throw new NotFoundException('User not found');
     }
 
-    return this.sanitizeUser(user);
+    const [roleRows, userWallets, subscriptions, referredBy, referralRows] =
+      await Promise.all([
+        db
+          .select({ name: roles.name })
+          .from(userRoles)
+          .innerJoin(roles, eq(userRoles.roleId, roles.id))
+          .where(eq(userRoles.userId, userId)),
+        db.query.wallets.findMany({ where: eq(wallets.userId, userId) }),
+        db
+          .select({
+            id: planSubscriptions.id,
+            planName: plans.name,
+            amountPaid: planSubscriptions.amountPaid,
+            dailyReward: planSubscriptions.dailyReward,
+            dailyTaskLimit: planSubscriptions.dailyTaskLimit,
+            status: planSubscriptions.status,
+            startsAt: planSubscriptions.startsAt,
+            createdAt: planSubscriptions.createdAt,
+          })
+          .from(planSubscriptions)
+          .innerJoin(plans, eq(planSubscriptions.planId, plans.id))
+          .where(eq(planSubscriptions.userId, userId))
+          .orderBy(desc(planSubscriptions.createdAt)),
+        user.referredById
+          ? db.query.users.findFirst({
+              where: eq(users.id, user.referredById),
+              columns: {
+                id: true,
+                username: true,
+                firstName: true,
+                lastName: true,
+              },
+            })
+          : Promise.resolve(null),
+        db
+          .select({
+            id: users.id,
+            username: users.username,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            status: users.status,
+            createdAt: users.createdAt,
+          })
+          .from(users)
+          .where(
+            and(eq(users.referredById, userId), ne(users.status, 'pending')),
+          )
+          .orderBy(desc(users.createdAt)),
+      ]);
+
+    const walletOf = (type: 'account' | 'task' | 'referral') =>
+      userWallets.find((wallet) => wallet.type === type) ?? null;
+
+    return {
+      ...this.sanitizeUser(user),
+      roles: roleRows.map((r) => r.name),
+      wallets: {
+        account: walletOf('account'),
+        task: walletOf('task'),
+        referral: walletOf('referral'),
+      },
+      totalBalance: userWallets
+        .reduce((sum, wallet) => sum + Number(wallet.balance), 0)
+        .toFixed(2),
+      activePlan:
+        subscriptions.find((s) => s.status === 'active')?.planName ?? null,
+      subscriptions,
+      referredBy: referredBy ?? null,
+      referredByUsername: referredBy?.username ?? null,
+      referralCount: referralRows.length,
+      recentReferrals: referralRows.slice(0, 5),
+    };
   }
 
   async updateUser(adminId: string, userId: string, dto: UpdateUserDto) {
@@ -230,8 +357,8 @@ export class AdminUsersService {
   }
 
   private sanitizeUser(user: typeof users.$inferSelect) {
-    const { passwordHash, ...safeUser } = user;
-    return safeUser;
+    const { passwordHash, withdrawalPinHash, ...safeUser } = user;
+    return { ...safeUser, hasWithdrawalPin: !!withdrawalPinHash };
   }
 
   async getUserWalletDetails(userId: string) {
@@ -278,7 +405,7 @@ export class AdminUsersService {
   }
 
   async suspendUser(adminId: string, userId: string) {
-    const user = await this.getUser(userId);
+    const user = await this.getUserRecord(userId);
 
     if (user.status === 'suspended') {
       throw new BadRequestException('User is already suspended');

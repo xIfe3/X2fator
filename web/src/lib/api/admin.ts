@@ -11,6 +11,7 @@ import type {
   AdminSupportTicketDetail,
   AdminWalletDetails,
   AdminUser,
+  AdminUserDetail,
   AdminBonusSettings,
   AdminBonusStats,
   AuditLog,
@@ -221,7 +222,7 @@ export const adminApi = {
   },
   users: {
     list: () => api.get<AdminUser[]>("/admin/users"),
-    get: (id: string) => api.get<AdminUser>(`/admin/users/${id}`),
+    get: (id: string) => api.get<AdminUserDetail>(`/admin/users/${id}`),
     update: (id: string, dto: Partial<AdminUser>) =>
       api.patch<AdminUser>(`/admin/users/${id}`, dto),
     resetPassword: (id: string, password: string) =>
