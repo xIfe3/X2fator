@@ -33,6 +33,10 @@ const WAT_OFFSET_MS = 60 * 60 * 1000;
 // allows more than this can still fill its allowance.
 const TASKS_SHOWN_PER_DAY = 10;
 
+// Max reviewed (approved/rejected) completions returned to the admin
+// review page. The pending queue is always returned in full.
+const COMPLETIONS_HISTORY_LIMIT = 500;
+
 /** Start of the current task day (00:00 Lagos time) as a UTC instant. */
 function startOfTaskDay(now = new Date()) {
   const shifted = new Date(now.getTime() + WAT_OFFSET_MS);
@@ -495,17 +499,50 @@ export class TasksService {
 
   /**
    * Admin: get every pending task completion awaiting screenshot review,
-   * each with its task attached.
+   * each with its task and the submitting user attached.
    */
   async getPendingCompletions() {
-    const rows = await db
-      .select({ completion: taskCompletions, task: tasks })
+    return this.getCompletions('pending');
+  }
+
+  /**
+   * Admin: list task completions for the review page, filtered by status
+   * ('all' for every status), newest first, each with its task and the
+   * submitting user attached. Reviewed history only grows, so everything
+   * but the pending queue is capped at the most recent
+   * COMPLETIONS_HISTORY_LIMIT rows.
+   */
+  async getCompletions(
+    status: 'pending' | 'approved' | 'rejected' | 'all' = 'pending',
+  ) {
+    const query = db
+      .select({
+        completion: taskCompletions,
+        task: tasks,
+        user: {
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          username: users.username,
+          email: users.email,
+        },
+      })
       .from(taskCompletions)
       .leftJoin(tasks, eq(taskCompletions.taskId, tasks.id))
-      .where(eq(taskCompletions.status, 'pending'))
+      .leftJoin(users, eq(taskCompletions.userId, users.id))
+      .where(status === 'all' ? undefined : eq(taskCompletions.status, status))
       .orderBy(desc(taskCompletions.completedAt));
 
-    return rows.map((r) => ({ ...r.completion, task: r.task ?? undefined }));
+    const rows =
+      status === 'pending'
+        ? await query
+        : await query.limit(COMPLETIONS_HISTORY_LIMIT);
+
+    return rows.map((r) => ({
+      ...r.completion,
+      task: r.task ?? undefined,
+      user: r.user ?? undefined,
+    }));
   }
 
   /**

@@ -229,6 +229,11 @@ export const adminApi = {
       api.patch<{ message: string }>(`/admin/users/${id}/password`, {
         password,
       }),
+    resetWithdrawalPin: (id: string, message?: string) =>
+      api.patch<{ message: string }>(
+        `/admin/users/${id}/withdrawal-pin/reset`,
+        { message },
+      ),
     suspend: (id: string) => api.patch<AdminUser>(`/admin/users/${id}/suspend`),
     activate: (id: string) =>
       api.patch<AdminUser>(`/admin/users/${id}/activate`),
@@ -390,6 +395,8 @@ export const adminApi = {
       api.patch<Task>(`/tasks/${id}`, dto),
     pendingCompletions: () =>
       api.get<TaskCompletion[]>(`/tasks/admin/completions/pending`),
+    completions: (status: "pending" | "approved" | "rejected" | "all") =>
+      api.get<TaskCompletion[]>(`/tasks/admin/completions?status=${status}`),
     approveCompletion: (id: string, note?: string) =>
       api.patch<TaskCompletion>(`/tasks/admin/completions/${id}/approve`, {
         note,
@@ -457,6 +464,12 @@ export const adminApi = {
     },
     get: (id: string) =>
       api.get<AdminSubscriptionDetail>(`/admin/subscriptions/${id}`),
+    cancel: (id: string) =>
+      api.patch<AdminSubscriptionDetail>(`/admin/subscriptions/${id}/cancel`),
+    reactivate: (id: string) =>
+      api.patch<AdminSubscriptionDetail>(
+        `/admin/subscriptions/${id}/reactivate`,
+      ),
   },
   payments: {
     gatewayStatus: () => api.get<GatewayStatus>("/admin/payments/gateway-status"),

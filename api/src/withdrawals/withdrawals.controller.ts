@@ -15,7 +15,10 @@ import { FlutterwaveAccountsService } from './flutterwave-accounts.service';
 import { CreateWithdrawalDto } from './dto/create-withdrawal.dto';
 import { ReviewWithdrawalDto } from './dto/review-withdrawal.dto';
 import { VerifyAccountDto } from './dto/verify-account.dto';
+import { Throttle } from '@nestjs/throttler';
+
 import { SetWithdrawalPinDto } from './dto/set-withdrawal-pin.dto';
+import { ResetWithdrawalPinDto } from './dto/reset-withdrawal-pin.dto';
 import { AddBankAccountDto } from './dto/add-bank-account.dto';
 
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -36,6 +39,14 @@ export class WithdrawalsController {
   @Get('settings')
   async getSettings() {
     return this.withdrawalSettingsService.get();
+  }
+
+  @Get('task-minimum')
+  async getTaskMinimum(@CurrentUser() user: AuthenticatedUser) {
+    const minimum = await this.withdrawalsService.getTaskMinimumWithdrawal(
+      user.id,
+    );
+    return { minimum: minimum.toFixed(2) };
   }
 
   @Get('banks')
@@ -62,6 +73,16 @@ export class WithdrawalsController {
     @Body() dto: SetWithdrawalPinDto,
   ) {
     return this.withdrawalsService.setPin(user.id, dto.pin);
+  }
+
+  // Throttled to slow down password guessing.
+  @Post('pin/reset')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  async resetPin(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: ResetWithdrawalPinDto,
+  ) {
+    return this.withdrawalsService.resetPin(user.id, dto.password, dto.newPin);
   }
 
   @Get('accounts')

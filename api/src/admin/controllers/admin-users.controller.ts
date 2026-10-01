@@ -3,6 +3,7 @@ import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/co
 import { AdminUsersService } from '../services/admin-users.service';
 import { UpdateUserDto } from '../dto/update-user.dto';
 import { ResetUserPasswordDto } from '../dto/reset-user-password.dto';
+import { ResetUserPinDto } from '../dto/reset-user-pin.dto';
 import { CreateAdminDto } from '../dto/create-admin.dto';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -66,6 +67,20 @@ export class AdminUsersController {
       admin.id,
       userId,
       dto.password,
+    );
+  }
+
+  @Patch(':id/withdrawal-pin/reset')
+  @RequirePermission('users.update')
+  async resetUserWithdrawalPin(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Param('id') userId: string,
+    @Body() dto: ResetUserPinDto,
+  ) {
+    return this.adminUsersService.resetUserWithdrawalPin(
+      admin.id,
+      userId,
+      dto.message,
     );
   }
 

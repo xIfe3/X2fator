@@ -52,6 +52,21 @@ export interface Mailer {
     taskTitle: string,
     reason?: string,
   ): Promise<void>;
+  sendWithdrawalPinChanged(to: string, firstName: string): Promise<void>;
+  sendWithdrawalPinResetByAdmin(
+    to: string,
+    firstName: string,
+    message?: string,
+  ): Promise<void>;
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 // Matches the app's teal brand color (see web/src/app/globals.css --color-primary).
@@ -444,6 +459,55 @@ export class MailerService implements Mailer {
     await this.send({
       to,
       subject: 'Your task submission was rejected',
+      html,
+    });
+  }
+
+  async sendWithdrawalPinChanged(to: string, firstName: string): Promise<void> {
+    if (!this.resend) {
+      this.logger.log(`[dev] Withdrawal PIN changed for ${to}`);
+      return;
+    }
+
+    const html = emailLayout(`
+      ${heading('Your withdrawal PIN was changed')}
+      <p style="margin:16px 0 0 0;">Hi ${escapeHtml(firstName)}, the withdrawal PIN on your X2Factor account was just changed.</p>
+      <p style="margin:8px 0 0 0;">If this wasn't you, change your password right away and contact support.</p>
+      ${buttonHtml(`${this.dashboardUrl}/support`, 'Contact support')}
+    `);
+
+    await this.send({
+      to,
+      subject: 'Your withdrawal PIN was changed',
+      html,
+    });
+  }
+
+  async sendWithdrawalPinResetByAdmin(
+    to: string,
+    firstName: string,
+    message?: string,
+  ): Promise<void> {
+    if (!this.resend) {
+      this.logger.log(`[dev] Withdrawal PIN reset by admin for ${to}`);
+      return;
+    }
+
+    const html = emailLayout(`
+      ${heading('Your withdrawal PIN was reset')}
+      <p style="margin:16px 0 0 0;">Hi ${escapeHtml(firstName)}, our support team has reset the withdrawal PIN on your X2Factor account.</p>
+      <p style="margin:8px 0 0 0;">You'll be asked to set a new 4-digit PIN the next time you make a withdrawal.</p>
+      ${
+        message
+          ? `<p style="margin:16px 0 0 0; padding:12px 14px; background-color:#0f1c2d; border-radius:10px; color:#f2f5fa; white-space:pre-line;">${escapeHtml(message)}</p>`
+          : ''
+      }
+      ${buttonHtml(`${this.dashboardUrl}/withdrawals`, 'Set a new PIN')}
+    `);
+
+    await this.send({
+      to,
+      subject: 'Your withdrawal PIN was reset',
       html,
     });
   }

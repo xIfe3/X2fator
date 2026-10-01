@@ -39,6 +39,8 @@ export default function PlansPage() {
   const [purchasing, setPurchasing] = useState(false);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
   const [selectedSub, setSelectedSub] = useState<Subscription | null>(null);
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   const highestHeldRank = (history ?? []).reduce(
     (max, sub) => Math.max(max, sub.plan?.rank ?? 0),
@@ -71,9 +73,11 @@ export default function PlansPage() {
 
   async function cancel() {
     if (!activeSubscription) return;
+    setCancelling(true);
     try {
       await subscriptionsApi.cancel(activeSubscription.id);
       push("success", "Subscription cancelled.");
+      setConfirmingCancel(false);
       refetchActive();
       refetchHistory();
     } catch (error) {
@@ -83,6 +87,8 @@ export default function PlansPage() {
           ? error.message
           : "Could not cancel your subscription.",
       );
+    } finally {
+      setCancelling(false);
     }
   }
 
@@ -117,7 +123,11 @@ export default function PlansPage() {
                   </p>
                 </div>
               </div>
-              <Button variant="outline" size="sm" onClick={cancel}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setConfirmingCancel(true)}
+              >
                 Cancel subscription
               </Button>
             </div>
@@ -298,6 +308,48 @@ export default function PlansPage() {
             </div>
           </div>
         )}
+      </Modal>
+
+      <Modal
+        open={confirmingCancel}
+        onClose={() => {
+          if (!cancelling) setConfirmingCancel(false);
+        }}
+        title="Cancel subscription?"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-ink-dim">
+            Your{" "}
+            <span className="font-medium text-ink">
+              {activeSubscription?.plan?.name ?? "current"}
+            </span>{" "}
+            plan will stop immediately and you will no longer earn daily
+            rewards from it.
+          </p>
+          <p className="rounded-lg border border-danger/30 bg-danger-soft px-3.5 py-2.5 text-sm text-danger">
+            You will not get a refund, and you can't buy this plan or any
+            lower plan again. To get a plan back you would have to buy a
+            higher one.
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setConfirmingCancel(false)}
+              disabled={cancelling}
+            >
+              Keep my plan
+            </Button>
+            <Button
+              variant="danger"
+              className="flex-1"
+              isLoading={cancelling}
+              onClick={cancel}
+            >
+              Yes, cancel
+            </Button>
+          </div>
+        </div>
       </Modal>
 
       <BottomSheet

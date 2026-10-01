@@ -108,6 +108,9 @@ export default function AdminUsersPage() {
   });
   const [adjustError, setAdjustError] = useState<string | null>(null);
   const [adjustSubmitting, setAdjustSubmitting] = useState(false);
+  const [pinTarget, setPinTarget] = useState<AdminUser | null>(null);
+  const [pinMessage, setPinMessage] = useState("");
+  const [pinSubmitting, setPinSubmitting] = useState(false);
   const [walletTarget, setWalletTarget] = useState<AdminUser | null>(null);
   const [walletDetails, setWalletDetails] = useState<AdminWalletDetails | null>(
     null,
@@ -279,6 +282,30 @@ export default function AdminUsersPage() {
       );
     } finally {
       setAdjustSubmitting(false);
+    }
+  }
+
+  async function submitPinReset(e: FormEvent) {
+    e.preventDefault();
+    if (!pinTarget) return;
+    setPinSubmitting(true);
+    try {
+      await adminApi.users.resetWithdrawalPin(
+        pinTarget.id,
+        pinMessage.trim() || undefined,
+      );
+      push("success", "Withdrawal PIN reset. The user has been notified.");
+      setPinTarget(null);
+      refreshAll();
+    } catch (err) {
+      push(
+        "error",
+        err instanceof ApiRequestError
+          ? err.message
+          : "Could not reset the withdrawal PIN.",
+      );
+    } finally {
+      setPinSubmitting(false);
     }
   }
 
@@ -921,6 +948,50 @@ export default function AdminUsersPage() {
         ) : null}
       </Modal>
 
+      <Modal
+        open={!!pinTarget}
+        onClose={() => {
+          if (!pinSubmitting) setPinTarget(null);
+        }}
+        title="Reset withdrawal PIN"
+      >
+        {pinTarget && (
+          <form onSubmit={submitPinReset} className="space-y-4">
+            <p className="text-sm text-ink-dim">
+              This clears the withdrawal PIN for{" "}
+              <span className="font-medium text-ink">
+                {pinTarget.firstName} {pinTarget.lastName}
+              </span>{" "}
+              ({pinTarget.email}). They'll be asked to set a new PIN on their
+              next withdrawal, and they'll get an email and an in-app
+              notification.
+            </p>
+            <Textarea
+              label="Message to the user (optional)"
+              rows={3}
+              maxLength={1000}
+              value={pinMessage}
+              onChange={(e) => setPinMessage(e.target.value)}
+              placeholder="E.g. We reset your PIN as you requested. Please set a new one before your next withdrawal."
+            />
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => setPinTarget(null)}
+                disabled={pinSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1" isLoading={pinSubmitting}>
+                Reset PIN
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
       <UserDetailPanel
         open={!!profileId}
         onClose={() => setProfileId(null)}
@@ -935,6 +1006,10 @@ export default function AdminUsersPage() {
         }}
         onEdit={openEdit}
         onAdjustWallet={setAdjustTarget}
+        onResetPin={(user) => {
+          setPinTarget(user);
+          setPinMessage("");
+        }}
         onViewWallet={setWalletTarget}
         onAction={(user, action: UserAction) =>
           setConfirmAction({ user, action })

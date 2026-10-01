@@ -14,6 +14,7 @@ import { ConfigService } from '@nestjs/config';
 
 import {
   db,
+  planSubscriptions,
   userBankAccounts,
   users,
   walletTransactions,
@@ -52,10 +53,23 @@ export class WithdrawalsService {
   }
 
   /**
-   * Sets (or replaces) the user's withdrawal PIN. There is no separate
-   * "change PIN" flow yet — setting it again simply overwrites the old one.
+   * Sets the user's first withdrawal PIN (or a new one after an admin
+   * reset cleared it). Replacing an existing PIN must go through
+   * resetPin(), which re-checks the account password — otherwise anyone
+   * holding a logged-in session could swap the PIN and withdraw.
    */
   async setPin(userId: string, pin: string) {
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, userId),
+      columns: { withdrawalPinHash: true },
+    });
+
+    if (user?.withdrawalPinHash) {
+      throw new ConflictException(
+        'You already have a withdrawal PIN. Use "Reset PIN" to change it.',
+      );
+    }
+
     const withdrawalPinHash = await bcrypt.hash(pin, this.pinSaltRounds);
 
     await db
@@ -64,6 +78,109 @@ export class WithdrawalsService {
       .where(eq(users.id, userId));
 
     return { message: 'Withdrawal PIN set successfully.' };
+  }
+
+  /**
+   * Replaces the user's withdrawal PIN after confirming their account
+   * password, then emails and notifies them so an unexpected change is
+   * noticed.
+   */
+  async resetPin(userId: string, password: string, newPin: string) {
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, userId),
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const validPassword = await bcrypt.compare(password, user.passwordHash);
+
+    if (!validPassword) {
+      throw new UnauthorizedException('Incorrect password');
+    }
+
+    const withdrawalPinHash = await bcrypt.hash(newPin, this.pinSaltRounds);
+
+    await db
+      .update(users)
+      .set({ withdrawalPinHash, updatedAt: new Date() })
+      .where(eq(users.id, userId));
+
+    this.mailer
+      ?.sendWithdrawalPinChanged(user.email, user.firstName)
+      .catch((err) =>
+        this.logger.error(
+          `Failed to send withdrawal-PIN-changed email to ${user.email}`,
+          err instanceof Error ? err.stack : err,
+        ),
+      );
+
+    this.notificationsService
+      ?.create({
+        userId: user.id,
+        title: 'Withdrawal PIN changed',
+        message:
+          "Your withdrawal PIN was just changed. If this wasn't you, change your password and contact support right away.",
+        type: 'security',
+      })
+      .catch((err) =>
+        this.logger.error(
+          `Failed to create PIN-changed notification for user ${user.id}`,
+          err instanceof Error ? err.stack : err,
+        ),
+      );
+
+    return { message: 'Withdrawal PIN changed successfully.' };
+  }
+
+  /**
+   * Admin: clears a user's withdrawal PIN so they set a fresh one on
+   * their next withdrawal, and tells them by email and in-app
+   * notification, including an optional message from the admin.
+   */
+  async adminResetPin(userId: string, message?: string) {
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, userId),
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    await db
+      .update(users)
+      .set({ withdrawalPinHash: null, updatedAt: new Date() })
+      .where(eq(users.id, userId));
+
+    const note = message?.trim() || undefined;
+
+    this.mailer
+      ?.sendWithdrawalPinResetByAdmin(user.email, user.firstName, note)
+      .catch((err) =>
+        this.logger.error(
+          `Failed to send admin-PIN-reset email to ${user.email}`,
+          err instanceof Error ? err.stack : err,
+        ),
+      );
+
+    this.notificationsService
+      ?.create({
+        userId: user.id,
+        title: 'Withdrawal PIN reset',
+        message: note
+          ? `Support reset your withdrawal PIN. Set a new one on your next withdrawal. Message from support: ${note}`
+          : 'Support reset your withdrawal PIN. Set a new one on your next withdrawal.',
+        type: 'security',
+      })
+      .catch((err) =>
+        this.logger.error(
+          `Failed to create admin-PIN-reset notification for user ${user.id}`,
+          err instanceof Error ? err.stack : err,
+        ),
+      );
+
+    return user;
   }
 
   private async assertValidPin(userId: string, pin: string) {
@@ -222,8 +339,25 @@ export class WithdrawalsService {
    * the funds are returned to that wallet.
    *
    * - Referral wallet: withdrawable anytime, subject to an admin-set minimum.
-   * - Task wallet: withdrawable only on the admin-set day of the month.
+   * - Task wallet: withdrawable only on the admin-set day of the month,
+   *   subject to the minimum set on the user's active plan.
    */
+  /**
+   * The minimum task-wallet withdrawal for a user: the `minimumWithdrawal`
+   * set on their active plan, or 0 when they have no active plan.
+   */
+  async getTaskMinimumWithdrawal(userId: string): Promise<number> {
+    const subscription = await db.query.planSubscriptions.findFirst({
+      where: and(
+        eq(planSubscriptions.userId, userId),
+        eq(planSubscriptions.status, 'active'),
+      ),
+      with: { plan: true },
+    });
+
+    return Number(subscription?.plan.minimumWithdrawal ?? 0);
+  }
+
   async createWithdrawal(
     userId: string,
     params: {
@@ -258,6 +392,13 @@ export class WithdrawalsService {
       if (today !== settings.taskWithdrawalDay) {
         throw new BadRequestException(
           `Task wallet withdrawals only open on day ${settings.taskWithdrawalDay} of each month`,
+        );
+      }
+
+      const minimum = await this.getTaskMinimumWithdrawal(userId);
+      if (amount < minimum) {
+        throw new BadRequestException(
+          `Minimum task withdrawal is ${minimum.toFixed(2)}`,
         );
       }
     }

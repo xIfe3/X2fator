@@ -338,10 +338,14 @@ export interface TaskCompletion {
   submissionData?: Record<string, unknown>;
   screenshotUrl?: string;
   reviewNote?: string;
+  rejectionReason?: string | null;
+  adId?: string | null;
   reviewedAt?: string;
   completedAt?: string;
   createdAt?: string;
   task?: Task;
+  // Only included on the admin review lists.
+  user?: Pick<User, "id" | "firstName" | "lastName" | "username" | "email">;
 }
 
 // ---- Earnings ----

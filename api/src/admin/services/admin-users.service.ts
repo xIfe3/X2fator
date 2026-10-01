@@ -20,6 +20,7 @@ import {
 
 import { AuditService } from '../../audit/audit.service';
 import { PasswordService } from '../../auth/password.service';
+import { WithdrawalsService } from '../../withdrawals/withdrawals.service';
 import type { UpdateUserDto } from '../dto/update-user.dto';
 import type { CreateAdminDto } from '../dto/create-admin.dto';
 
@@ -28,6 +29,7 @@ export class AdminUsersService {
   constructor(
     private readonly auditService: AuditService,
     private readonly passwordService: PasswordService,
+    private readonly withdrawalsService: WithdrawalsService,
   ) {}
 
   /**
@@ -346,6 +348,27 @@ export class AdminUsersService {
       description: `Reset password for user ${user.email}`,
     });
     return { message: 'User password has been reset.' };
+  }
+
+  /**
+   * Clears the user's withdrawal PIN (they set a new one on their next
+   * withdrawal) and emails/notifies them, with an optional admin message.
+   */
+  async resetUserWithdrawalPin(
+    adminId: string,
+    userId: string,
+    message?: string,
+  ) {
+    const user = await this.withdrawalsService.adminResetPin(userId, message);
+    await this.auditService.log({
+      actorId: adminId,
+      action: 'update',
+      entityType: 'user',
+      entityId: userId,
+      description: `Reset withdrawal PIN for user ${user.email}`,
+      newValues: message?.trim() ? { message: message.trim() } : undefined,
+    });
+    return { message: 'Withdrawal PIN has been reset. The user has been notified.' };
   }
 
   private async getUserRecord(userId: string) {

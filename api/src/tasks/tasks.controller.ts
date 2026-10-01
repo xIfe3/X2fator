@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 
@@ -45,6 +46,19 @@ export class TasksController {
   @RequirePermission('tasks.review')
   async getPendingCompletions() {
     return this.tasksService.getPendingCompletions();
+  }
+
+  /**
+   * Admin: list task completions by status (pending, approved, rejected,
+   * or all). Defaults to pending.
+   */
+  @Get('admin/completions')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('tasks.review')
+  async getCompletions(@Query('status') status?: string) {
+    const allowed = ['pending', 'approved', 'rejected', 'all'] as const;
+    const parsed = allowed.find((s) => s === status) ?? 'pending';
+    return this.tasksService.getCompletions(parsed);
   }
 
   @Get('my/today')

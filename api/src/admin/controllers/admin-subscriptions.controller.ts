@@ -1,11 +1,21 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 
 import { AdminSubscriptionsService } from '../services/admin-subscriptions.service';
 
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/required-permission.decorator';
 
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
+
+import type { AuthenticatedUser } from '../../common/types/authenticated-request';
 
 @Controller('admin/subscriptions')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -45,5 +55,23 @@ export class AdminSubscriptionsController {
   @Get(':id')
   async getOne(@Param('id') id: string) {
     return this.adminSubscriptionsService.getOne(id);
+  }
+
+  @Patch(':id/cancel')
+  @RequirePermission('subscriptions.manage')
+  async cancel(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    return this.adminSubscriptionsService.cancel(admin.id, id);
+  }
+
+  @Patch(':id/reactivate')
+  @RequirePermission('subscriptions.manage')
+  async reactivate(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    return this.adminSubscriptionsService.reactivate(admin.id, id);
   }
 }

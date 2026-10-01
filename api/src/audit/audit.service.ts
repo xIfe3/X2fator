@@ -31,6 +31,7 @@ export interface AuditLogParams {
     | 'withdrawal'
     | 'wallet'
     | 'plan'
+    | 'subscription'
     | 'task'
     | 'system';
 

@@ -28,12 +28,16 @@ export const withdrawalsApi = {
   list: () => api.get<Withdrawal[]>("/withdrawals"),
   get: (id: string) => api.get<Withdrawal>(`/withdrawals/${id}`),
   settings: () => api.get<WithdrawalSettings>("/withdrawals/settings"),
+  taskMinimum: () =>
+    api.get<{ minimum: string }>("/withdrawals/task-minimum"),
   banks: () => api.get<FlutterwaveBank[]>("/withdrawals/banks"),
   verifyAccount: (dto: { accountNumber: string; bankCode: string }) =>
     api.post<{ accountName: string }>("/withdrawals/verify-account", dto),
   pinStatus: () => api.get<{ isSet: boolean }>("/withdrawals/pin/status"),
   setPin: (pin: string) =>
     api.post<{ message: string }>("/withdrawals/pin", { pin }),
+  resetPin: (payload: { password: string; newPin: string }) =>
+    api.post<{ message: string }>("/withdrawals/pin/reset", payload),
   listAccounts: () => api.get<SavedBankAccount[]>("/withdrawals/accounts"),
   addAccount: (dto: {
     accountNumber: string;

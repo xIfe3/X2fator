@@ -1,7 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { and, count, desc, eq, gte, lte, sql } from 'drizzle-orm';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { and, count, desc, eq, gte, lte, ne, sql } from 'drizzle-orm';
 
 import { db, planSubscriptions, plans, users } from '../../database';
+
+import { AuditService } from '../../audit/audit.service';
 
 export interface SubscriptionFilters {
   status?: 'pending' | 'active' | 'completed' | 'cancelled' | 'expired';
@@ -15,6 +21,8 @@ export interface SubscriptionFilters {
 
 @Injectable()
 export class AdminSubscriptionsService {
+  constructor(private readonly auditService: AuditService) {}
+
   /**
    * Investment/plan overview for the admin dashboard: subscription
    * counts by status, and total capital currently deployed in active
@@ -155,5 +163,83 @@ export class AdminSubscriptionsService {
     }
 
     return row[0];
+  }
+
+  /**
+   * Admin cancel of an active subscription. No refund is issued — use a
+   * manual wallet adjustment for that if one is owed.
+   */
+  async cancel(adminId: string, id: string) {
+    const subscription = await this.getOne(id);
+
+    if (subscription.status !== 'active') {
+      throw new BadRequestException('Only an active subscription can be cancelled');
+    }
+
+    await db
+      .update(planSubscriptions)
+      .set({ status: 'cancelled', updatedAt: new Date() })
+      .where(eq(planSubscriptions.id, id));
+
+    await this.auditService.log({
+      actorId: adminId,
+      action: 'update',
+      entityType: 'subscription',
+      entityId: id,
+      description: `Cancelled ${subscription.planName} subscription for ${subscription.userEmail}`,
+      oldValues: { status: subscription.status },
+      newValues: { status: 'cancelled' },
+    });
+
+    return this.getOne(id);
+  }
+
+  /**
+   * Restores a cancelled or expired subscription to active — e.g. a user
+   * who cancelled by mistake. A user may only hold one active plan, so
+   * this is refused while they have another active subscription.
+   */
+  async reactivate(adminId: string, id: string) {
+    const subscription = await this.getOne(id);
+
+    if (subscription.status !== 'cancelled' && subscription.status !== 'expired') {
+      throw new BadRequestException(
+        'Only a cancelled or expired subscription can be reactivated',
+      );
+    }
+
+    return db.transaction(async (tx) => {
+      const otherActive = await tx.query.planSubscriptions.findFirst({
+        where: and(
+          eq(planSubscriptions.userId, subscription.userId),
+          eq(planSubscriptions.status, 'active'),
+          ne(planSubscriptions.id, id),
+        ),
+      });
+
+      if (otherActive) {
+        throw new BadRequestException(
+          'This user already has an active subscription. Cancel it first.',
+        );
+      }
+
+      await tx
+        .update(planSubscriptions)
+        .set({ status: 'active', updatedAt: new Date() })
+        .where(eq(planSubscriptions.id, id));
+
+      await this.auditService.log({
+        actorId: adminId,
+        action: 'activate',
+        entityType: 'subscription',
+        entityId: id,
+        description: `Reactivated ${subscription.planName} subscription for ${subscription.userEmail}`,
+        oldValues: { status: subscription.status },
+        newValues: { status: 'active' },
+        tx,
+      });
+
+      return { ...subscription, status: 'active' as const, updatedAt: new Date() };
+    });
   }
 }

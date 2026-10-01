@@ -248,82 +248,98 @@ export default function AdminWithdrawalsPage() {
                 />
               </div>
 
-              <form
-                onSubmit={saveSettings}
-                className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-end"
-              >
-                <Input
-                label="Referral wallet minimum withdrawal (NGN)"
-                type="number"
-                min={0}
-                step="0.01"
-                required
-                value={settingsForm.referralMinimumWithdrawal}
-                onChange={(e) =>
-                  setSettingsForm((f) => ({
-                    ...f,
-                    referralMinimumWithdrawal: e.target.value,
-                  }))
-                }
-              />
-              <Input
-                label="Task wallet withdrawal day (1-28)"
-                type="number"
-                min={1}
-                max={28}
-                required
-                value={settingsForm.taskWithdrawalDay}
-                onChange={(e) =>
-                  setSettingsForm((f) => ({
-                    ...f,
-                    taskWithdrawalDay: e.target.value,
-                  }))
-                }
-              />
-              <Input
-                label="Withdrawal fee, flat (NGN)"
-                type="number"
-                min={0}
-                step="0.01"
-                required
-                value={settingsForm.withdrawalFeeFlat}
-                onChange={(e) =>
-                  setSettingsForm((f) => ({
-                    ...f,
-                    withdrawalFeeFlat: e.target.value,
-                  }))
-                }
-              />
-              <Input
-                label="Withdrawal fee, percent (%)"
-                type="number"
-                min={0}
-                max={99}
-                step="0.01"
-                required
-                value={settingsForm.withdrawalFeePercent}
-                onChange={(e) =>
-                  setSettingsForm((f) => ({
-                    ...f,
-                    withdrawalFeePercent: e.target.value,
-                  }))
-                }
-              />
-              <div className="sm:col-span-2">
-                <p className="mb-3 text-xs text-ink-dim">
-                  The withdrawal fee is flat + percent of the amount, and is
-                  deducted from what the user receives. It covers the
-                  Flutterwave transfer fee charged on each payout.
-                </p>
-                <p className="mb-3 text-xs text-ink-dim">
-                  Referral wallet withdrawals are allowed anytime, subject to
-                  the minimum above. Task wallet withdrawals only open once a
-                  month, on the day set above.
-                </p>
+              <form onSubmit={saveSettings} className="space-y-4">
+                <fieldset className="rounded-xl border border-base-border p-4">
+                  <legend className="px-1 text-sm font-semibold text-ink">
+                    Referral wallet
+                  </legend>
+                  <p className="mb-3 text-xs text-ink-dim">
+                    Withdrawable anytime, as long as the amount meets the minimum.
+                  </p>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <Input
+                      label="Minimum withdrawal (NGN)"
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      required
+                      value={settingsForm.referralMinimumWithdrawal}
+                      onChange={(e) =>
+                        setSettingsForm((f) => ({
+                          ...f,
+                          referralMinimumWithdrawal: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </fieldset>
+                <fieldset className="rounded-xl border border-base-border p-4">
+                  <legend className="px-1 text-sm font-semibold text-ink">
+                    Task wallet
+                  </legend>
+                  <p className="mb-3 text-xs text-ink-dim">
+                    Withdrawals open once a month on the set day. The minimum
+                    amount is set per plan, under Plans.
+                  </p>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <Input
+                      label="Withdrawal day of the month (1-28)"
+                      type="number"
+                      min={1}
+                      max={28}
+                      required
+                      value={settingsForm.taskWithdrawalDay}
+                      onChange={(e) =>
+                        setSettingsForm((f) => ({
+                          ...f,
+                          taskWithdrawalDay: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </fieldset>
+                <fieldset className="rounded-xl border border-base-border p-4">
+                  <legend className="px-1 text-sm font-semibold text-ink">
+                    Withdrawal fee
+                  </legend>
+                  <p className="mb-3 text-xs text-ink-dim">
+                    Flat + percent of the amount, deducted from what the user receives. Covers the Flutterwave transfer fee charged on each payout.
+                  </p>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <Input
+                      label="Flat fee (NGN)"
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      required
+                      value={settingsForm.withdrawalFeeFlat}
+                      onChange={(e) =>
+                        setSettingsForm((f) => ({
+                          ...f,
+                          withdrawalFeeFlat: e.target.value,
+                        }))
+                      }
+                    />
+                    <Input
+                      label="Percent fee (%)"
+                      type="number"
+                      min={0}
+                      max={99}
+                      step="0.01"
+                      required
+                      value={settingsForm.withdrawalFeePercent}
+                      onChange={(e) =>
+                        setSettingsForm((f) => ({
+                          ...f,
+                          withdrawalFeePercent: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </fieldset>
                 <Button type="submit" isLoading={settingsSubmitting}>
                   Save rules
                 </Button>
-              </div>
               </form>
             </div>
           )}

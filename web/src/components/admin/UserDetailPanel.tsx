@@ -5,6 +5,7 @@ import {
   Ban,
   Check,
   Copy,
+  KeyRound,
   PauseCircle,
   Pencil,
   PlayCircle,
@@ -40,6 +41,7 @@ interface UserDetailPanelProps {
   };
   onEdit: (user: AdminUser) => void;
   onAdjustWallet: (user: AdminUser) => void;
+  onResetPin: (user: AdminUser) => void;
   onViewWallet: (user: AdminUser) => void;
   onAction: (user: AdminUser, action: UserAction) => void;
   onOpenUser: (id: string) => void;
@@ -94,6 +96,7 @@ export function UserDetailPanel({
   permissions,
   onEdit,
   onAdjustWallet,
+  onResetPin,
   onViewWallet,
   onAction,
   onOpenUser,
@@ -183,6 +186,11 @@ export function UserDetailPanel({
                 onClick={() => onAdjustWallet(user)}
               >
                 <WalletIcon className="h-3.5 w-3.5" /> Adjust wallet
+              </Button>
+            )}
+            {permissions.canUpdate && user.hasWithdrawalPin && (
+              <Button size="sm" variant="outline" onClick={() => onResetPin(user)}>
+                <KeyRound className="h-3.5 w-3.5" /> Reset PIN
               </Button>
             )}
             {permissions.canActivate && user.status !== "active" && (

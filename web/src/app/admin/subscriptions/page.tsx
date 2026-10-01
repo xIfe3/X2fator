@@ -4,6 +4,10 @@ import { useState } from "react";
 import { Award, TrendingUp, Wallet2 } from "lucide-react";
 import { useApiQuery } from "@/hooks/useApiQuery";
 import { adminApi } from "@/lib/api/admin";
+import { useAuth } from "@/lib/auth-context";
+import { ApiRequestError } from "@/lib/api-client";
+import { Button } from "@/components/ui/Button";
+import { useToast } from "@/components/ui/Toast";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Table, THead, Th, Tr, Td } from "@/components/ui/Table";
 import { Select } from "@/components/ui/Input";
@@ -24,9 +28,18 @@ export default function AdminSubscriptionsPage() {
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<
+    "cancel" | "reactivate" | null
+  >(null);
+  const [acting, setActing] = useState(false);
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission("subscriptions.manage");
+  const { push } = useToast();
 
-  const { data: stats } = useApiQuery(() => adminApi.subscriptions.stats());
-  const { data, isLoading } = useApiQuery(
+  const { data: stats, refetch: refetchStats } = useApiQuery(() =>
+    adminApi.subscriptions.stats(),
+  );
+  const { data, isLoading, refetch: refetchList } = useApiQuery(
     () =>
       adminApi.subscriptions.all({
         status: status || undefined,
@@ -35,10 +48,41 @@ export default function AdminSubscriptionsPage() {
       }),
     [status, page],
   );
-  const { data: selectedSub, isLoading: selectedLoading } = useApiQuery(
+  const {
+    data: selectedSub,
+    isLoading: selectedLoading,
+    refetch: refetchSelected,
+  } = useApiQuery(
     () => (selectedId ? adminApi.subscriptions.get(selectedId) : Promise.resolve(null)),
     [selectedId],
   );
+
+  async function runAction() {
+    if (!selectedId || !confirmAction) return;
+    setActing(true);
+    try {
+      if (confirmAction === "cancel") {
+        await adminApi.subscriptions.cancel(selectedId);
+        push("success", "Subscription cancelled.");
+      } else {
+        await adminApi.subscriptions.reactivate(selectedId);
+        push("success", "Subscription reactivated.");
+      }
+      setConfirmAction(null);
+      refetchSelected();
+      refetchList();
+      refetchStats();
+    } catch (error) {
+      push(
+        "error",
+        error instanceof ApiRequestError
+          ? error.message
+          : "Could not update this subscription.",
+      );
+    } finally {
+      setActing(false);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -177,7 +221,10 @@ export default function AdminSubscriptionsPage() {
 
       <BottomSheet
         open={!!selectedId}
-        onClose={() => setSelectedId(null)}
+        onClose={() => {
+          setSelectedId(null);
+          setConfirmAction(null);
+        }}
         title="Subscription details"
       >
         {selectedLoading ? (
@@ -211,6 +258,58 @@ export default function AdminSubscriptionsPage() {
                 { label: "Updated", value: formatDateTime(selectedSub.updatedAt) },
               ]}
             />
+
+            {canManage &&
+              (selectedSub.status === "active" ||
+                selectedSub.status === "cancelled" ||
+                selectedSub.status === "expired") && (
+                <div className="space-y-3 border-t border-base-border pt-4">
+                  {confirmAction ? (
+                    <>
+                      <p className="text-sm text-ink-dim">
+                        {confirmAction === "cancel"
+                          ? `Cancel ${selectedSub.userEmail}'s ${selectedSub.planName} plan? They stop earning from it right away, and no refund is issued.`
+                          : `Reactivate ${selectedSub.userEmail}'s ${selectedSub.planName} plan? They start earning from it again right away.`}
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => setConfirmAction(null)}
+                          disabled={acting}
+                        >
+                          Back
+                        </Button>
+                        <Button
+                          variant={confirmAction === "cancel" ? "danger" : "primary"}
+                          className="flex-1"
+                          isLoading={acting}
+                          onClick={runAction}
+                        >
+                          {confirmAction === "cancel"
+                            ? "Yes, cancel"
+                            : "Yes, reactivate"}
+                        </Button>
+                      </div>
+                    </>
+                  ) : selectedSub.status === "active" ? (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => setConfirmAction("cancel")}
+                    >
+                      Cancel subscription
+                    </Button>
+                  ) : (
+                    <Button
+                      className="w-full"
+                      onClick={() => setConfirmAction("reactivate")}
+                    >
+                      Reactivate subscription
+                    </Button>
+                  )}
+                </div>
+              )}
           </div>
         ) : null}
       </BottomSheet>

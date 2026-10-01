@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   ChevronRight,
   CircleHelp,
+  KeyRound,
   Landmark,
   Lock,
   Plus,
@@ -67,6 +68,7 @@ export default function WithdrawalsPage() {
     refetch,
   } = useApiQuery(() => withdrawalsApi.list());
   const { data: settings } = useApiQuery(() => withdrawalsApi.settings());
+  const { data: taskMinimum } = useApiQuery(() => withdrawalsApi.taskMinimum());
   const { data: balance, refetch: refetchBalance } = useApiQuery(() =>
     walletApi.getBalance(),
   );
@@ -87,6 +89,7 @@ export default function WithdrawalsPage() {
 
   const [open, setOpen] = useState(false);
   const [pinModalOpen, setPinModalOpen] = useState(false);
+  const [resetPinOpen, setResetPinOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
   const [walletType, setWalletType] = useState<WalletType>("referral");
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(
@@ -182,7 +185,12 @@ export default function WithdrawalsPage() {
             Move earnings out to your bank account.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          {pinStatus?.isSet && (
+            <Button variant="outline" onClick={() => setResetPinOpen(true)}>
+              <KeyRound className="h-4 w-4" /> Reset PIN
+            </Button>
+          )}
           <Button variant="outline" onClick={() => setManageOpen(true)}>
             <Settings2 className="h-4 w-4" /> Manage accounts
           </Button>
@@ -233,7 +241,13 @@ export default function WithdrawalsPage() {
                   <span className="font-medium text-ink">
                     {settings ? ordinal(settings.taskWithdrawalDay) : "…"}
                   </span>{" "}
-                  of every month.
+                  of every month. The minimum withdrawal is{" "}
+                  <span className="font-medium text-ink">
+                    {taskMinimum
+                      ? formatMoney(taskMinimum.minimum)
+                      : "…"}
+                  </span>
+                  .
                   {settings && (
                     <>
                       {" "}
@@ -282,7 +296,7 @@ export default function WithdrawalsPage() {
                     ? "…"
                     : type === "referral"
                       ? `Withdraw anytime · min ${formatMoney(settings.referralMinimumWithdrawal)}`
-                      : `Opens on the ${ordinal(settings.taskWithdrawalDay)} of each month`}
+                      : `Opens on the ${ordinal(settings.taskWithdrawalDay)} of each month${taskMinimum ? ` · min ${formatMoney(taskMinimum.minimum)}` : ""}`}
                 </p>
               </div>
             ))}
@@ -359,6 +373,24 @@ export default function WithdrawalsPage() {
         />
       </Modal>
 
+      {/* Reset withdrawal PIN */}
+      <Modal
+        open={resetPinOpen}
+        onClose={() => setResetPinOpen(false)}
+        title="Reset your withdrawal PIN"
+      >
+        <ResetPinForm
+          onDone={() => {
+            setResetPinOpen(false);
+            refetchPinStatus();
+            push(
+              "success",
+              "Withdrawal PIN changed. We've sent a confirmation to your email.",
+            );
+          }}
+        />
+      </Modal>
+
       {/* Manage saved accounts */}
       <Modal
         open={manageOpen}
@@ -426,7 +458,8 @@ export default function WithdrawalsPage() {
             <p className="text-xs text-ink-faint">
               Task wallet withdrawals only open on the{" "}
               {settings ? ordinal(settings.taskWithdrawalDay) : "…"} of each
-              month.
+              month. Minimum:{" "}
+              {taskMinimum ? formatMoney(taskMinimum.minimum) : "…"}.
             </p>
           )}
 
@@ -535,6 +568,16 @@ export default function WithdrawalsPage() {
             }
             rightElement={<Lock className="h-4 w-4 text-ink-faint" />}
           />
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              setResetPinOpen(true);
+            }}
+            className="-mt-2 text-xs font-medium text-primary hover:underline"
+          >
+            Forgot PIN?
+          </button>
 
           {error && <p className="text-sm text-danger">{error}</p>}
 
@@ -668,6 +711,84 @@ function SetPinForm({ onDone }: { onDone: () => void }) {
         disabled={pin.length !== 4 || confirmPin.length !== 4}
       >
         Set PIN
+      </Button>
+    </form>
+  );
+}
+
+function ResetPinForm({ onDone }: { onDone: () => void }) {
+  const [password, setPassword] = useState("");
+  const [pin, setPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (pin.length !== 4) {
+      setError("PIN must be exactly 4 digits.");
+      return;
+    }
+    if (pin !== confirmPin) {
+      setError("PINs do not match.");
+      return;
+    }
+    setError(null);
+    setSubmitting(true);
+    try {
+      await withdrawalsApi.resetPin({ password, newPin: pin });
+      onDone();
+    } catch (err) {
+      setError(
+        err instanceof ApiRequestError ? err.message : "Could not reset PIN.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-4">
+      <p className="text-sm text-ink-dim">
+        Enter your account password to choose a new withdrawal PIN. We'll email
+        you to confirm the change.
+      </p>
+      <Input
+        label="Account password"
+        type="password"
+        autoComplete="current-password"
+        required
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+      />
+      <Input
+        label="New 4-digit PIN"
+        type="password"
+        inputMode="numeric"
+        required
+        maxLength={4}
+        value={pin}
+        onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+      />
+      <Input
+        label="Confirm new PIN"
+        type="password"
+        inputMode="numeric"
+        required
+        maxLength={4}
+        value={confirmPin}
+        onChange={(e) =>
+          setConfirmPin(e.target.value.replace(/\D/g, "").slice(0, 4))
+        }
+      />
+      {error && <p className="text-sm text-danger">{error}</p>}
+      <Button
+        type="submit"
+        className="w-full"
+        isLoading={submitting}
+        disabled={!password || pin.length !== 4 || confirmPin.length !== 4}
+      >
+        Change PIN
       </Button>
     </form>
   );

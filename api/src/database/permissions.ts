@@ -70,6 +70,10 @@ export const PERMISSIONS: { name: string; description: string }[] = [
     description: "View plan subscriptions (investments) across all users",
   },
   {
+    name: "subscriptions.manage",
+    description: "Cancel or reactivate a user's plan subscription",
+  },
+  {
     name: "payments.read",
     description:
       "View payment gateway transactions, webhook activity, and configuration status",
