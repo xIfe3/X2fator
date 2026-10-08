@@ -58,6 +58,9 @@ export default function AdminTaskSubmissionsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
   const [bulkApproving, setBulkApproving] = useState(false);
+  const [bulkRejectOpen, setBulkRejectOpen] = useState(false);
+  const [bulkNote, setBulkNote] = useState("");
+  const [bulkRejecting, setBulkRejecting] = useState(false);
 
   // Tasks that appear in the loaded submissions, for the task dropdown.
   const taskOptions = useMemo(() => {
@@ -226,6 +229,35 @@ export default function AdminTaskSubmissionsPage() {
     refetch();
   }
 
+  async function confirmBulkReject() {
+    if (selected.size === 0) return;
+    setBulkRejecting(true);
+    // Same one-at-a-time approach as bulk approve, so one failure
+    // doesn't stop the rest.
+    const reason = bulkNote.trim() || undefined;
+    let rejected = 0;
+    let failed = 0;
+    for (const id of selected) {
+      try {
+        await adminApi.tasks.rejectCompletion(id, reason);
+        rejected++;
+      } catch {
+        failed++;
+      }
+    }
+    if (rejected > 0) {
+      push("success", `Rejected ${rejected} submission${rejected === 1 ? "" : "s"}.`);
+    }
+    if (failed > 0) {
+      push("error", `${failed} submission${failed === 1 ? "" : "s"} couldn't be rejected.`);
+    }
+    setSelected(new Set());
+    setBulkNote("");
+    setBulkRejectOpen(false);
+    setBulkRejecting(false);
+    refetch();
+  }
+
   const statusLabel = statusFilter === "all" ? "" : `${statusFilter} `;
 
   return (
@@ -336,13 +368,23 @@ export default function AdminTaskSubmissionsPage() {
       </Card>
 
       {selected.size > 0 && (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-primary-dim/40 bg-primary-soft px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary-dim/40 bg-primary-soft px-4 py-3">
           <p className="text-sm font-medium text-primary">
             {selected.size} submission{selected.size === 1 ? "" : "s"} selected
           </p>
           <div className="flex gap-2">
             <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
               Clear
+            </Button>
+            <Button
+              size="sm"
+              variant="danger"
+              onClick={() => {
+                setBulkNote("");
+                setBulkRejectOpen(true);
+              }}
+            >
+              <ThumbsDown className="h-3.5 w-3.5" /> Reject selected
             </Button>
             <Button size="sm" onClick={() => setBulkConfirmOpen(true)}>
               <ThumbsUp className="h-3.5 w-3.5" /> Approve selected
@@ -474,6 +516,28 @@ export default function AdminTaskSubmissionsPage() {
           <Textarea label="Note (optional)" rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Why is this being rejected?" />
           <Button variant="danger" className="w-full" isLoading={busyId === rejecting?.id} onClick={confirmReject}>
             Confirm reject
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal open={bulkRejectOpen} onClose={() => setBulkRejectOpen(false)} title="Reject selected submissions">
+        <div className="space-y-4">
+          <p className="text-sm text-ink-dim">
+            Reject{" "}
+            <span className="font-medium text-ink">
+              {selected.size} submission{selected.size === 1 ? "" : "s"}
+            </span>
+            ? No rewards will be credited. This can't be undone.
+          </p>
+          <Textarea
+            label="Note (optional, sent with every rejection)"
+            rows={3}
+            value={bulkNote}
+            onChange={(e) => setBulkNote(e.target.value)}
+            placeholder="Why are these being rejected?"
+          />
+          <Button variant="danger" className="w-full" isLoading={bulkRejecting} onClick={confirmBulkReject}>
+            Reject selected
           </Button>
         </div>
       </Modal>
