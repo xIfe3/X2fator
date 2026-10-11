@@ -355,6 +355,94 @@ export class TasksService {
   }
 
   /**
+   * Admin: recycle a task — copy it into a brand-new active task with a
+   * clean slate, so every user (including those who already did the
+   * original) can complete it again. The original row and its
+   * completion history are left untouched, apart from being set to
+   * inactive so users don't see two copies of the same task. Ad-generated
+   * tasks belong to a paid campaign and can't be recycled.
+   */
+  async recycleTask(adminId: string, taskId: string) {
+    const existing = await db.query.tasks.findFirst({
+      where: eq(tasks.id, taskId),
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Task not found');
+    }
+
+    if (existing.adId) {
+      throw new BadRequestException(
+        'Ad campaign tasks cannot be recycled',
+      );
+    }
+
+    const recycled = await db.transaction(async (tx) => {
+      const [task] = await tx
+        .insert(tasks)
+        .values({
+          title: existing.title,
+          description: existing.description,
+          reward: existing.reward,
+          durationSeconds: existing.durationSeconds,
+          taskType: existing.taskType,
+          targetUrl: existing.targetUrl,
+          status: 'active',
+        })
+        .returning();
+
+      await tx
+        .update(tasks)
+        .set({ status: 'inactive', updatedAt: new Date() })
+        .where(eq(tasks.id, taskId));
+
+      await this.auditService.log({
+        actorId: adminId,
+        action: 'create',
+        entityType: 'task',
+        entityId: task.id,
+        description: `Recycled task "${existing.title}"`,
+        oldValues: { recycledFromTaskId: taskId },
+        newValues: { ...task },
+        tx,
+      });
+
+      return task;
+    });
+
+    return recycled;
+  }
+
+  /**
+   * Admin: recycle several tasks at once. Best-effort like
+   * bulkDeleteTasks — each id goes through recycleTask independently and
+   * the result reports which were recycled (with the new task id) and
+   * which were skipped.
+   */
+  async bulkRecycleTasks(adminId: string, taskIds: string[]) {
+    const recycled: { id: string; newTaskId: string }[] = [];
+    const skipped: { id: string; reason: string }[] = [];
+
+    for (const taskId of taskIds) {
+      try {
+        const task = await this.recycleTask(adminId, taskId);
+        recycled.push({ id: taskId, newTaskId: task.id });
+      } catch (err) {
+        skipped.push({
+          id: taskId,
+          reason:
+            err instanceof BadRequestException ||
+            err instanceof NotFoundException
+              ? err.message
+              : 'Could not recycle this task',
+        });
+      }
+    }
+
+    return { recycled, skipped };
+  }
+
+  /**
    * Submit a task completion. Screenshot proof is required — this is
    * always a URL to an uploaded image (see UploadsModule), never a link
    * the user just types in, so admin review has something to actually

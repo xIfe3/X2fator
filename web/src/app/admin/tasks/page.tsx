@@ -1,8 +1,8 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
-import { ClipboardList, ImageIcon, Pencil, Plus, Trash2 } from "lucide-react";
+import { ClipboardList, ImageIcon, Lightbulb, Pencil, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import { useApiQuery } from "@/hooks/useApiQuery";
 import { useAuth } from "@/lib/auth-context";
 import { adminApi } from "@/lib/api/admin";
@@ -19,6 +19,7 @@ import { PageSkeleton } from "@/components/ui/Skeleton";
 import { ApiRequestError } from "@/lib/api-client";
 import { useToast } from "@/components/ui/Toast";
 import { Money } from "@/components/ui/Money";
+import { Badge } from "@/components/ui/Badge";
 
 interface TaskFormState {
   title: string;
@@ -40,6 +41,10 @@ const emptyForm: TaskFormState = {
   targetUrl: "",
 };
 
+// Per-admin flag: once an admin dismisses the recycle tip it stays hidden
+// for their account on this browser.
+const RECYCLE_TIP_KEY = "2xf_recycle_tip_dismissed";
+
 function formatDuration(seconds?: number) {
   if (!seconds) return "—";
   if (seconds < 60) return `${seconds}s`;
@@ -47,7 +52,7 @@ function formatDuration(seconds?: number) {
 }
 
 export default function AdminTasksPage() {
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
   const canReview = hasPermission("tasks.review");
   const { data: tasks, isLoading, refetch } = useApiQuery(() => adminApi.tasks.all());
   const { push } = useToast();
@@ -62,6 +67,32 @@ export default function AdminTasksPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [recycleTarget, setRecycleTarget] = useState<Task | null>(null);
+  const [recycling, setRecycling] = useState(false);
+  const [bulkRecycleOpen, setBulkRecycleOpen] = useState(false);
+  const [bulkRecycling, setBulkRecycling] = useState(false);
+  const [showRecycleTip, setShowRecycleTip] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    try {
+      setShowRecycleTip(
+        window.localStorage.getItem(`${RECYCLE_TIP_KEY}:${user.id}`) !== "1",
+      );
+    } catch {
+      setShowRecycleTip(true);
+    }
+  }, [user]);
+
+  function dismissRecycleTip() {
+    setShowRecycleTip(false);
+    if (!user) return;
+    try {
+      window.localStorage.setItem(`${RECYCLE_TIP_KEY}:${user.id}`, "1");
+    } catch {
+      // Storage unavailable — the tip just reappears next visit.
+    }
+  }
 
   function openCreate() {
     setEditing(null);
@@ -150,6 +181,48 @@ export default function AdminTasksPage() {
     }
   }
 
+  async function confirmRecycle() {
+    if (!recycleTarget) return;
+    setRecycling(true);
+    try {
+      await adminApi.tasks.recycle(recycleTarget.id);
+      push("success", "Task recycled — a fresh copy is now live for all users.");
+      setRecycleTarget(null);
+      refetch();
+    } catch (err) {
+      push("error", err instanceof ApiRequestError ? err.message : "Could not recycle this task.");
+    } finally {
+      setRecycling(false);
+    }
+  }
+
+  async function confirmBulkRecycle() {
+    if (selected.size === 0) return;
+    setBulkRecycling(true);
+    try {
+      const { recycled, skipped } = await adminApi.tasks.bulkRecycle([...selected]);
+      if (recycled.length > 0) {
+        push(
+          "success",
+          `Recycled ${recycled.length} task${recycled.length === 1 ? "" : "s"}.`,
+        );
+      }
+      if (skipped.length > 0) {
+        push(
+          "error",
+          `${skipped.length} task${skipped.length === 1 ? "" : "s"} couldn't be recycled (ad campaign tasks can't be recycled).`,
+        );
+      }
+      setSelected(new Set());
+      setBulkRecycleOpen(false);
+      refetch();
+    } catch (err) {
+      push("error", err instanceof ApiRequestError ? err.message : "Could not recycle these tasks.");
+    } finally {
+      setBulkRecycling(false);
+    }
+  }
+
   function toggleSelected(id: string) {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -217,6 +290,33 @@ export default function AdminTasksPage() {
         </div>
       </div>
 
+      {showRecycleTip && (
+        <div className="flex items-start gap-3 rounded-xl border border-info/30 bg-info-soft px-4 py-3">
+          <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-info" />
+          <div className="flex-1 text-sm text-ink">
+            <p className="font-medium">Tip: recycle tasks instead of recreating them</p>
+            <p className="mt-1 text-ink-dim">
+              <RefreshCw className="inline h-3.5 w-3.5" /> <strong>Recycle</strong> creates a fresh copy of a task that
+              every user can complete again. The <strong>original task is disabled</strong> (set to inactive) but keeps
+              its submission history. <strong>Ad campaign tasks can&apos;t be recycled.</strong>
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            <Button size="sm" variant="ghost" onClick={dismissRecycleTip}>
+              Got it
+            </Button>
+            <button
+              type="button"
+              onClick={dismissRecycleTip}
+              aria-label="Dismiss tip"
+              className="rounded-lg p-1 text-ink-faint hover:text-ink"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {selected.size > 0 && (
         <div className="flex items-center justify-between gap-3 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3">
           <p className="text-sm font-medium text-danger">
@@ -225,6 +325,9 @@ export default function AdminTasksPage() {
           <div className="flex gap-2">
             <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
               Clear
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => setBulkRecycleOpen(true)}>
+              <RefreshCw className="h-3.5 w-3.5" /> Recycle selected
             </Button>
             <Button
               size="sm"
@@ -288,6 +391,11 @@ export default function AdminTasksPage() {
                     <Td>
                       <p className="font-medium text-ink">{t.title}</p>
                       {t.description && <p className="mt-0.5 text-xs text-ink-faint">{t.description}</p>}
+                      {t.adId && (
+                        <Badge tone="info" className="mt-1">
+                          Ad campaign · can&apos;t be recycled
+                        </Badge>
+                      )}
                     </Td>
                     <Td className="text-right"><Money value={t.reward} size="sm" /></Td>
                     <Td className="text-right text-ink-dim">{formatDuration(t.durationSeconds)}</Td>
@@ -299,6 +407,16 @@ export default function AdminTasksPage() {
                         <Button size="sm" variant="secondary" onClick={() => openEdit(t)}>
                           <Pencil className="h-3.5 w-3.5" /> Edit
                         </Button>
+                        <span title={t.adId ? "Ad campaign tasks can't be recycled" : undefined}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={!!t.adId}
+                            onClick={() => setRecycleTarget(t)}
+                          >
+                            <RefreshCw className="h-3.5 w-3.5" /> Recycle
+                          </Button>
+                        </span>
                         <Button size="sm" variant="outline" onClick={() => toggleStatus(t)}>
                           {t.status === "active" ? "Deactivate" : "Activate"}
                         </Button>
@@ -408,6 +526,26 @@ export default function AdminTasksPage() {
         confirmLabel="Delete selected"
         variant="danger"
         isLoading={bulkDeleting}
+      />
+
+      <ConfirmDialog
+        open={!!recycleTarget}
+        onClose={() => setRecycleTarget(null)}
+        onConfirm={confirmRecycle}
+        title="Recycle task"
+        description={`Create a fresh copy of "${recycleTarget?.title ?? ""}" that every user can complete again — including those who already did it? Heads up: the original task will be disabled (set to inactive). Its submission history is kept.`}
+        confirmLabel="Recycle task"
+        isLoading={recycling}
+      />
+
+      <ConfirmDialog
+        open={bulkRecycleOpen}
+        onClose={() => setBulkRecycleOpen(false)}
+        onConfirm={confirmBulkRecycle}
+        title="Recycle selected tasks"
+        description={`Create fresh copies of ${selected.size} task${selected.size === 1 ? "" : "s"} that every user can complete again? Heads up: the originals will be disabled (set to inactive) — their submission history is kept. Ad campaign tasks can't be recycled and will be skipped.`}
+        confirmLabel="Recycle selected"
+        isLoading={bulkRecycling}
       />
     </div>
   );

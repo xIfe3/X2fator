@@ -327,6 +327,7 @@ export interface Task {
   taskType?: TaskType;
   targetUrl?: string;
   createdAt?: string;
+  adId?: string | null;
   source?: "admin" | "ad";
 }
 export interface TaskCompletion {

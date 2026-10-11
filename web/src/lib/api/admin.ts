@@ -411,6 +411,12 @@ export const adminApi = {
         `/tasks/bulk-delete`,
         { taskIds },
       ),
+    recycle: (id: string) => api.post<Task>(`/tasks/${id}/recycle`, {}),
+    bulkRecycle: (taskIds: string[]) =>
+      api.post<{
+        recycled: { id: string; newTaskId: string }[];
+        skipped: { id: string; reason: string }[];
+      }>(`/tasks/bulk-recycle`, { taskIds }),
   },
   siteContent: {
     update: (section: string, content: Record<string, unknown>) =>

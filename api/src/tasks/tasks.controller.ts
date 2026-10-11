@@ -169,6 +169,33 @@ export class TasksController {
   }
 
   /**
+   * Admin: recycle several tasks at once (see TasksService.recycleTask).
+   */
+  @Post('bulk-recycle')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('tasks.manage')
+  async bulkRecycleTasks(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Body() body: { taskIds: string[] },
+  ) {
+    return this.tasksService.bulkRecycleTasks(admin.id, body.taskIds ?? []);
+  }
+
+  /**
+   * Admin: recycle a task — copies it into a new active task that every
+   * user can complete again, and deactivates the original.
+   */
+  @Post(':id/recycle')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('tasks.manage')
+  async recycleTask(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    return this.tasksService.recycleTask(admin.id, id);
+  }
+
+  /**
    * Admin: delete a task (only if it has no completion history).
    */
   @Delete(':id')
