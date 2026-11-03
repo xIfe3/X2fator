@@ -1,4 +1,4 @@
-import { IsBoolean, IsInt, IsNumberString, IsOptional, Max, Min } from 'class-validator';
+import { IsBoolean, IsDateString, IsInt, IsNumberString, IsOptional, Max, Min } from 'class-validator';
 
 export class UpdateWithdrawalSettingsDto {
   @IsOptional()
@@ -22,4 +22,12 @@ export class UpdateWithdrawalSettingsDto {
   @IsOptional()
   @IsNumberString()
   withdrawalFeePercent?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  planRenewalAfterWithdrawalEnabled?: boolean;
+
+  @IsOptional()
+  @IsDateString()
+  planRenewalEffectiveFrom?: string;
 }

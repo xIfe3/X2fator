@@ -34,6 +34,8 @@ export class WithdrawalSettingsService {
     autoPayoutEnabled?: boolean;
     withdrawalFeeFlat?: string;
     withdrawalFeePercent?: string;
+    planRenewalAfterWithdrawalEnabled?: boolean;
+    planRenewalEffectiveFrom?: string;
   }) {
     await this.get();
 
@@ -76,6 +78,16 @@ export class WithdrawalSettingsService {
       }
     }
 
+    let planRenewalEffectiveFrom: Date | undefined;
+    if (params.planRenewalEffectiveFrom !== undefined) {
+      planRenewalEffectiveFrom = new Date(params.planRenewalEffectiveFrom);
+      if (Number.isNaN(planRenewalEffectiveFrom.getTime())) {
+        throw new BadRequestException(
+          'Plan renewal effective date must be a valid date',
+        );
+      }
+    }
+
     const [updated] = await db
       .update(withdrawalSettings)
       .set({
@@ -96,6 +108,11 @@ export class WithdrawalSettingsService {
         ...(params.withdrawalFeePercent !== undefined && {
           withdrawalFeePercent: Number(params.withdrawalFeePercent).toFixed(2),
         }),
+        ...(params.planRenewalAfterWithdrawalEnabled !== undefined && {
+          planRenewalAfterWithdrawalEnabled:
+            params.planRenewalAfterWithdrawalEnabled,
+        }),
+        ...(planRenewalEffectiveFrom && { planRenewalEffectiveFrom }),
         updatedAt: new Date(),
       })
       .where(eq(withdrawalSettings.id, 1))

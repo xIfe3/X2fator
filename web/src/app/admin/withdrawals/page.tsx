@@ -77,9 +77,12 @@ export default function AdminWithdrawalsPage() {
     autoPayoutEnabled: true,
     withdrawalFeeFlat: "",
     withdrawalFeePercent: "",
+    planRenewalAfterWithdrawalEnabled: false,
+    planRenewalEffectiveDate: "",
   });
   const [settingsSubmitting, setSettingsSubmitting] = useState(false);
   const [autoPayoutSaving, setAutoPayoutSaving] = useState(false);
+  const [planRenewalSaving, setPlanRenewalSaving] = useState(false);
 
   useEffect(() => {
     if (!settings) return;
@@ -89,6 +92,11 @@ export default function AdminWithdrawalsPage() {
       autoPayoutEnabled: settings.autoPayoutEnabled,
       withdrawalFeeFlat: settings.withdrawalFeeFlat,
       withdrawalFeePercent: settings.withdrawalFeePercent,
+      planRenewalAfterWithdrawalEnabled:
+        settings.planRenewalAfterWithdrawalEnabled,
+      planRenewalEffectiveDate: toLagosDateInput(
+        settings.planRenewalEffectiveFrom,
+      ),
     });
   }, [settings]);
 
@@ -101,6 +109,10 @@ export default function AdminWithdrawalsPage() {
         taskWithdrawalDay: Number(settingsForm.taskWithdrawalDay),
         withdrawalFeeFlat: settingsForm.withdrawalFeeFlat,
         withdrawalFeePercent: settingsForm.withdrawalFeePercent,
+        ...(settingsForm.planRenewalEffectiveDate && {
+          // Midnight Nigeria time (WAT, UTC+1) on the chosen day.
+          planRenewalEffectiveFrom: `${settingsForm.planRenewalEffectiveDate}T00:00:00+01:00`,
+        }),
       });
       push("success", "Withdrawal rules updated.");
       refetchSettings();
@@ -138,6 +150,36 @@ export default function AdminWithdrawalsPage() {
       );
     } finally {
       setAutoPayoutSaving(false);
+    }
+  }
+
+  async function togglePlanRenewal(next: boolean) {
+    setSettingsForm((f) => ({ ...f, planRenewalAfterWithdrawalEnabled: next }));
+    setPlanRenewalSaving(true);
+    try {
+      await adminApi.withdrawals.updateSettings({
+        planRenewalAfterWithdrawalEnabled: next,
+      });
+      push(
+        "success",
+        next
+          ? "Plan renewal after withdrawal is now on."
+          : "Plan renewal after withdrawal is now off.",
+      );
+      refetchSettings();
+    } catch (err) {
+      setSettingsForm((f) => ({
+        ...f,
+        planRenewalAfterWithdrawalEnabled: !next,
+      }));
+      push(
+        "error",
+        err instanceof ApiRequestError
+          ? err.message
+          : "Could not update plan renewal rule.",
+      );
+    } finally {
+      setPlanRenewalSaving(false);
     }
   }
 
@@ -248,6 +290,20 @@ export default function AdminWithdrawalsPage() {
                 />
               </div>
 
+              <div className="rounded-xl border border-base-border bg-base-raised p-4">
+                <Switch
+                  checked={settingsForm.planRenewalAfterWithdrawalEnabled}
+                  onChange={togglePlanRenewal}
+                  disabled={planRenewalSaving}
+                  label="Require new plan after task withdrawal"
+                  hint={
+                    settingsForm.planRenewalAfterWithdrawalEnabled
+                      ? `When a task-earnings withdrawal requested on or after ${settingsForm.planRenewalEffectiveDate || "the effective date"} is paid out, the user's plan ends and they must buy a plan (same or higher) to keep earning. Set the date under Task wallet below.`
+                      : "Off — users keep their plan after withdrawing task earnings."
+                  }
+                />
+              </div>
+
               <form onSubmit={saveSettings} className="space-y-4">
                 <fieldset className="rounded-xl border border-base-border p-4">
                   <legend className="px-1 text-sm font-semibold text-ink">
@@ -293,6 +349,19 @@ export default function AdminWithdrawalsPage() {
                         setSettingsForm((f) => ({
                           ...f,
                           taskWithdrawalDay: e.target.value,
+                        }))
+                      }
+                    />
+                    <Input
+                      label="Plan renewal rule starts on"
+                      type="date"
+                      required
+                      hint="Task withdrawals requested from this date (Nigeria time) end the user's plan, if the rule is on."
+                      value={settingsForm.planRenewalEffectiveDate}
+                      onChange={(e) =>
+                        setSettingsForm((f) => ({
+                          ...f,
+                          planRenewalEffectiveDate: e.target.value,
                         }))
                       }
                     />
@@ -629,4 +698,15 @@ export default function AdminWithdrawalsPage() {
       </BottomSheet>
     </div>
   );
+}
+
+/** ISO timestamp -> "YYYY-MM-DD" in Nigeria time, for a date input. */
+function toLagosDateInput(iso: string | null | undefined) {
+  if (!iso) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Lagos",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(iso));
 }

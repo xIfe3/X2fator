@@ -273,6 +273,8 @@ export interface WithdrawalSettings {
   autoPayoutEnabled: boolean;
   withdrawalFeeFlat: string;
   withdrawalFeePercent: string;
+  planRenewalAfterWithdrawalEnabled: boolean;
+  planRenewalEffectiveFrom: string;
   updatedAt: string;
 }
 export interface WithdrawalStats {

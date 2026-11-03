@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { boolean, integer, numeric, pgTable, timestamp } from "drizzle-orm/pg-core";
 
 // Single-row table holding admin-configurable withdrawal rules.
@@ -37,6 +38,22 @@ export const withdrawalSettings = pgTable("withdrawal_settings", {
   })
     .notNull()
     .default("0"),
+
+  // When enabled, a successfully paid-out TASK wallet withdrawal ends the
+  // user's active plan, so they must buy a plan again (same rank or higher)
+  // before they can earn from tasks. Only withdrawals requested on/after
+  // `planRenewalEffectiveFrom` are affected.
+  planRenewalAfterWithdrawalEnabled: boolean(
+    "plan_renewal_after_withdrawal_enabled",
+  )
+    .notNull()
+    .default(false),
+
+  planRenewalEffectiveFrom: timestamp("plan_renewal_effective_from", {
+    withTimezone: true,
+  })
+    .notNull()
+    .default(sql`'2026-12-01 00:00:00+01'::timestamptz`),
 
   updatedAt: timestamp("updated_at", {
     withTimezone: true,

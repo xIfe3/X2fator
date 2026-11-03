@@ -56,9 +56,22 @@ export class SubscriptionsService {
 
       const highestHeldRank = await this.getHighestHeldRank(userId, tx);
 
-      if (plan.rank <= highestHeldRank) {
+      // A plan ended by a task-earnings withdrawal ("plan renewal after
+      // withdrawal" rule) may be reactivated at the same rank — the user
+      // just has to pay for it again. Otherwise purchases are upgrade-only.
+      const canRenewSameRank =
+        !existingSubscription &&
+        (await this.lastPlanEndedByWithdrawal(userId, tx));
+
+      const allowed = canRenewSameRank
+        ? plan.rank >= highestHeldRank
+        : plan.rank > highestHeldRank;
+
+      if (!allowed) {
         throw new BadRequestException(
-          'You can only upgrade to a higher-ranked plan',
+          canRenewSameRank
+            ? 'You can only reactivate your previous plan or a higher-ranked one'
+            : 'You can only upgrade to a higher-ranked plan',
         );
       }
 
@@ -140,6 +153,22 @@ export class SubscriptionsService {
       .where(eq(planSubscriptions.userId, userId));
 
     return rows.reduce((max, row) => Math.max(max, row.rank), 0);
+  }
+
+  /**
+   * Whether the user's most recent subscription was ended by a task
+   * withdrawal (status `completed`, set by the plan-renewal rule).
+   */
+  private async lastPlanEndedByWithdrawal(
+    userId: string,
+    tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  ) {
+    const latest = await tx.query.planSubscriptions.findFirst({
+      where: eq(planSubscriptions.userId, userId),
+      orderBy: [desc(planSubscriptions.createdAt)],
+    });
+
+    return latest?.status === 'completed';
   }
 
   /**

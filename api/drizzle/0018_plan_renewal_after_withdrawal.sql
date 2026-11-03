@@ -1,0 +1,2 @@
+ALTER TABLE "withdrawal_settings" ADD COLUMN "plan_renewal_after_withdrawal_enabled" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "withdrawal_settings" ADD COLUMN "plan_renewal_effective_from" timestamp with time zone DEFAULT '2026-12-01 00:00:00+01'::timestamptz NOT NULL;

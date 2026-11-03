@@ -127,6 +127,13 @@
       "when": 1790273636817,
       "tag": "0017_remove_unpaid_signup_referrals",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793741609723,
+      "tag": "0018_plan_renewal_after_withdrawal",
+      "breakpoints": true
     }
   ]
 }

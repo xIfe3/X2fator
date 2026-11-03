@@ -8,7 +8,7 @@ import {
   Optional,
   UnauthorizedException,
 } from '@nestjs/common';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, lte, sql } from 'drizzle-orm';
 import * as bcrypt from 'bcrypt';
 import { ConfigService } from '@nestjs/config';
 
@@ -709,6 +709,68 @@ export class WithdrawalsService {
   }
 
   /**
+   * "Plan renewal after withdrawal" rule (admin-toggled in withdrawal
+   * settings): once a TASK wallet withdrawal is successfully paid out, the
+   * user's active plan ends and they must buy a plan again (same rank or
+   * higher) before they can earn from tasks.
+   *
+   * Only applies to withdrawals requested on/after the configured effective
+   * date, and only ends a plan that was already running when the withdrawal
+   * was requested — a plan bought while the payout was pending is kept.
+   *
+   * Returns true if a plan was ended.
+   */
+  private async endPlanAfterTaskWithdrawal(
+    withdrawal: { userId: string; walletType: string; createdAt: Date },
+    executor: Pick<typeof db, 'update'>,
+  ): Promise<boolean> {
+    if (withdrawal.walletType !== 'task') {
+      return false;
+    }
+
+    const settings = await this.withdrawalSettingsService.get();
+
+    if (
+      !settings.planRenewalAfterWithdrawalEnabled ||
+      withdrawal.createdAt < settings.planRenewalEffectiveFrom
+    ) {
+      return false;
+    }
+
+    const ended = await executor
+      .update(planSubscriptions)
+      .set({ status: 'completed', updatedAt: new Date() })
+      .where(
+        and(
+          eq(planSubscriptions.userId, withdrawal.userId),
+          eq(planSubscriptions.status, 'active'),
+          lte(planSubscriptions.startsAt, withdrawal.createdAt),
+        ),
+      )
+      .returning({ id: planSubscriptions.id });
+
+    return ended.length > 0;
+  }
+
+  private notifyPlanEndedAfterWithdrawal(userId: string) {
+    this.notificationsService
+      ?.create({
+        userId,
+        title: 'Plan ended — reactivate to keep earning',
+        message:
+          'Your task earnings withdrawal has been paid, so your current plan has ended. Purchase a plan (same or higher) to continue earning from tasks.',
+        type: 'plan',
+        metadata: { reason: 'task_withdrawal' },
+      })
+      .catch((err) =>
+        this.logger.error(
+          `Failed to create plan-ended notification for user ${userId}`,
+          err instanceof Error ? err.stack : err,
+        ),
+      );
+  }
+
+  /**
    * Marks a withdrawal completed once Flutterwave confirms the transfer
    * succeeded — called from the transfer webhook.
    */
@@ -729,11 +791,22 @@ export class WithdrawalsService {
       return withdrawal;
     }
 
-    const [updated] = await db
-      .update(withdrawals)
-      .set({ status: 'completed', processedAt: new Date(), updatedAt: new Date() })
-      .where(eq(withdrawals.id, withdrawalId))
-      .returning();
+    const { updated, planEnded } = await db.transaction(async (tx) => {
+      const [completed] = await tx
+        .update(withdrawals)
+        .set({ status: 'completed', processedAt: new Date(), updatedAt: new Date() })
+        .where(eq(withdrawals.id, withdrawalId))
+        .returning();
+
+      return {
+        updated: completed,
+        planEnded: await this.endPlanAfterTaskWithdrawal(withdrawal, tx),
+      };
+    });
+
+    if (planEnded) {
+      this.notifyPlanEndedAfterWithdrawal(withdrawal.userId);
+    }
 
     const withdrawingUser = await db.query.users.findFirst({
       where: eq(users.id, withdrawal.userId),
@@ -1008,6 +1081,13 @@ export class WithdrawalsService {
         })
         .where(eq(withdrawals.id, withdrawalId))
         .returning();
+
+      if (
+        params.status === 'completed' &&
+        (await this.endPlanAfterTaskWithdrawal(withdrawal, tx))
+      ) {
+        this.notifyPlanEndedAfterWithdrawal(withdrawal.userId);
+      }
 
       if (params.status === 'completed' || params.status === 'rejected') {
         const withdrawingUser = await tx.query.users.findFirst({

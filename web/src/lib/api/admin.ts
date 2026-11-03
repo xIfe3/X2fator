@@ -274,6 +274,8 @@ export const adminApi = {
       autoPayoutEnabled?: boolean;
       withdrawalFeeFlat?: string;
       withdrawalFeePercent?: string;
+      planRenewalAfterWithdrawalEnabled?: boolean;
+      planRenewalEffectiveFrom?: string;
     }) =>
       api.patch<WithdrawalSettings>("/admin/withdrawals/settings", dto),
   },

@@ -47,6 +47,11 @@ export default function PlansPage() {
     0,
   );
 
+  // History is newest-first. A plan ended by a task-earnings withdrawal
+  // (status "completed") can be reactivated at the same rank.
+  const canRenewSameRank =
+    !activeSubscription && history?.[0]?.status === "completed";
+
   async function confirmPurchase() {
     if (!confirming) return;
     setPurchasing(true);
@@ -144,7 +149,9 @@ export default function PlansPage() {
       <div className="grid grid-cols-1 gap-4">
         {plans?.map((plan) => {
           const isCurrent = activeSubscription?.planId === plan.id;
-          const locked = plan.rank <= highestHeldRank && !isCurrent;
+          const isRenewal = canRenewSameRank && plan.rank === highestHeldRank;
+          const locked =
+            plan.rank <= highestHeldRank && !isCurrent && !isRenewal;
 
           return (
             <Card
@@ -211,7 +218,11 @@ export default function PlansPage() {
                       setConfirming(plan);
                     }}
                   >
-                    {activeSubscription ? "Upgrade to this plan" : "Subscribe"}
+                    {isRenewal
+                      ? "Reactivate this plan"
+                      : activeSubscription
+                        ? "Upgrade to this plan"
+                        : "Subscribe"}
                   </Button>
                 )}
               </CardBody>
