@@ -38,5 +38,13 @@ yarn-error.log*
 *.pem
 
 # Runtime-uploaded files (task proof screenshots, etc.)
-apps/api/uploads/
+api/uploads/
 *.tsbuildinfo
+
+# Local logs
+*.log
+
+# Compiled drizzle config (generated)
+api/drizzle.config.js
+api/drizzle.config.js.map
+api/drizzle.config.d.ts
